@@ -25,9 +25,13 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'mod_vrsculpt';
-$plugin->version = 2026102700;
+$plugin->version = 2026102701;
 $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;
 // Moodle 5.2.0 (the v5.2.0 tag's public/version.php: 2026042000.00), as mod_vrroom.
 $plugin->requires = 2026042000;
 $plugin->supported = [502, 503];
+// The 3D studio loads three.js, the WebXR helpers and the presence codec from VR room's built-in run
+// mode (vrroomruntime_builtin, bundled with mod_vrroom). The companion service (vrroomruntime_companion)
+// is optional: group sculptures use it only when it is installed and configured.
+$plugin->dependencies = ['vrroomruntime_builtin' => 2026101100];

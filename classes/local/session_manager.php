@@ -21,7 +21,9 @@ namespace mod_vrsculpt\local;
  *
  * A session belongs to one user (individual mode, groupid 0) or one group (group mode, userid 0).
  * Each saved version is a row in vrsculpt_snapshots and one file in the snapshots file area of the
- * module context, item id = the snapshot id.
+ * module context, item id = the snapshot id. A snapshot file is in the "VRSC" format (version 1): a
+ * 48-byte little-endian header followed by one signed byte per voxel, optionally deflate-compressed;
+ * the header is checked before anything is stored.
  *
  * @package    mod_vrsculpt
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -51,6 +53,39 @@ class session_manager {
 
     /** @var string The file area holding snapshot data. */
     public const FILEAREA = 'snapshots';
+
+    /** @var string Group work with one partner, browser to browser (built in). */
+    public const CONNECTION_PAIR = 'pair';
+
+    /** @var string Group work over the companion service. */
+    public const CONNECTION_COMPANION = 'companion';
+
+    /** @var string[] The connections of group work. */
+    public const CONNECTIONS = [self::CONNECTION_PAIR, self::CONNECTION_COMPANION];
+
+    /** @var int Bytes of a snapshot's header. */
+    public const SNAPSHOT_HEADER_SIZE = 48;
+
+    /** @var int The snapshot format version this plugin reads and writes. */
+    public const SNAPSHOT_VERSION = 1;
+
+    /** @var int Header flag: the payload is deflate-raw compressed. */
+    public const SNAPSHOT_FLAG_DEFLATE = 1;
+
+    /** @var int Smallest grid size on each axis. */
+    public const SNAPSHOT_MIN_DIM = 8;
+
+    /** @var int Largest grid size on each axis. */
+    public const SNAPSHOT_MAX_DIM = 256;
+
+    /** @var float Smallest voxel size, metres. */
+    public const SNAPSHOT_MIN_VOXEL = 0.0005;
+
+    /** @var float Largest voxel size, metres. */
+    public const SNAPSHOT_MAX_VOXEL = 0.05;
+
+    /** @var string[] What a teacher can do to a sculpture on the manage page. */
+    public const MANAGE_ACTIONS = ['close', 'reopen', 'reset'];
 
     /**
      * The groups a user may sculpt in for a group-mode activity: their groups in the activity's grouping.
@@ -134,6 +169,27 @@ class session_manager {
     }
 
     /**
+     * Whether an activity is done in groups (one shared sculpture per group).
+     *
+     * @param \stdClass $vrsculpt the vrsculpt row
+     * @return bool
+     */
+    public static function is_group_work(\stdClass $vrsculpt): bool {
+        return (int)$vrsculpt->workmode === self::MODE_GROUP;
+    }
+
+    /**
+     * The connection of an activity's group work: one of CONNECTIONS, pair when unknown.
+     *
+     * @param \stdClass $vrsculpt the vrsculpt row
+     * @return string
+     */
+    public static function connection(\stdClass $vrsculpt): string {
+        $connection = (string)($vrsculpt->connectmode ?? '');
+        return in_array($connection, self::CONNECTIONS, true) ? $connection : self::CONNECTION_PAIR;
+    }
+
+    /**
      * Load a session of this activity.
      *
      * @param int $sessionid the session id (client-supplied: never trusted on its own)
@@ -205,25 +261,69 @@ class session_manager {
     }
 
     /**
+     * Check a snapshot's header against the "VRSC" format, version 1.
+     *
+     * Header (little-endian): 0 "VRSC"; 4 u16 format version (1); 6 u16 flags (bit 0 = deflate-raw
+     * payload, no other bits); 8, 10, 12 u16 grid size on x, y, z (8..256 each); 14 u16 reserved;
+     * 16 f32 voxel size in metres (0.0005..0.05); 20 f32 band in metres (> 0); 24 u32 the edit sequence
+     * number the data reflects; 28 16 bytes epoch; 44 u32 payload length (file length - 48). An
+     * uncompressed payload holds exactly one byte per voxel.
+     *
+     * @param string $data the snapshot bytes
+     * @return array the header: version, flags, nx, ny, nz, voxel, band, seq, epoch, length
+     * @throws \moodle_exception snapshotinvalid
+     */
+    public static function validate_snapshot(string $data): array {
+        $size = strlen($data);
+        if ($size <= self::SNAPSHOT_HEADER_SIZE || substr($data, 0, 4) !== self::SNAPSHOT_MAGIC) {
+            throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
+        }
+        $header = unpack('vversion/vflags/vnx/vny/vnz/vreserved/gvoxel/gband/Vseq', substr($data, 4, 24));
+        $header['epoch'] = substr($data, 28, 16);
+        $header['length'] = unpack('V', substr($data, 44, 4))[1];
+
+        $valid = $header['version'] === self::SNAPSHOT_VERSION
+            && ($header['flags'] & ~self::SNAPSHOT_FLAG_DEFLATE) === 0
+            && $header['length'] === $size - self::SNAPSHOT_HEADER_SIZE
+            && is_finite($header['voxel'])
+            && $header['voxel'] >= self::SNAPSHOT_MIN_VOXEL - 1e-9
+            && $header['voxel'] <= self::SNAPSHOT_MAX_VOXEL + 1e-9
+            && is_finite($header['band'])
+            && $header['band'] > 0;
+        foreach (['nx', 'ny', 'nz'] as $axis) {
+            $valid = $valid && $header[$axis] >= self::SNAPSHOT_MIN_DIM && $header[$axis] <= self::SNAPSHOT_MAX_DIM;
+        }
+        if ($valid && !($header['flags'] & self::SNAPSHOT_FLAG_DEFLATE)) {
+            $valid = $header['length'] === $header['nx'] * $header['ny'] * $header['nz'];
+        }
+        if (!$valid) {
+            throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
+        }
+        return $header;
+    }
+
+    /**
      * Save a new version of a session's sculpture.
      *
-     * The caller has checked can_sculpt(). The data is checked here: not empty, not over the size
-     * limit, and starting with the format's magic number.
+     * The caller has checked can_sculpt(). The data is checked here: not over the size limit, and a
+     * valid "VRSC" header (validate_snapshot()). The version's operation count is the header's
+     * sequence number: the number of confirmed edits the data reflects.
+     *
+     * Data identical to the latest version (both partners of a pair pressing Save, or an autosave with
+     * nothing new) does not make a new version: the latest one is returned.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
      * @param int $userid who saves it
      * @param string $data the snapshot bytes
-     * @param int $opcount sculpting operations applied since the session started
-     * @return \stdClass the new vrsculpt_snapshots row
+     * @return \stdClass the new vrsculpt_snapshots row, or the latest one when the data is the same
      * @throws \moodle_exception snapshottoolarge or snapshotinvalid
      */
     public static function save_snapshot(
         \stdClass $session,
         \context_module $context,
         int $userid,
-        string $data,
-        int $opcount
+        string $data
     ): \stdClass {
         global $DB;
 
@@ -231,8 +331,14 @@ class session_manager {
         if ($size > self::max_snapshot_size()) {
             throw new \moodle_exception('snapshottoolarge', 'mod_vrsculpt', '', display_size(self::max_snapshot_size()));
         }
-        if ($size <= strlen(self::SNAPSHOT_MAGIC) || !str_starts_with($data, self::SNAPSHOT_MAGIC)) {
-            throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
+        $header = self::validate_snapshot($data);
+
+        $latest = self::get_latest_snapshot((int)$session->id);
+        if ($latest) {
+            $file = self::get_snapshot_file($latest, $context);
+            if ($file && $file->get_contenthash() === \file_storage::hash_from_string($data)) {
+                return $latest;
+            }
         }
 
         $transaction = $DB->start_delegated_transaction();
@@ -245,7 +351,7 @@ class session_manager {
             'sessionid' => $session->id,
             'version' => $version,
             'userid' => $userid,
-            'opcount' => max(0, $opcount),
+            'opcount' => (int)$header['seq'],
             'filesize' => $size,
             'timecreated' => $now,
         ];
@@ -336,7 +442,83 @@ class session_manager {
     }
 
     /**
-     * Delete sessions with their versions and files.
+     * A version of a session by its number.
+     *
+     * @param int $sessionid the session id
+     * @param int $version the version number
+     * @return \stdClass|null the vrsculpt_snapshots row, or null when there is no such version
+     */
+    public static function get_snapshot_by_version(int $sessionid, int $version): ?\stdClass {
+        global $DB;
+        return $DB->get_record('vrsculpt_snapshots', ['sessionid' => $sessionid, 'version' => $version]) ?: null;
+    }
+
+    /**
+     * Close or reopen a sculpture.
+     *
+     * @param \stdClass $session the session row; its status is updated too
+     * @param int $status STATUS_OPEN or STATUS_CLOSED
+     * @return void
+     * @throws \moodle_exception invalidstatus
+     */
+    public static function set_status(\stdClass $session, int $status): void {
+        global $DB;
+        if ($status !== self::STATUS_OPEN && $status !== self::STATUS_CLOSED) {
+            throw new \moodle_exception('invalidstatus', 'mod_vrsculpt');
+        }
+        $now = time();
+        $DB->update_record('vrsculpt_sessions', (object)['id' => $session->id, 'status' => $status, 'timemodified' => $now]);
+        $session->status = $status;
+        $session->timemodified = $now;
+    }
+
+    /**
+     * Start a sculpture again: delete every version (with its file), the recorded contributions and the
+     * live connections. The sculpture itself, its owner and its status stay.
+     *
+     * @param \stdClass $session the session row
+     * @param \context_module $context the activity context
+     * @return void
+     */
+    public static function reset_session(\stdClass $session, \context_module $context): void {
+        global $DB;
+        $fs = get_file_storage();
+        foreach ($DB->get_records('vrsculpt_snapshots', ['sessionid' => $session->id], '', 'id') as $snapshot) {
+            $fs->delete_area_files($context->id, 'mod_vrsculpt', self::FILEAREA, $snapshot->id);
+        }
+        $DB->delete_records('vrsculpt_snapshots', ['sessionid' => $session->id]);
+        $DB->delete_records('vrsculpt_contrib', ['sessionid' => $session->id]);
+        $DB->delete_records('vrsculpt_signals', ['sessionid' => $session->id]);
+        $DB->delete_records('vrsculpt_peers', ['sessionid' => $session->id]);
+        $DB->set_field('vrsculpt_sessions', 'timemodified', time(), ['id' => $session->id]);
+    }
+
+    /**
+     * Carry out a teacher's action on a sculpture (the caller has checked managesessions and sesskey).
+     *
+     * @param \stdClass $session the session row
+     * @param \context_module $context the activity context
+     * @param string $action one of MANAGE_ACTIONS
+     * @return string the lang string key (mod_vrsculpt) of the message telling what was done
+     * @throws \moodle_exception invalidaction
+     */
+    public static function manage(\stdClass $session, \context_module $context, string $action): string {
+        switch ($action) {
+            case 'close':
+                self::set_status($session, self::STATUS_CLOSED);
+                return 'managedone_close';
+            case 'reopen':
+                self::set_status($session, self::STATUS_OPEN);
+                return 'managedone_reopen';
+            case 'reset':
+                self::reset_session($session, $context);
+                return 'managedone_reset';
+        }
+        throw new \moodle_exception('invalidaction', 'mod_vrsculpt');
+    }
+
+    /**
+     * Delete sessions with their versions, files, live connections and contributions.
      *
      * @param \stdClass[] $sessions vrsculpt_sessions rows
      * @param \context_module $context the activity context they belong to
@@ -354,24 +536,38 @@ class session_manager {
             $fs->delete_area_files($context->id, 'mod_vrsculpt', self::FILEAREA, $snapshot->id);
         }
         $DB->delete_records_select('vrsculpt_snapshots', "sessionid $insql", $params);
+        $DB->delete_records_select('vrsculpt_contrib', "sessionid $insql", $params);
+        $DB->delete_records_select('vrsculpt_signals', "sessionid $insql", $params);
+        $DB->delete_records_select('vrsculpt_peers', "sessionid $insql", $params);
         $DB->delete_records_select('vrsculpt_sessions', "id $insql", $params);
     }
 
     /**
-     * Delete every session of an activity.
+     * Delete the rows of every session of an activity (not the files: see delete_all()).
+     *
+     * For an activity whose course module is already gone, so that it has no context.
+     *
+     * @param int $vrsculptid the vrsculpt id
+     * @return void
+     */
+    public static function delete_rows(int $vrsculptid): void {
+        global $DB;
+        $select = 'sessionid IN (SELECT id FROM {vrsculpt_sessions} WHERE vrsculptid = ?)';
+        foreach (['vrsculpt_snapshots', 'vrsculpt_contrib', 'vrsculpt_signals', 'vrsculpt_peers'] as $table) {
+            $DB->delete_records_select($table, $select, [$vrsculptid]);
+        }
+        $DB->delete_records('vrsculpt_sessions', ['vrsculptid' => $vrsculptid]);
+    }
+
+    /**
+     * Delete every session of an activity, with everything that belongs to them.
      *
      * @param \stdClass $vrsculpt the vrsculpt row
      * @param \context_module $context its context
      * @return void
      */
     public static function delete_all(\stdClass $vrsculpt, \context_module $context): void {
-        global $DB;
-        $DB->delete_records_select(
-            'vrsculpt_snapshots',
-            'sessionid IN (SELECT id FROM {vrsculpt_sessions} WHERE vrsculptid = ?)',
-            [$vrsculpt->id]
-        );
-        $DB->delete_records('vrsculpt_sessions', ['vrsculptid' => $vrsculpt->id]);
+        self::delete_rows((int)$vrsculpt->id);
         get_file_storage()->delete_area_files($context->id, 'mod_vrsculpt', self::FILEAREA);
     }
 }

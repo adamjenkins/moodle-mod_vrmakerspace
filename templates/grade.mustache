@@ -1,0 +1,162 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_vrsculpt/grade
+
+    The grading page: one section per sculpture with its latest version, the members' shares and a
+    grade field for each person graded; a group's sculpture also has a field that gives every member
+    the same grade. One form, saved with the button at the end.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * none
+
+    Context variables required for this template:
+    * cmid - course module id
+    * sesskey - the session key
+    * actionurl - where the form posts
+    * maxgrade - the highest grade, formatted
+    * tracked - whether contributions are tracked
+    * hassculptures, sculptures - sessionid, owner, isgroup, status, version, hasversion, lastsaved,
+      viewurl, hasmembers, members (userid, name, inputid, label, value, haserror, error), grouplabel,
+      groupinputid, hascontributions, contributions (name, ops, share, added, removed),
+      hasmanagelinks, managelinks (action, label, url)
+
+    Example context (json):
+    {
+        "cmid": 5,
+        "sesskey": "abc123",
+        "actionurl": "#",
+        "maxgrade": "100.00",
+        "tracked": true,
+        "hassculptures": true,
+        "sculptures": [
+            {
+                "sessionid": 3,
+                "owner": "Group A",
+                "isgroup": true,
+                "status": "Open",
+                "version": 4,
+                "hasversion": true,
+                "lastsaved": "Tuesday, 27 October 2026, 10:00 AM",
+                "viewurl": "#",
+                "hasmembers": true,
+                "members": [
+                    {"userid": 7, "name": "Sam Student", "inputid": "mod_vrsculpt-grade-3-7",
+                     "label": "Grade for Sam Student", "value": "75.00", "haserror": false, "error": ""}
+                ],
+                "grouplabel": "Give every member of Group A this grade",
+                "groupinputid": "mod_vrsculpt-groupgrade-3",
+                "hascontributions": true,
+                "contributions": [
+                    {"name": "Sam Student", "ops": 120, "share": "60.0%", "added": "12.5", "removed": "3.1"}
+                ],
+                "hasmanagelinks": true,
+                "managelinks": [
+                    {"action": "close", "label": "Close", "url": "#"}
+                ]
+            }
+        ]
+    }
+}}
+<div class="mod_vrsculpt-grade">
+    {{#hassculptures}}
+        <form method="post" action="{{actionurl}}">
+            <input type="hidden" name="id" value="{{cmid}}">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <p>{{#str}} gradeintro, mod_vrsculpt, {{maxgrade}} {{/str}}</p>
+            {{#sculptures}}
+                <section class="card mb-3" aria-labelledby="mod_vrsculpt-gradehead-{{sessionid}}">
+                    <div class="card-body">
+                        <h4 class="card-title" id="mod_vrsculpt-gradehead-{{sessionid}}">{{owner}}</h4>
+                        <p class="mb-2">
+                            {{#str}} status, mod_vrsculpt {{/str}}: {{status}}.
+                            {{#hasversion}}
+                                {{#str}} latestversion, mod_vrsculpt, {{version}} {{/str}} ({{lastsaved}}).
+                                <a href="{{viewurl}}">{{#str}} viewin3d, mod_vrsculpt {{/str}}</a>
+                            {{/hasversion}}
+                            {{^hasversion}}
+                                {{#str}} noversions, mod_vrsculpt {{/str}}
+                            {{/hasversion}}
+                        </p>
+                        {{#hasmanagelinks}}
+                            <p class="mb-2">
+                                {{#managelinks}}
+                                    <a class="btn btn-secondary btn-sm me-1" href="{{url}}">{{label}}</a>
+                                {{/managelinks}}
+                            </p>
+                        {{/hasmanagelinks}}
+                        {{#hascontributions}}
+                            <table class="table table-sm generaltable">
+                                <caption>{{#str}} contributions, mod_vrsculpt {{/str}}</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">{{#str}} owner, mod_vrsculpt {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionshare, mod_vrsculpt {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionops, mod_vrsculpt {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionadded, mod_vrsculpt {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionremoved, mod_vrsculpt {{/str}}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{#contributions}}
+                                        <tr>
+                                            <td>{{name}}</td>
+                                            <td>{{share}}</td>
+                                            <td>{{ops}}</td>
+                                            <td>{{added}}</td>
+                                            <td>{{removed}}</td>
+                                        </tr>
+                                    {{/contributions}}
+                                </tbody>
+                            </table>
+                        {{/hascontributions}}
+                        {{#hasmembers}}
+                            {{#isgroup}}
+                                <div class="mb-2">
+                                    <label for="{{groupinputid}}" class="form-label">{{grouplabel}}</label>
+                                    <input type="text" class="form-control w-auto" id="{{groupinputid}}"
+                                        name="groupgrade[{{sessionid}}]" value="" size="8" inputmode="decimal">
+                                </div>
+                            {{/isgroup}}
+                            {{#members}}
+                                <div class="mb-2">
+                                    <label for="{{inputid}}" class="form-label">{{label}}</label>
+                                    <input type="text" class="form-control w-auto{{#haserror}} is-invalid{{/haserror}}"
+                                        id="{{inputid}}" name="grade[{{userid}}]" value="{{value}}" size="8" inputmode="decimal"
+                                        {{#haserror}}aria-describedby="{{inputid}}-error" aria-invalid="true"{{/haserror}}>
+                                    {{#haserror}}
+                                        <div class="invalid-feedback d-block" id="{{inputid}}-error">{{error}}</div>
+                                    {{/haserror}}
+                                </div>
+                            {{/members}}
+                        {{/hasmembers}}
+                        {{^hasmembers}}
+                            <p>{{#str}} nobodytograde, mod_vrsculpt {{/str}}</p>
+                        {{/hasmembers}}
+                    </div>
+                </section>
+            {{/sculptures}}
+            <button type="submit" class="btn btn-primary" name="savegrades" value="1">{{#str}} savegrades, mod_vrsculpt {{/str}}</button>
+        </form>
+    {{/hassculptures}}
+    {{^hassculptures}}
+        <p>{{#str}} nosculptures, mod_vrsculpt {{/str}}</p>
+    {{/hassculptures}}
+</div>

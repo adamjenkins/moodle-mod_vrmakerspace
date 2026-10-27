@@ -16,8 +16,10 @@
 
 namespace mod_vrsculpt\external;
 
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use mod_vrsculpt\local\pair_manager;
 use mod_vrsculpt\local\session_manager;
 
 /**
@@ -48,17 +50,36 @@ class helper {
     }
 
     /**
+     * Refuse a user who may not sculpt a session: the capability, an open session, one of its owners.
+     *
+     * @param \stdClass $session the session row
+     * @param \context_module $context the activity context
+     * @param int $userid the user
+     * @return void
+     * @throws \required_capability_exception without mod/vrsculpt:sculpt
+     * @throws \moodle_exception cannotsculpt
+     */
+    public static function require_sculptor(\stdClass $session, \context_module $context, int $userid): void {
+        require_capability('mod/vrsculpt:sculpt', $context);
+        if (!session_manager::can_sculpt($session, $context, $userid)) {
+            throw new \moodle_exception('cannotsculpt', 'mod_vrsculpt');
+        }
+    }
+
+    /**
      * The state of a session.
      *
+     * @param \stdClass $vrsculpt the vrsculpt row
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
      * @param int $userid the user asking
      * @return array see state_structure()
      */
-    public static function state(\stdClass $session, \context_module $context, int $userid): array {
+    public static function state(\stdClass $vrsculpt, \stdClass $session, \context_module $context, int $userid): array {
         $latest = session_manager::get_latest_snapshot((int)$session->id);
         return [
             'sessionid' => (int)$session->id,
+            'connection' => session_manager::is_group_work($vrsculpt) ? session_manager::connection($vrsculpt) : '',
             'startmodel' => session_manager::clean_start_model((string)$session->startmodel),
             'status' => (int)$session->status,
             'cansculpt' => session_manager::can_sculpt($session, $context, $userid),
@@ -77,6 +98,7 @@ class helper {
     public static function state_structure(): external_single_structure {
         return new external_single_structure([
             'sessionid' => new external_value(PARAM_INT, 'Session id'),
+            'connection' => new external_value(PARAM_ALPHA, 'Group work: pair or companion; empty for individual work'),
             'startmodel' => new external_value(PARAM_ALPHA, 'Starting model: lump, sphere or cube'),
             'status' => new external_value(PARAM_INT, '0 = open, 1 = closed'),
             'cansculpt' => new external_value(PARAM_BOOL, 'Whether the user may save versions'),
@@ -85,5 +107,32 @@ class helper {
             'timesaved' => new external_value(PARAM_INT, 'When the latest version was saved, 0 when none'),
             'url' => new external_value(PARAM_URL, 'URL of the latest version\'s data, empty when none'),
         ]);
+    }
+
+    /**
+     * Refuse a pair-work call for an activity whose sculptures are not sculpted in pairs.
+     *
+     * @param \stdClass $vrsculpt the vrsculpt row
+     * @return void
+     * @throws \moodle_exception notpairwork
+     */
+    public static function require_pair_work(\stdClass $vrsculpt): void {
+        if (!pair_manager::allowed($vrsculpt)) {
+            throw new \moodle_exception('notpairwork', 'mod_vrsculpt');
+        }
+    }
+
+    /**
+     * Structure of the other people connected to a pair-work sculpture.
+     *
+     * @return external_multiple_structure
+     */
+    public static function peers_structure(): external_multiple_structure {
+        return new external_multiple_structure(new external_single_structure([
+            'userid' => new external_value(PARAM_INT, 'User id'),
+            'name' => new external_value(PARAM_RAW, 'Display name, plain text (escape it where it is shown)'),
+            'peerkey' => new external_value(PARAM_ALPHANUM, 'Peer key (32 hex)'),
+            'role' => new external_value(PARAM_ALPHA, 'host or guest'),
+        ]));
     }
 }

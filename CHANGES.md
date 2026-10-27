@@ -2,11 +2,23 @@
 
 ## 0.1.0 (unreleased) — ALPHA
 
-Milestone 1: the activity skeleton.
+The first version: sculpt a 3D model of clay alone or together, in VR or in the browser.
 
-- New VR sculpting activity: starting model, individual or group work, people per group sculpture,
-  contribution tracking setting, points grade.
-- Sculptures (one per student, or one per group) with saved versions stored as files, a version
-  history on the activity page, and a list of every sculpture for teachers.
-- Web services to save a version and read a sculpture's state.
-- Gradebook item and grades, privacy provider, backup and restore, course reset.
+- New VR sculpting activity: starting model (clay lump, sphere, cube), individual or group work,
+  how groups sculpt together, people per group sculpture, contribution tracking, points grade.
+- The sculpting studio: grab, twist, add, carve and smooth with brush size and strength, per-person
+  undo and redo, in a WebXR headset (controllers or hand tracking, with a wrist palette) or on the
+  desktop with mouse and keyboard. Export to STL, 3MF and glTF binary, with a watertightness report.
+- Sculpting together with one partner, built in: two members of a group, browser to browser, with no
+  server besides Moodle. Or with up to 8 people over VR room's companion service when it is set up
+  (otherwise such an activity falls back to one partner). Presence (head, hands, name), and the part
+  being grabbed or twisted is locked for the others.
+- Saved versions (automatic, on demand, on leaving) with a version history; every sculpture and
+  version can be viewed in 3D. Saved files are checked before they are stored.
+- Grading page: each sculpture with its latest version and the members' shares, a grade per student
+  and "give every member this grade" for groups; grades go to the gradebook.
+- Teachers close, reopen and reset sculptures.
+- Contribution tracking: each member's operations and clay added and removed, bounded on the server.
+- Privacy provider (including what is sent to the partner's browser and to the companion service),
+  backup and restore (with contributions), course reset, and a scheduled task that removes expired
+  pair-work connections.

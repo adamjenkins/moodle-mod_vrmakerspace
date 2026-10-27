@@ -44,17 +44,29 @@ $PAGE->set_url('/mod/vrsculpt/view.php', ['id' => $cm->id]);
 $PAGE->set_title(format_string($vrsculpt->name, true, ['context' => $context]));
 $PAGE->set_heading(format_string($course->fullname, true, ['context' => context_course::instance($course->id)]));
 
-$isgroupwork = (int)$vrsculpt->workmode === session_manager::MODE_GROUP;
+$isgroupwork = session_manager::is_group_work($vrsculpt);
+$tracked = $isgroupwork && !empty($vrsculpt->trackcontributions);
 $templatecontext = [
     'startmodel' => get_string('startmodel_' . session_manager::clean_start_model($vrsculpt->startmodel), 'vrsculpt'),
     'workmode' => get_string($isgroupwork ? 'workmode_group' : 'workmode_individual', 'vrsculpt'),
+    'hasconnection' => $isgroupwork,
+    'connection' => '',
     'hassculpture' => false,
     'nogroup' => false,
     'groupselector' => '',
     'canviewall' => false,
+    'cangrade' => has_capability('mod/vrsculpt:grade', $context) && (int)$vrsculpt->grade > 0,
+    'gradeurl' => (new moodle_url('/mod/vrsculpt/grade.php', ['id' => $cm->id]))->out(false),
+    'tracked' => $tracked,
 ];
+if ($isgroupwork) {
+    $templatecontext['connection'] = session_manager::connection($vrsculpt) === session_manager::CONNECTION_COMPANION
+        ? get_string('connection_companion', 'vrsculpt', (int)$vrsculpt->maxusers)
+        : get_string('connection_pair', 'vrsculpt');
+}
 
-$authors = [];
+$names = [];
+$canmanage = has_capability('mod/vrsculpt:managesessions', $context);
 
 // The user's own sculpture (or their group's).
 if (has_capability('mod/vrsculpt:sculpt', $context)) {
@@ -76,26 +88,31 @@ if (has_capability('mod/vrsculpt:sculpt', $context)) {
         $snapshots = session_manager::get_snapshots((int)$session->id);
         $rows = [];
         foreach (array_reverse($snapshots) as $snapshot) {
-            $rows[] = view_helper::snapshot_row($snapshot, $context, $authors);
+            $rows[] = view_helper::snapshot_row($snapshot, $context, $names);
         }
         $owner = get_string('yoursculpture', 'vrsculpt');
         if ((int)$session->groupid) {
-            $owner = get_string('groupsculpture', 'vrsculpt', format_string(
-                groups_get_group_name($session->groupid),
-                true,
-                ['context' => $context]
-            ));
+            $owner = get_string('groupsculpture', 'vrsculpt', view_helper::owner_name($session, $context, $names));
+        }
+        $mine = '';
+        if ($tracked) {
+            foreach (view_helper::contribution_rows((int)$session->id, $context, $names) as $row) {
+                if ($row['userid'] === (int)$USER->id) {
+                    $mine = get_string('yourcontribution', 'vrsculpt', ['ops' => $row['ops'], 'share' => $row['share']]);
+                }
+            }
         }
         $templatecontext['hassculpture'] = true;
         $templatecontext['sculpture'] = [
             'sessionid' => (int)$session->id,
             'owner' => $owner,
-            'status' => get_string(
-                (int)$session->status === session_manager::STATUS_OPEN ? 'statusopen' : 'statusclosed',
-                'vrsculpt'
-            ),
+            'status' => view_helper::status_text($session),
+            'isclosed' => (int)$session->status === session_manager::STATUS_CLOSED,
+            'studiourl' => view_helper::studio_url($context, 0, 0, (int)$session->groupid)->out(false),
             'versions' => $rows,
             'hasversions' => !empty($rows),
+            'hascontribution' => $mine !== '',
+            'contribution' => $mine,
         ];
     } else if ($isgroupwork) {
         $templatecontext['nogroup'] = true;
@@ -104,49 +121,29 @@ if (has_capability('mod/vrsculpt:sculpt', $context)) {
 
 // Every sculpture, for teachers.
 if (has_capability('mod/vrsculpt:viewallsubmissions', $context)) {
-    $sessions = $DB->get_records('vrsculpt_sessions', ['vrsculptid' => $vrsculpt->id], 'id ASC');
-
-    // In separate groups without access to all groups, only the teacher's own groups' work.
-    $allowedgroups = null;
-    if (groups_get_activity_groupmode($cm) == SEPARATEGROUPS && !has_capability('moodle/site:accessallgroups', $context)) {
-        $allowedgroups = array_map('intval', array_keys(groups_get_activity_allowed_groups($cm)));
-        $allowedusers = [];
-        if ($allowedgroups) {
-            [$insql, $params] = $DB->get_in_or_equal($allowedgroups);
-            $allowedusers = array_map('intval', $DB->get_fieldset_select(
-                'groups_members',
-                'DISTINCT userid',
-                "groupid $insql",
-                $params
-            ));
-        }
-        $sessions = array_filter($sessions, function ($session) use ($allowedgroups, $allowedusers) {
-            return (int)$session->groupid ? in_array((int)$session->groupid, $allowedgroups, true)
-                : in_array((int)$session->userid, $allowedusers, true);
-        });
-    }
-
     $rows = [];
-    foreach ($sessions as $session) {
-        if ((int)$session->groupid) {
-            $owner = format_string(groups_get_group_name($session->groupid), true, ['context' => $context]);
-        } else {
-            $user = $DB->get_record('user', ['id' => $session->userid]);
-            $owner = $user ? fullname($user) : '';
-        }
+    foreach (view_helper::visible_sessions($vrsculpt, $cm, $context) as $session) {
         $latest = session_manager::get_latest_snapshot((int)$session->id);
+        $contributions = [];
+        if ($tracked) {
+            foreach (view_helper::contribution_rows((int)$session->id, $context, $names) as $row) {
+                $a = ['name' => $row['name'], 'share' => $row['share']];
+                $contributions[] = get_string('contributionof', 'vrsculpt', $a);
+            }
+        }
         $rows[] = [
-            'owner' => $owner,
+            'owner' => view_helper::owner_name($session, $context, $names),
             'versions' => $latest ? (int)$latest->version : 0,
             'lastsaved' => $latest ? userdate($latest->timecreated) : get_string('never'),
-            'status' => get_string(
-                (int)$session->status === session_manager::STATUS_OPEN ? 'statusopen' : 'statusclosed',
-                'vrsculpt'
-            ),
+            'status' => view_helper::status_text($session),
             'url' => $latest ? session_manager::snapshot_url($latest, $context)->out(false) : '',
+            'viewurl' => $latest ? view_helper::studio_url($context, (int)$session->id)->out(false) : '',
+            'contributions' => implode(', ', $contributions),
+            'managelinks' => $canmanage ? view_helper::manage_links($session, $context) : [],
         ];
     }
     $templatecontext['canviewall'] = true;
+    $templatecontext['canmanage'] = $canmanage;
     $templatecontext['allsculptures'] = $rows;
     $templatecontext['hasallsculptures'] = !empty($rows);
 }

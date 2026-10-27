@@ -24,6 +24,7 @@ use core_privacy\local\request\helper;
 use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
+use mod_vrsculpt\local\pair_manager;
 use mod_vrsculpt\local\session_manager;
 
 /**
@@ -31,10 +32,14 @@ use mod_vrsculpt\local\session_manager;
  *
  * Personal data: a user's own sculptures (vrsculpt_sessions with their userid) with every saved version
  * (vrsculpt_snapshots and the snapshots file area), the versions they saved of a group's sculpture,
- * and their grades (vrsculpt_grades: as the graded user and as the grader).
+ * their grades (vrsculpt_grades: as the graded user and as the grader), their share of a sculpture
+ * (vrsculpt_contrib), and, briefly, their live connections of pair work (vrsculpt_peers) with the
+ * connection messages they sent (vrsculpt_signals). Live sculpting also sends data outside Moodle: to
+ * the partner's browser (pair work) and to the companion service (companion work).
  *
- * Deleting one user deletes their own sculptures and grades. A group's sculpture is the group's shared
- * work, so it is kept, and the versions the user saved are anonymised (userid 0).
+ * Deleting one user deletes their own sculptures, grades, shares, connections and messages. A group's
+ * sculpture is the group's shared work, so it is kept, and the versions the user saved are anonymised
+ * (userid 0).
  *
  * @package    mod_vrsculpt
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -72,7 +77,35 @@ class provider implements
             'grader' => 'privacy:metadata:grades:grader',
             'timemodified' => 'privacy:metadata:grades:timemodified',
         ], 'privacy:metadata:grades');
+        $collection->add_database_table('vrsculpt_contrib', [
+            'userid' => 'privacy:metadata:contrib:userid',
+            'ops' => 'privacy:metadata:contrib:ops',
+            'added' => 'privacy:metadata:contrib:added',
+            'removed' => 'privacy:metadata:contrib:removed',
+            'timemodified' => 'privacy:metadata:contrib:timemodified',
+        ], 'privacy:metadata:contrib');
+        $collection->add_database_table('vrsculpt_peers', [
+            'userid' => 'privacy:metadata:peers:userid',
+            'role' => 'privacy:metadata:peers:role',
+            'lastseen' => 'privacy:metadata:peers:lastseen',
+            'timecreated' => 'privacy:metadata:peers:timecreated',
+        ], 'privacy:metadata:peers');
+        $collection->add_database_table('vrsculpt_signals', [
+            'fromuserid' => 'privacy:metadata:signals:fromuserid',
+            'payload' => 'privacy:metadata:signals:payload',
+            'timecreated' => 'privacy:metadata:signals:timecreated',
+        ], 'privacy:metadata:signals');
         $collection->add_subsystem_link('core_files', [], 'privacy:metadata:core_files');
+        $collection->add_external_location_link('pairpartner', [
+            'fullname' => 'privacy:metadata:pairpartner:fullname',
+            'address' => 'privacy:metadata:pairpartner:address',
+            'edits' => 'privacy:metadata:pairpartner:edits',
+        ], 'privacy:metadata:pairpartner');
+        $collection->add_external_location_link('vrroomsync', [
+            'fullname' => 'privacy:metadata:vrroomsync:fullname',
+            'peerid' => 'privacy:metadata:vrroomsync:peerid',
+            'edits' => 'privacy:metadata:vrroomsync:edits',
+        ], 'privacy:metadata:vrroomsync');
         return $collection;
     }
 
@@ -94,8 +127,27 @@ class provider implements
                  UNION
                 SELECT g.vrsculptid
                   FROM {vrsculpt_grades} g
-                 WHERE g.userid = :u3 OR g.grader = :u4";
-        return [$sql, ['u1' => $userid, 'u2' => $userid, 'u3' => $userid, 'u4' => $userid]];
+                 WHERE g.userid = :u3 OR g.grader = :u4
+                 UNION
+                SELECT s.vrsculptid
+                  FROM {vrsculpt_sessions} s
+                  JOIN {vrsculpt_contrib} c ON c.sessionid = s.id
+                 WHERE c.userid = :u5
+                 UNION
+                SELECT s.vrsculptid
+                  FROM {vrsculpt_sessions} s
+                  JOIN {vrsculpt_peers} p ON p.sessionid = s.id
+                 WHERE p.userid = :u6
+                 UNION
+                SELECT s.vrsculptid
+                  FROM {vrsculpt_sessions} s
+                  JOIN {vrsculpt_signals} sg ON sg.sessionid = s.id
+                 WHERE sg.fromuserid = :u7";
+        $params = [];
+        foreach (range(1, 7) as $n) {
+            $params['u' . $n] = $userid;
+        }
+        return [$sql, $params];
     }
 
     /**
@@ -134,6 +186,11 @@ class provider implements
                 JOIN {vrsculpt_sessions} s ON s.id = sn.sessionid WHERE s.vrsculptid = :id AND sn.userid > 0', $params);
         $userlist->add_from_sql('userid', 'SELECT userid FROM {vrsculpt_grades} WHERE vrsculptid = :id', $params);
         $userlist->add_from_sql('grader', 'SELECT grader FROM {vrsculpt_grades} WHERE vrsculptid = :id AND grader > 0', $params);
+        $live = ['vrsculpt_contrib' => 'userid', 'vrsculpt_peers' => 'userid', 'vrsculpt_signals' => 'fromuserid'];
+        foreach ($live as $table => $field) {
+            $userlist->add_from_sql($field, "SELECT t.{$field} AS {$field} FROM {{$table}} t
+                    JOIN {vrsculpt_sessions} s ON s.id = t.sessionid WHERE s.vrsculptid = :id", $params);
+        }
     }
 
     /**
@@ -176,16 +233,17 @@ class provider implements
                         (int)$snapshot->id
                     );
                 }
-                if (!$own && !$versions) {
+                $live = self::live_data((int)$session->id, $userid);
+                if (!$own && !$versions && !$live) {
                     continue;
                 }
-                $sculptures[] = (object)[
+                $sculptures[] = (object)([
                     'sculpture' => (int)$session->id,
                     'yourown' => transform::yesno($own),
                     'timecreated' => transform::datetime($session->timecreated),
                     'timemodified' => transform::datetime($session->timemodified),
                     'versions' => $versions,
-                ];
+                ] + $live);
             }
             if ($sculptures) {
                 $data->sculptures = $sculptures;
@@ -274,6 +332,61 @@ class provider implements
 
         $DB->delete_records_select('vrsculpt_grades', "vrsculptid = :vrsculptid AND userid $usersql", $params);
         $DB->set_field_select('vrsculpt_grades', 'grader', 0, "vrsculptid = :vrsculptid AND grader $usersql", $params);
+
+        // Their shares of the group's sculptures, their live connections and the messages they sent.
+        $insessions = "sessionid IN (SELECT id FROM {vrsculpt_sessions} WHERE vrsculptid = :vrsculptid)";
+        $DB->delete_records_select('vrsculpt_contrib', "userid $usersql AND $insessions", $params);
+        $sessionids = array_map(
+            'intval',
+            $DB->get_fieldset_select('vrsculpt_sessions', 'id', 'vrsculptid = ?', [$vrsculptid])
+        );
+        foreach ($userids as $userid) {
+            pair_manager::purge_user((int)$userid, $sessionids);
+        }
+    }
+
+    /**
+     * A user's share of a sculpture, live connections and messages sent, for the export.
+     *
+     * @param int $sessionid the session id
+     * @param int $userid the user
+     * @return array with the keys contribution, connections and connectionmessages, each only when there is data
+     */
+    private static function live_data(int $sessionid, int $userid): array {
+        global $DB;
+        $data = [];
+        $contrib = $DB->get_record('vrsculpt_contrib', ['sessionid' => $sessionid, 'userid' => $userid]);
+        if ($contrib) {
+            $data['contribution'] = (object)[
+                'operations' => (int)$contrib->ops,
+                'addedmm3' => format_float((float)$contrib->added, 2),
+                'removedmm3' => format_float((float)$contrib->removed, 2),
+                'timemodified' => transform::datetime($contrib->timemodified),
+            ];
+        }
+        $connections = [];
+        foreach ($DB->get_records('vrsculpt_peers', ['sessionid' => $sessionid, 'userid' => $userid], 'id ASC') as $peer) {
+            $connections[] = (object)[
+                'role' => (string)$peer->role,
+                'timecreated' => transform::datetime($peer->timecreated),
+                'lastseen' => transform::datetime($peer->lastseen),
+            ];
+        }
+        if ($connections) {
+            $data['connections'] = $connections;
+        }
+        $messages = [];
+        $signals = $DB->get_records('vrsculpt_signals', ['sessionid' => $sessionid, 'fromuserid' => $userid], 'id ASC');
+        foreach ($signals as $signal) {
+            $messages[] = (object)[
+                'timecreated' => transform::datetime($signal->timecreated),
+                'message' => (string)$signal->payload,
+            ];
+        }
+        if ($messages) {
+            $data['connectionmessages'] = $messages;
+        }
+        return $data;
     }
 
     /**

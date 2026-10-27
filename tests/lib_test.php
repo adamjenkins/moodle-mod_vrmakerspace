@@ -52,7 +52,28 @@ final class lib_test extends \advanced_testcase {
         $record = $DB->get_record('vrsculpt', ['id' => $vrsculpt->id]);
         $this->assertSame('lump', $record->startmodel);
         $this->assertSame(session_manager::MODE_INDIVIDUAL, (int)$record->workmode);
-        $this->assertSame(8, (int)$record->maxusers);
+        $this->assertSame('pair', $record->connectmode);
+        $this->assertSame(2, (int)$record->maxusers);
+    }
+
+    /**
+     * The connection: pair forces two people; companion keeps 2..8; individual work is always pair;
+     * an unknown value becomes pair.
+     */
+    public function test_connection_normalised(): void {
+        $group = session_manager::MODE_GROUP;
+        $clean = fn(array $data) => vrsculpt_clean_instance_data((object)$data);
+
+        $data = $clean(['workmode' => $group, 'connectmode' => 'pair', 'maxusers' => 6]);
+        $this->assertSame(['pair', 2], [$data->connectmode, $data->maxusers]);
+        $data = $clean(['workmode' => $group, 'connectmode' => 'companion', 'maxusers' => 6]);
+        $this->assertSame(['companion', 6], [$data->connectmode, $data->maxusers]);
+        $data = $clean(['workmode' => $group, 'connectmode' => 'companion', 'maxusers' => 99]);
+        $this->assertSame(['companion', 8], [$data->connectmode, $data->maxusers]);
+        $data = $clean(['workmode' => $group, 'connectmode' => 'telepathy', 'maxusers' => 6]);
+        $this->assertSame(['pair', 2], [$data->connectmode, $data->maxusers]);
+        $data = $clean(['workmode' => session_manager::MODE_INDIVIDUAL, 'connectmode' => 'companion', 'maxusers' => 6]);
+        $this->assertSame('pair', $data->connectmode);
     }
 
     /**
@@ -69,9 +90,17 @@ final class lib_test extends \advanced_testcase {
         $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
         $session = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $student->id]);
         $generator->create_snapshot($session, (int)$student->id);
+        $generator->create_contribution($session, (int)$student->id, 3, 1.0, 1.0);
+        $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $session->id, 'userid' => $student->id,
+            'peerkey' => str_repeat('a', 32), 'role' => 'host', 'lastseen' => time(), 'timecreated' => time()]);
+        $DB->insert_record('vrsculpt_signals', (object)['sessionid' => $session->id, 'frompeerkey' => str_repeat('a', 32),
+            'topeerkey' => str_repeat('b', 32), 'fromuserid' => $student->id, 'payload' => '{}', 'timecreated' => time()]);
         grader::save_grade($vrsculpt, (int)$student->id, 50.0, 2);
 
         $this->assertTrue(vrsculpt_delete_instance((int)$vrsculpt->id));
+        $this->assertSame(0, $DB->count_records('vrsculpt_contrib'));
+        $this->assertSame(0, $DB->count_records('vrsculpt_peers'));
+        $this->assertSame(0, $DB->count_records('vrsculpt_signals'));
 
         $this->assertFalse($DB->record_exists('vrsculpt', ['id' => $vrsculpt->id]));
         $this->assertSame(0, $DB->count_records('vrsculpt_sessions'));
@@ -94,10 +123,9 @@ final class lib_test extends \advanced_testcase {
         $othervrsculpt = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $othercourse->id]);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
-        $generator->create_snapshot(
-            $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $student->id]),
-            (int)$student->id
-        );
+        $resetsession = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $student->id]);
+        $generator->create_snapshot($resetsession, (int)$student->id);
+        $generator->create_contribution($resetsession, (int)$student->id, 3, 1.0, 1.0);
         $kept = $generator->create_session(['vrsculptid' => $othervrsculpt->id, 'userid' => $student->id]);
         grader::save_grade($vrsculpt, (int)$student->id, 10.0, 2);
 
@@ -107,6 +135,7 @@ final class lib_test extends \advanced_testcase {
         $this->assertFalse($status[0]['error']);
         $this->assertSame(0, $DB->count_records('vrsculpt_sessions', ['vrsculptid' => $vrsculpt->id]));
         $this->assertSame(0, $DB->count_records('vrsculpt_grades', ['vrsculptid' => $vrsculpt->id]));
+        $this->assertSame(0, $DB->count_records('vrsculpt_contrib', ['sessionid' => $resetsession->id]));
         $this->assertTrue($DB->record_exists('vrsculpt_sessions', ['id' => $kept->id]));
     }
 

@@ -84,7 +84,8 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
-     * Settings, a sculpture with two versions and their files, and a grade survive.
+     * Settings, a group sculpture with two versions and their files, a member's share and a grade
+     * survive; live connections do not.
      */
     public function test_backup_restore_with_user_data(): void {
         global $DB;
@@ -92,27 +93,46 @@ final class backup_restore_test extends \advanced_testcase {
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
         $vrsculpt = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $course->id, 'startmodel' => 'cube',
-            'maxusers' => 4]);
+            'workmode' => session_manager::MODE_GROUP, 'connectmode' => 'companion', 'maxusers' => 4,
+            'trackcontributions' => 1]);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $group = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Otters']);
+        $this->getDataGenerator()->create_group_member(['groupid' => $group->id, 'userid' => $student->id]);
         $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
-        $session = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $student->id]);
+        $session = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'groupid' => $group->id]);
         $generator->create_snapshot($session, (int)$student->id, 'first', 2);
         $generator->create_snapshot($session, (int)$student->id, 'second', 5);
+        $generator->create_contribution($session, (int)$student->id, 17, 1234.5, 67.25);
+        // Live connections are never backed up.
+        $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $session->id, 'userid' => $student->id,
+            'peerkey' => str_repeat('a', 32), 'role' => 'host', 'lastseen' => time(), 'timecreated' => time()]);
         grader::save_grade($vrsculpt, (int)$student->id, 75.0, 2);
 
         $newcourseid = $this->backup_and_restore($course);
 
         $restored = $DB->get_record('vrsculpt', ['course' => $newcourseid], '*', MUST_EXIST);
         $this->assertSame('cube', $restored->startmodel);
+        $this->assertSame('companion', $restored->connectmode);
         $this->assertSame(4, (int)$restored->maxusers);
         $newsession = $DB->get_record('vrsculpt_sessions', ['vrsculptid' => $restored->id], '*', MUST_EXIST);
-        $this->assertSame((int)$student->id, (int)$newsession->userid);
+        $newgroup = $DB->get_record('groups', ['id' => $newsession->groupid], '*', MUST_EXIST);
+        $this->assertSame((int)$newcourseid, (int)$newgroup->courseid);
+        $this->assertSame('Otters', $newgroup->name);
+        $contrib = $DB->get_record('vrsculpt_contrib', ['sessionid' => $newsession->id], '*', MUST_EXIST);
+        $this->assertSame((int)$student->id, (int)$contrib->userid);
+        $this->assertSame(17, (int)$contrib->ops);
+        $this->assertEquals(1234.5, (float)$contrib->added);
+        $this->assertEquals(67.25, (float)$contrib->removed);
+        $this->assertSame(0, $DB->count_records('vrsculpt_peers', ['sessionid' => $newsession->id]));
         $snapshots = array_values(session_manager::get_snapshots((int)$newsession->id));
         $this->assertSame([1, 2], array_map(fn($s) => (int)$s->version, $snapshots));
         $cm = get_coursemodule_from_instance('vrsculpt', $restored->id, $newcourseid, false, MUST_EXIST);
         $context = \context_module::instance($cm->id);
-        $this->assertSame('VRSCsecond', session_manager::get_snapshot_file($snapshots[1], $context)->get_content());
-        $this->assertSame('VRSCfirst', session_manager::get_snapshot_file($snapshots[0], $context)->get_content());
+        $second = session_manager::get_snapshot_file($snapshots[1], $context)->get_content();
+        $this->assertSame($generator->snapshot_data('second', 5), $second);
+        $first = session_manager::get_snapshot_file($snapshots[0], $context)->get_content();
+        $this->assertSame($generator->snapshot_data('first', 2), $first);
+        $this->assertSame([2, 5], array_map(fn($s) => (int)$s->opcount, $snapshots));
         $grade = $DB->get_record('vrsculpt_grades', ['vrsculptid' => $restored->id], '*', MUST_EXIST);
         $this->assertEquals(75.0, (float)$grade->grade);
     }

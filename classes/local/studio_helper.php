@@ -1,0 +1,183 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+namespace mod_vrsculpt\local;
+
+/**
+ * Which sculpture the studio page opens, and how: the configuration of the studio's JavaScript.
+ *
+ * @package    mod_vrsculpt
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+final class studio_helper {
+    /** @var int Milliseconds between automatic saves. */
+    public const AUTOSAVE_MS = 60000;
+
+    /** @var int Milliseconds between contribution reports. */
+    public const CONTRIBUTION_MS = 30000;
+
+    /** @var string Individual work. */
+    public const MODE_SOLO = 'solo';
+
+    /** @var string Group work with one partner, browser to browser. */
+    public const MODE_PAIR = 'pair';
+
+    /** @var string Group work over the companion service. */
+    public const MODE_COMPANION = 'companion';
+
+    /** @var string Looking only. */
+    public const MODE_VIEW = 'view';
+
+    /**
+     * The sculpture a request asks for, checked against what the user may do.
+     *
+     * Without $sessionid, the user's own sculpture (or their group's), created on first use as on the
+     * activity page; with it, any sculpture of this activity the user may see. With $version, that
+     * saved version. The studio is read-only for users who may not sculpt the sculpture, for a closed
+     * sculpture, and for any version but the latest.
+     *
+     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \cm_info|\stdClass $cm the course module
+     * @param \context_module $context the activity context
+     * @param int $userid the user (never from the client)
+     * @param int $sessionid a sculpture, or 0 for the user's own
+     * @param int $version a saved version, or 0 for the latest
+     * @param int $groupid group work, own sculpture: which of the user's groups (0 for the first)
+     * @return array{session: \stdClass, snapshot: ?\stdClass, latest: ?\stdClass, readonly: bool}
+     * @throws \moodle_exception invalidsession, nogroup, invalidversion
+     * @throws \required_capability_exception when the user may not see the sculpture
+     */
+    public static function resolve(
+        \stdClass $vrsculpt,
+        $cm,
+        \context_module $context,
+        int $userid,
+        int $sessionid,
+        int $version,
+        int $groupid = 0
+    ): array {
+        if ($sessionid) {
+            $session = session_manager::get_session($sessionid, $vrsculpt);
+            if (!session_manager::can_view($session, $context, $userid)) {
+                throw new \required_capability_exception($context, 'mod/vrsculpt:viewallsubmissions', 'nopermissions', '');
+            }
+        } else {
+            require_capability('mod/vrsculpt:sculpt', $context, $userid);
+            $session = session_manager::get_or_create_for_user($vrsculpt, $cm, $userid, $groupid);
+            if (!$session) {
+                throw new \moodle_exception('nogroup', 'mod_vrsculpt');
+            }
+        }
+
+        $latest = session_manager::get_latest_snapshot((int)$session->id);
+        $snapshot = $latest;
+        if ($version) {
+            $snapshot = session_manager::get_snapshot_by_version((int)$session->id, $version);
+            if (!$snapshot) {
+                throw new \moodle_exception('invalidversion', 'mod_vrsculpt');
+            }
+        }
+        $old = $snapshot && $latest && (int)$snapshot->version < (int)$latest->version;
+        $readonly = $old || !session_manager::can_sculpt($session, $context, $userid);
+        return ['session' => $session, 'snapshot' => $snapshot, 'latest' => $latest, 'readonly' => $readonly];
+    }
+
+    /**
+     * The studio mode of a sculpture.
+     *
+     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param bool $readonly whether the studio only shows the sculpture
+     * @return string one of the MODE_* constants
+     */
+    public static function mode(\stdClass $vrsculpt, bool $readonly): string {
+        if ($readonly) {
+            return self::MODE_VIEW;
+        }
+        if (!session_manager::is_group_work($vrsculpt)) {
+            return self::MODE_SOLO;
+        }
+        return session_manager::connection($vrsculpt) === session_manager::CONNECTION_COMPANION
+            ? self::MODE_COMPANION : self::MODE_PAIR;
+    }
+
+    /**
+     * The configuration passed to mod_vrsculpt/studio init().
+     *
+     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \context_module $context the activity context
+     * @param \stdClass $user the user
+     * @param array $resolved what resolve() returned
+     * @return array
+     */
+    public static function config(\stdClass $vrsculpt, \context_module $context, \stdClass $user, array $resolved): array {
+        $session = $resolved['session'];
+        $snapshot = $resolved['snapshot'];
+        $readonly = (bool)$resolved['readonly'];
+        $mode = self::mode($vrsculpt, $readonly);
+
+        $maxusers = 1;
+        if (session_manager::is_group_work($vrsculpt)) {
+            $maxusers = session_manager::connection($vrsculpt) === session_manager::CONNECTION_COMPANION
+                ? min(8, max(2, (int)$vrsculpt->maxusers)) : pair_manager::MAX_PEERS;
+        }
+        // Served by engine.php under a versioned path, so the worker's relative imports are versioned too.
+        $workerurl = new \moodle_url('/mod/vrsculpt/engine.php/' . (int)get_config('mod_vrsculpt', 'version') . '/worker.js');
+
+        return [
+            'cmid' => (int)$context->instanceid,
+            'sessionid' => (int)$session->id,
+            'mode' => $mode,
+            'readonly' => $readonly,
+            'user' => ['id' => (int)$user->id, 'name' => pair_manager::display_name(fullname($user))],
+            'model' => session_manager::clean_start_model((string)$session->startmodel),
+            // Looking only: the version shown, fetched directly. Sculpting: the session fetches its state.
+            'snapshoturl' => $readonly && $snapshot ? session_manager::snapshot_url($snapshot, $context)->out(false) : '',
+            'version' => $snapshot ? (int)$snapshot->version : 0,
+            'workerurl' => $workerurl->out(false),
+            'trackcontributions' => !$readonly && session_manager::is_group_work($vrsculpt)
+                && !empty($vrsculpt->trackcontributions),
+            'maxusers' => $maxusers,
+            'autosavems' => self::AUTOSAVE_MS,
+            'contributionms' => self::CONTRIBUTION_MS,
+            'backurl' => (new \moodle_url('/mod/vrsculpt/view.php', ['id' => $context->instanceid]))->out(false),
+        ];
+    }
+
+    /**
+     * The studio page's heading: whose sculpture, and which version when an older one is shown.
+     *
+     * @param \stdClass $session the session row
+     * @param \context_module $context the activity context
+     * @param int $userid the user looking
+     * @param \stdClass|null $snapshot the version shown, when one was asked for
+     * @return string plain text
+     */
+    public static function title(\stdClass $session, \context_module $context, int $userid, ?\stdClass $snapshot): string {
+        $names = [];
+        if ((int)$session->groupid) {
+            $owner = get_string('groupsculpture', 'vrsculpt', view_helper::owner_name($session, $context, $names));
+        } else if ((int)$session->userid === $userid) {
+            $owner = get_string('yoursculpture', 'vrsculpt');
+        } else {
+            $owner = get_string('sculptureof', 'vrsculpt', view_helper::owner_name($session, $context, $names));
+        }
+        if (!$snapshot) {
+            return $owner;
+        }
+        return get_string('studiotitleversion', 'vrsculpt', ['owner' => $owner, 'version' => (int)$snapshot->version]);
+    }
+}

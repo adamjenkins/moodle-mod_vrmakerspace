@@ -1,0 +1,61 @@
+@mod @mod_vrsculpt
+Feature: Grade sculptures
+  In order to assess my students' sculptures
+  As a teacher
+  I need to grade each student, or every member of a group at once
+
+  Background:
+    Given the following "users" exist:
+      | username | firstname | lastname | email                |
+      | teacher1 | Terry     | Teacher  | teacher1@example.com |
+      | student1 | Sam       | Student  | student1@example.com |
+      | student2 | Sue       | Student  | student2@example.com |
+    And the following "courses" exist:
+      | fullname  | shortname | summary |
+      | Sculpting | SCULPT    |         |
+    And the following "course enrolments" exist:
+      | user     | course | role           |
+      | teacher1 | SCULPT | editingteacher |
+      | student1 | SCULPT | student        |
+      | student2 | SCULPT | student        |
+
+  Scenario: A teacher grades a student's sculpture
+    Given the following "activities" exist:
+      | activity | name         | course | idnumber | grade |
+      | vrsculpt | Clay animals | SCULPT | sculpt1  | 100   |
+    And I am on the "Clay animals" "vrsculpt activity" page logged in as "student1"
+    And I log out
+    When I am on the "Clay animals" "vrsculpt activity" page logged in as "teacher1"
+    And I follow "Grade sculptures"
+    Then I should see "Grades are out of 100.00."
+    And I should see "Not saved yet."
+    And I set the field "Grade for Sam Student" to "75"
+    And I press "Save grades"
+    And I should see "Grades saved (1 changed)."
+    And the field "Grade for Sam Student" matches value "75.00"
+    And I set the field "Grade for Sam Student" to "120"
+    And I press "Save grades"
+    And I should see "1 grades could not be saved"
+    And I should see "The grade must be between 0 and 100.00."
+
+  Scenario: A teacher gives every member of a group the same grade
+    Given the following "groups" exist:
+      | name    | course | idnumber |
+      | Otters  | SCULPT | G1       |
+    And the following "group members" exist:
+      | user     | group |
+      | student1 | G1    |
+      | student2 | G1    |
+    And the following "activities" exist:
+      | activity | name        | course | idnumber | workmode | grade |
+      | vrsculpt | Group whale | SCULPT | sculpt2  | 1        | 50    |
+    And I am on the "Group whale" "vrsculpt activity" page logged in as "student1"
+    And I should see "Sculpture of Otters"
+    And I log out
+    When I am on the "Group whale" "vrsculpt activity" page logged in as "teacher1"
+    And I follow "Grade sculptures"
+    And I set the field "Give every member of Otters this grade" to "40"
+    And I press "Save grades"
+    Then I should see "Grades saved (2 changed)."
+    And the field "Grade for Sam Student" matches value "40.00"
+    And the field "Grade for Sue Student" matches value "40.00"

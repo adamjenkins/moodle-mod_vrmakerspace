@@ -13,6 +13,7 @@
         <FIELD NAME="introformat" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="startmodel" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="lump" SEQUENCE="false" COMMENT="Starting primitive: sphere, cube or lump"/>
         <FIELD NAME="workmode" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 = one sculpture per user, 1 = one shared sculpture per group"/>
+        <FIELD NAME="connectmode" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="pair" SEQUENCE="false" COMMENT="Group work: pair (built in, two people) or companion (the companion service)"/>
         <FIELD NAME="maxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="8" SEQUENCE="false" COMMENT="Most people sculpting one group sculpture at once"/>
         <FIELD NAME="trackcontributions" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Record each user's share of the edits"/>
         <FIELD NAME="grade" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="100" SEQUENCE="false" COMMENT="Maximum grade, 0 = not graded"/>
@@ -81,6 +82,66 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="vrsculptuser" UNIQUE="true" FIELDS="vrsculptid, userid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="vrsculpt_peers" COMMENT="People connected to a group sculpture in pair work, refreshed while their studio polls">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="peerkey" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false" COMMENT="Random key of this connection (32 hex)"/>
+        <FIELD NAME="role" TYPE="char" LENGTH="5" NOTNULL="true" SEQUENCE="false" COMMENT="host (orders the edits) or guest"/>
+        <FIELD NAME="lastseen" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="sessionuser" UNIQUE="true" FIELDS="sessionid, userid"/>
+        <INDEX NAME="peerkey" UNIQUE="false" FIELDS="peerkey"/>
+        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="vrsculpt_signals" COMMENT="Connection messages between the two browsers of pair work, deleted once delivered">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="frompeerkey" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="topeerkey" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="fromuserid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="payload" TYPE="text" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="sessionto" UNIQUE="false" FIELDS="sessionid, topeerkey"/>
+        <INDEX NAME="fromuserid" UNIQUE="false" FIELDS="fromuserid"/>
+        <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="vrsculpt_contrib" COMMENT="How much of a group sculpture each member made, when the activity tracks contributions">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="ops" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Sculpting operations made"/>
+        <FIELD NAME="added" TYPE="number" LENGTH="12" NOTNULL="true" DEFAULT="0" SEQUENCE="false" DECIMALS="2" COMMENT="Clay added, cubic millimetres"/>
+        <FIELD NAME="removed" TYPE="number" LENGTH="12" NOTNULL="true" DEFAULT="0" SEQUENCE="false" DECIMALS="2" COMMENT="Clay removed, cubic millimetres"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="lastreport" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the last report was accepted"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="sessionuser" UNIQUE="true" FIELDS="sessionid, userid"/>
+        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

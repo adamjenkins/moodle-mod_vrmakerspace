@@ -26,8 +26,9 @@
  * Defines the structure of vrsculpt.xml.
  *
  * The activity always; with user data, the sculptures (sessions) with their versions (snapshots, and
- * their files) and the grades. A grade is written as usergrade so no element contains a child of its
- * own name.
+ * their files) and their members' shares (contributions), and the grades. A grade is written as
+ * usergrade so no element contains a child of its own name. Live connections of pair work (peers and
+ * their messages) last minutes and are never backed up.
  */
 class backup_vrsculpt_activity_structure_step extends backup_activity_structure_step {
     /**
@@ -39,7 +40,7 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
         $userinfo = $this->get_setting_value('userinfo');
 
         $vrsculpt = new backup_nested_element('vrsculpt', ['id'], [
-            'name', 'intro', 'introformat', 'startmodel', 'workmode', 'maxusers', 'trackcontributions',
+            'name', 'intro', 'introformat', 'startmodel', 'workmode', 'connectmode', 'maxusers', 'trackcontributions',
             'grade', 'timecreated', 'timemodified',
         ]);
 
@@ -53,6 +54,11 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
             'version', 'userid', 'opcount', 'filesize', 'timecreated',
         ]);
 
+        $contributions = new backup_nested_element('contributions');
+        $contribution = new backup_nested_element('contribution', ['id'], [
+            'userid', 'ops', 'added', 'removed', 'timemodified', 'lastreport',
+        ]);
+
         $usergrades = new backup_nested_element('usergrades');
         $usergrade = new backup_nested_element('usergrade', ['id'], [
             'userid', 'grade', 'grader', 'timecreated', 'timemodified',
@@ -62,6 +68,8 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
         $sessions->add_child($session);
         $session->add_child($snapshots);
         $snapshots->add_child($snapshot);
+        $session->add_child($contributions);
+        $contributions->add_child($contribution);
         $vrsculpt->add_child($usergrades);
         $usergrades->add_child($usergrade);
 
@@ -69,12 +77,14 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
         if ($userinfo) {
             $session->set_source_table('vrsculpt_sessions', ['vrsculptid' => backup::VAR_PARENTID], 'id ASC');
             $snapshot->set_source_table('vrsculpt_snapshots', ['sessionid' => backup::VAR_PARENTID], 'version ASC');
+            $contribution->set_source_table('vrsculpt_contrib', ['sessionid' => backup::VAR_PARENTID], 'id ASC');
             $usergrade->set_source_table('vrsculpt_grades', ['vrsculptid' => backup::VAR_PARENTID], 'id ASC');
         }
 
         $session->annotate_ids('group', 'groupid');
         $session->annotate_ids('user', 'userid');
         $snapshot->annotate_ids('user', 'userid');
+        $contribution->annotate_ids('user', 'userid');
         $usergrade->annotate_ids('user', 'userid');
         $usergrade->annotate_ids('user', 'grader');
 

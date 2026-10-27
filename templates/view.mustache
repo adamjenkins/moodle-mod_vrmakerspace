@@ -17,44 +17,60 @@
 {{!
     @template mod_vrsculpt/view
 
-    The activity page: the user's sculpture with its versions, and every sculpture for teachers.
+    The activity page: the user's sculpture with its versions and the studio link, and every sculpture
+    for teachers, with their management links.
 
     Classes required for JS:
     * none
 
     Data attributes required for JS:
-    * data-region="mod_vrsculpt-studio" data-sessionid: where the 3D studio will start
+    * none
 
     Context variables required for this template:
     * startmodel - name of the starting model
     * workmode - individual or group work
+    * hasconnection, connection - group work: how the members sculpt together
     * groupselector - rendered group selector HTML, or empty
-    * hassculpture, sculpture - the user's sculpture: sessionid, owner, status, hasversions, versions
+    * cangrade, gradeurl - the grading page link
+    * hassculpture, sculpture - the user's sculpture: sessionid, owner, status, isclosed, studiourl,
+      hasversions, versions (version, savedby, timesaved, size, url, viewurl), hascontribution, contribution
     * nogroup - group work but the user is in no group
-    * canviewall, hasallsculptures, allsculptures - every sculpture (teachers)
+    * canviewall, canmanage, tracked, hasallsculptures, allsculptures - every sculpture (teachers):
+      owner, versions, lastsaved, status, url, viewurl, contributions, managelinks (action, label, url)
 
     Example context (json):
     {
         "startmodel": "Clay lump",
         "workmode": "Individual",
+        "hasconnection": false,
+        "connection": "",
         "groupselector": "",
+        "cangrade": true,
+        "gradeurl": "#",
         "hassculpture": true,
         "sculpture": {
             "sessionid": 3,
             "owner": "Your sculpture",
             "status": "Open",
+            "isclosed": false,
+            "studiourl": "#",
             "hasversions": true,
             "versions": [
                 {"version": 2, "savedby": "Sam Student", "timesaved": "Tuesday, 27 October 2026, 10:00 AM",
-                 "size": "120.5 KB", "url": "#"}
-            ]
+                 "size": "120.5 KB", "url": "#", "viewurl": "#"}
+            ],
+            "hascontribution": false,
+            "contribution": ""
         },
         "nogroup": false,
         "canviewall": true,
+        "canmanage": true,
+        "tracked": false,
         "hasallsculptures": true,
         "allsculptures": [
             {"owner": "Sam Student", "versions": 2, "lastsaved": "Tuesday, 27 October 2026, 10:00 AM",
-             "status": "Open", "url": "#"}
+             "status": "Open", "url": "#", "viewurl": "#", "contributions": "",
+             "managelinks": [{"action": "close", "label": "Close", "url": "#"}]}
         ]
     }
 }}
@@ -64,7 +80,15 @@
         <dd class="col-sm-9">{{startmodel}}</dd>
         <dt class="col-sm-3">{{#str}} workmode, mod_vrsculpt {{/str}}</dt>
         <dd class="col-sm-9">{{workmode}}</dd>
+        {{#hasconnection}}
+            <dt class="col-sm-3">{{#str}} connection, mod_vrsculpt {{/str}}</dt>
+            <dd class="col-sm-9">{{connection}}</dd>
+        {{/hasconnection}}
     </dl>
+
+    {{#cangrade}}
+        <p><a class="btn btn-secondary" href="{{gradeurl}}">{{#str}} gradesculptures, mod_vrsculpt {{/str}}</a></p>
+    {{/cangrade}}
 
     {{{groupselector}}}
 
@@ -77,9 +101,13 @@
             <section class="mb-4" aria-labelledby="mod_vrsculpt-mine-{{sessionid}}">
                 <h3 id="mod_vrsculpt-mine-{{sessionid}}">{{owner}}</h3>
                 <p>{{#str}} status, mod_vrsculpt {{/str}}: {{status}}</p>
-                <div class="alert alert-info" data-region="mod_vrsculpt-studio" data-sessionid="{{sessionid}}">
-                    {{#str}} studionotavailable, mod_vrsculpt {{/str}}
-                </div>
+                {{#isclosed}}
+                    <div class="alert alert-info">{{#str}} sculptureclosed, mod_vrsculpt {{/str}}</div>
+                {{/isclosed}}
+                <p><a class="btn btn-primary" href="{{studiourl}}">{{#str}} openstudio, mod_vrsculpt {{/str}}</a></p>
+                {{#hascontribution}}
+                    <p>{{contribution}}</p>
+                {{/hascontribution}}
                 <h4>{{#str}} versionhistory, mod_vrsculpt {{/str}}</h4>
                 {{#hasversions}}
                     <table class="table table-sm generaltable">
@@ -89,15 +117,21 @@
                                 <th scope="col">{{#str}} savedby, mod_vrsculpt {{/str}}</th>
                                 <th scope="col">{{#str}} timesaved, mod_vrsculpt {{/str}}</th>
                                 <th scope="col">{{#str}} size {{/str}}</th>
+                                <th scope="col">{{#str}} actions {{/str}}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {{#versions}}
                                 <tr>
-                                    <td><a href="{{url}}">{{version}}</a></td>
+                                    <td>{{version}}</td>
                                     <td>{{savedby}}</td>
                                     <td>{{timesaved}}</td>
                                     <td>{{size}}</td>
+                                    <td>
+                                        <a href="{{viewurl}}">{{#str}} viewin3d, mod_vrsculpt {{/str}}</a>
+                                        &middot;
+                                        <a href="{{url}}">{{#str}} download {{/str}}</a>
+                                    </td>
                                 </tr>
                             {{/versions}}
                         </tbody>
@@ -121,15 +155,33 @@
                             <th scope="col">{{#str}} versions, mod_vrsculpt {{/str}}</th>
                             <th scope="col">{{#str}} lastsaved, mod_vrsculpt {{/str}}</th>
                             <th scope="col">{{#str}} status, mod_vrsculpt {{/str}}</th>
+                            {{#tracked}}
+                                <th scope="col">{{#str}} contributions, mod_vrsculpt {{/str}}</th>
+                            {{/tracked}}
+                            <th scope="col">{{#str}} actions {{/str}}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {{#allsculptures}}
                             <tr>
                                 <td>{{owner}}</td>
-                                <td>{{#url}}<a href="{{url}}">{{versions}}</a>{{/url}}{{^url}}{{versions}}{{/url}}</td>
+                                <td>{{versions}}</td>
                                 <td>{{lastsaved}}</td>
                                 <td>{{status}}</td>
+                                {{#tracked}}
+                                    <td>{{contributions}}</td>
+                                {{/tracked}}
+                                <td>
+                                    {{#viewurl}}
+                                        <a class="me-2" href="{{viewurl}}">{{#str}} viewin3d, mod_vrsculpt {{/str}}</a>
+                                    {{/viewurl}}
+                                    {{#url}}
+                                        <a class="me-2" href="{{url}}">{{#str}} download {{/str}}</a>
+                                    {{/url}}
+                                    {{#managelinks}}
+                                        <a class="btn btn-secondary btn-sm me-1" href="{{url}}">{{label}}</a>
+                                    {{/managelinks}}
+                                </td>
                             </tr>
                         {{/allsculptures}}
                     </tbody>

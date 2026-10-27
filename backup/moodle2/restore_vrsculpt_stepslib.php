@@ -28,8 +28,8 @@ use mod_vrsculpt\local\session_manager;
  * Restores vrsculpt.xml.
  *
  * Restore input is untrusted: the activity's settings are normalised as the form's are, a sculpture
- * whose owner (user or group) was not restored is skipped with its versions, and a grade of a user
- * who was not restored is skipped.
+ * whose owner (user or group) was not restored is skipped with its versions and shares, and a grade
+ * or share of a user who was not restored is skipped.
  */
 class restore_vrsculpt_activity_structure_step extends restore_activity_structure_step {
     /**
@@ -42,6 +42,10 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
         if ($this->get_setting_value('userinfo')) {
             $paths[] = new restore_path_element('vrsculpt_session', '/activity/vrsculpt/sessions/session');
             $paths[] = new restore_path_element('vrsculpt_snapshot', '/activity/vrsculpt/sessions/session/snapshots/snapshot');
+            $paths[] = new restore_path_element(
+                'vrsculpt_contribution',
+                '/activity/vrsculpt/sessions/session/contributions/contribution'
+            );
             $paths[] = new restore_path_element('vrsculpt_usergrade', '/activity/vrsculpt/usergrades/usergrade');
         }
         return $this->prepare_activity_structure($paths);
@@ -124,6 +128,32 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
         }
         $newid = $DB->insert_record('vrsculpt_snapshots', $data);
         $this->set_mapping('vrsculpt_snapshot', $oldid, $newid, true);
+    }
+
+    /**
+     * One member's share of a sculpture.
+     *
+     * @param array $data the element's data
+     * @return void
+     */
+    protected function process_vrsculpt_contribution($data) {
+        global $DB;
+
+        $data = (object)$data;
+        $data->sessionid = $this->get_new_parentid('vrsculpt_session');
+        $data->userid = (int)$this->get_mappingid('user', $data->userid);
+        if (!$data->sessionid || !$data->userid) {
+            return;
+        }
+        if ($DB->record_exists('vrsculpt_contrib', ['sessionid' => $data->sessionid, 'userid' => $data->userid])) {
+            return;
+        }
+        $data->ops = max(0, (int)$data->ops);
+        $data->added = max(0.0, (float)$data->added);
+        $data->removed = max(0.0, (float)$data->removed);
+        $data->timemodified = (int)$data->timemodified;
+        $data->lastreport = (int)$data->lastreport;
+        $DB->insert_record('vrsculpt_contrib', $data);
     }
 
     /**

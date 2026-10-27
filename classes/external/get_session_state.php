@@ -55,12 +55,12 @@ class get_session_state extends external_api {
             self::execute_parameters(),
             ['cmid' => $cmid, 'sessionid' => $sessionid]
         );
-        [, , $context, $session] = helper::load($cmid, $sessionid);
+        [$vrsculpt, , $context, $session] = helper::load($cmid, $sessionid);
         require_capability('mod/vrsculpt:view', $context);
         if (!session_manager::can_view($session, $context, (int)$USER->id)) {
             throw new \required_capability_exception($context, 'mod/vrsculpt:viewallsubmissions', 'nopermissions', '');
         }
-        return helper::state($session, $context, (int)$USER->id);
+        return helper::state($vrsculpt, $session, $context, (int)$USER->id);
     }
 
     /**

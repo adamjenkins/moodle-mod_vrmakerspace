@@ -84,6 +84,33 @@ final class provider_test extends provider_testcase {
         $sculpt->create_snapshot($this->groupsession, (int)$this->alice->id, 'team1');
         $sculpt->create_snapshot($this->groupsession, (int)$this->bob->id, 'team2');
         grader::save_grade($this->solo, (int)$this->alice->id, 60.0, (int)$this->teacher->id);
+
+        // Shares of the group's sculpture, and alice's live connection with a message to bob's.
+        $sculpt->create_contribution($this->groupsession, (int)$this->alice->id, 12, 400.0, 100.0);
+        $sculpt->create_contribution($this->groupsession, (int)$this->bob->id, 3, 50.0, 0.0);
+        $this->add_peer($this->alice, 'a', 'host');
+        $this->add_peer($this->bob, 'b', 'guest');
+        global $DB;
+        $DB->insert_record('vrsculpt_signals', (object)['sessionid' => $this->groupsession->id,
+            'frompeerkey' => str_repeat('a', 32), 'topeerkey' => str_repeat('b', 32), 'fromuserid' => $this->alice->id,
+            'payload' => '{"type":"description"}', 'timecreated' => time()]);
+        $DB->insert_record('vrsculpt_signals', (object)['sessionid' => $this->groupsession->id,
+            'frompeerkey' => str_repeat('b', 32), 'topeerkey' => str_repeat('c', 32), 'fromuserid' => $this->bob->id,
+            'payload' => '{"type":"candidates"}', 'timecreated' => time()]);
+    }
+
+    /**
+     * A live connection to the group's sculpture.
+     *
+     * @param \stdClass $user the user
+     * @param string $char the character the peer key repeats
+     * @param string $role host or guest
+     * @return void
+     */
+    private function add_peer(\stdClass $user, string $char, string $role): void {
+        global $DB;
+        $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $this->groupsession->id, 'userid' => $user->id,
+            'peerkey' => str_repeat($char, 32), 'role' => $role, 'lastseen' => time(), 'timecreated' => time()]);
     }
 
     /**
@@ -93,7 +120,8 @@ final class provider_test extends provider_testcase {
         $collection = provider::get_metadata(new \core_privacy\local\metadata\collection('mod_vrsculpt'));
         $names = array_map(fn($item) => $item->get_name(), $collection->get_collection());
         $this->assertEqualsCanonicalizing(
-            ['vrsculpt_sessions', 'vrsculpt_snapshots', 'vrsculpt_grades', 'core_files'],
+            ['vrsculpt_sessions', 'vrsculpt_snapshots', 'vrsculpt_grades', 'vrsculpt_contrib', 'vrsculpt_peers',
+                'vrsculpt_signals', 'core_files', 'pairpartner', 'vrroomsync'],
             $names
         );
     }
@@ -152,6 +180,34 @@ final class provider_test extends provider_testcase {
         $this->assertCount(1, $data->sculptures);
         $this->assertCount(1, $data->sculptures[0]->versions);
         $this->assertSame(1, $data->sculptures[0]->versions[0]->version);
+        $this->assertSame(12, $data->sculptures[0]->contribution->operations);
+        $this->assertCount(1, $data->sculptures[0]->connections);
+        $this->assertSame('host', $data->sculptures[0]->connections[0]->role);
+        $this->assertCount(1, $data->sculptures[0]->connectionmessages);
+        $this->assertSame('{"type":"description"}', $data->sculptures[0]->connectionmessages[0]->message);
+    }
+
+    /**
+     * A user whose only data is a share or a connection is still found and exported.
+     */
+    public function test_live_data_only_user(): void {
+        global $DB;
+        $carol = $this->getDataGenerator()->create_and_enrol($this->course, 'student');
+        $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')
+            ->create_contribution($this->groupsession, (int)$carol->id, 1, 1.0, 0.0);
+        $team = \context_module::instance($this->team->cmid);
+
+        $this->assertEquals([$team->id], array_map('intval', provider::get_contexts_for_userid((int)$carol->id)->get_contextids()));
+        $userlist = new userlist($team, 'mod_vrsculpt');
+        provider::get_users_in_context($userlist);
+        $this->assertContains((int)$carol->id, array_map('intval', $userlist->get_userids()));
+
+        $this->export_context_data_for_user((int)$carol->id, $team, 'mod_vrsculpt');
+        $data = writer::with_context($team)->get_data();
+        $this->assertSame([], $data->sculptures[0]->versions);
+        $this->assertSame(1, $data->sculptures[0]->contribution->operations);
+        $DB->delete_records('vrsculpt_contrib', ['userid' => $carol->id]);
+        $this->assertSame([], provider::get_contexts_for_userid((int)$carol->id)->get_contextids());
     }
 
     /**
@@ -168,6 +224,12 @@ final class provider_test extends provider_testcase {
         $this->assertSame(0, $DB->count_records('vrsculpt_snapshots', ['userid' => $this->alice->id]));
         $this->assertSame(2, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $this->groupsession->id]));
         $this->assertTrue($DB->record_exists('vrsculpt_sessions', ['vrsculptid' => $this->solo->id, 'userid' => $this->bob->id]));
+        $this->assertFalse($DB->record_exists('vrsculpt_contrib', ['userid' => $this->alice->id]));
+        $this->assertFalse($DB->record_exists('vrsculpt_peers', ['userid' => $this->alice->id]));
+        $this->assertFalse($DB->record_exists('vrsculpt_signals', ['fromuserid' => $this->alice->id]));
+        $this->assertTrue($DB->record_exists('vrsculpt_contrib', ['userid' => $this->bob->id]));
+        $this->assertTrue($DB->record_exists('vrsculpt_peers', ['userid' => $this->bob->id]));
+        $this->assertTrue($DB->record_exists('vrsculpt_signals', ['fromuserid' => $this->bob->id]));
         $itemids = array_map(
             fn($f) => (int)$f->get_itemid(),
             get_file_storage()->get_area_files($solo->id, 'mod_vrsculpt', 'snapshots', false, 'id', false)
@@ -197,5 +259,12 @@ final class provider_test extends provider_testcase {
         $this->assertSame(0, $DB->count_records('vrsculpt_grades', ['vrsculptid' => $this->solo->id]));
         $this->assertSame([], get_file_storage()->get_area_files($solo->id, 'mod_vrsculpt', 'snapshots', false, 'id', false));
         $this->assertSame(2, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $this->groupsession->id]));
+        $this->assertSame(2, $DB->count_records('vrsculpt_contrib'));
+
+        $team = \context_module::instance($this->team->cmid);
+        provider::delete_data_for_all_users_in_context($team);
+        foreach (['vrsculpt_contrib', 'vrsculpt_peers', 'vrsculpt_signals', 'vrsculpt_sessions'] as $table) {
+            $this->assertSame(0, $DB->count_records($table), $table);
+        }
     }
 }

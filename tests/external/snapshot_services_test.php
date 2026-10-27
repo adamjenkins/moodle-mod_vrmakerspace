@@ -47,6 +47,15 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
     }
 
     /**
+     * A valid snapshot file.
+     *
+     * @return string
+     */
+    private function valid_data(): string {
+        return $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')->snapshot_data();
+    }
+
+    /**
      * The owner saves a version; the returned state and the stored file agree.
      */
     public function test_owner_saves(): void {
@@ -54,14 +63,16 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
         [$vrsculpt, $owner, , , $session] = $this->setup_activity();
         $this->setUser($owner);
 
-        $result = save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode('VRSC data'), 12);
+        $data = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')->snapshot_data('data', 12);
+        $result = save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode($data), 12);
         $result = external_api::clean_returnvalue(save_snapshot::execute_returns(), $result);
 
         $this->assertSame(1, $result['version']);
         $this->assertSame(12, $result['opcount']);
         $this->assertTrue($result['cansculpt']);
+        $this->assertSame('', $result['connection']);
         $snapshot = session_manager::get_latest_snapshot((int)$session->id);
-        $this->assertSame('VRSC data', session_manager::get_snapshot_file(
+        $this->assertSame($data, session_manager::get_snapshot_file(
             $snapshot,
             \context_module::instance($vrsculpt->cmid)
         )->get_content());
@@ -84,7 +95,7 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
         $this->setUser($other);
 
         try {
-            save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode('VRSC data'), 1);
+            save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode($this->valid_data()), 1);
             $this->fail('A student saved into another student\'s sculpture');
         } catch (\moodle_exception $e) {
             $this->assertSame('cannotsculpt', $e->errorcode);
@@ -106,7 +117,7 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
 
         $this->expectException(\moodle_exception::class);
         $this->expectExceptionMessage(get_string('invalidsession', 'mod_vrsculpt'));
-        save_snapshot::execute((int)$othercm->cmid, (int)$session->id, base64_encode('VRSC data'), 1);
+        save_snapshot::execute((int)$othercm->cmid, (int)$session->id, base64_encode($this->valid_data()), 1);
     }
 
     /**
@@ -121,7 +132,7 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
         $this->assertFalse($state['cansculpt']);
 
         $this->expectException(\required_capability_exception::class);
-        save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode('VRSC data'), 1);
+        save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode($this->valid_data()), 1);
     }
 
     /**
@@ -138,5 +149,51 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
         } catch (\moodle_exception $e) {
             $this->assertSame('snapshotinvalid', $e->errorcode);
         }
+    }
+
+    /**
+     * A file with a broken header is refused through the service too, and the opcount sent is not what
+     * is stored: the header's sequence number is.
+     */
+    public function test_header_checked_and_seq_stored(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$vrsculpt, $owner, , , $session] = $this->setup_activity();
+        $this->setUser($owner);
+        $data = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')->snapshot_data('x', 33);
+
+        try {
+            save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode(substr($data, 0, -1)), 33);
+            $this->fail('A truncated file was accepted');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('snapshotinvalid', $e->errorcode);
+        }
+        $this->assertSame(0, $DB->count_records('vrsculpt_snapshots'));
+
+        $result = save_snapshot::execute((int)$vrsculpt->cmid, (int)$session->id, base64_encode($data), 999);
+        $this->assertSame(33, $result['opcount']);
+    }
+
+    /**
+     * Group work reports its connection in the state.
+     */
+    public function test_state_reports_connection(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $vrsculpt = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $course->id,
+            'workmode' => session_manager::MODE_GROUP, 'connectmode' => 'pair']);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $group = $this->getDataGenerator()->create_group(['courseid' => $course->id]);
+        $this->getDataGenerator()->create_group_member(['groupid' => $group->id, 'userid' => $student->id]);
+        $session = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')
+            ->create_session(['vrsculptid' => $vrsculpt->id, 'groupid' => $group->id]);
+        $this->setUser($student);
+
+        $state = external_api::clean_returnvalue(
+            get_session_state::execute_returns(),
+            get_session_state::execute((int)$vrsculpt->cmid, (int)$session->id)
+        );
+        $this->assertSame('pair', $state['connection']);
+        $this->assertTrue($state['cansculpt']);
     }
 }

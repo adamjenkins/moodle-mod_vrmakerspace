@@ -40,7 +40,12 @@ class save_snapshot extends external_api {
             'cmid' => new external_value(PARAM_INT, 'Course module id'),
             'sessionid' => new external_value(PARAM_INT, 'Session id'),
             'data' => new external_value(PARAM_RAW, 'The sculpture, base64-encoded'),
-            'opcount' => new external_value(PARAM_INT, 'Operations applied since the session started', VALUE_DEFAULT, 0),
+            'opcount' => new external_value(
+                PARAM_INT,
+                'Operations applied since the session started (informational: the data header\'s sequence number is stored)',
+                VALUE_DEFAULT,
+                0
+            ),
         ]);
     }
 
@@ -50,7 +55,7 @@ class save_snapshot extends external_api {
      * @param int $cmid course module id
      * @param int $sessionid session id
      * @param string $data base64 sculpture data
-     * @param int $opcount operations applied
+     * @param int $opcount operations applied (the header's sequence number is what is stored)
      * @return array the session's new state
      */
     public static function execute(int $cmid, int $sessionid, string $data, int $opcount = 0): array {
@@ -61,11 +66,8 @@ class save_snapshot extends external_api {
             'data' => $data,
             'opcount' => $opcount,
         ]);
-        [, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
-        require_capability('mod/vrsculpt:sculpt', $context);
-        if (!session_manager::can_sculpt($session, $context, (int)$USER->id)) {
-            throw new \moodle_exception('cannotsculpt', 'mod_vrsculpt');
-        }
+        [$vrsculpt, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
+        helper::require_sculptor($session, $context, (int)$USER->id);
 
         // Base64 is a third larger than the data: refuse oversize input before decoding it.
         if (strlen($params['data']) > intdiv(session_manager::max_snapshot_size() * 4, 3) + 4) {
@@ -75,8 +77,9 @@ class save_snapshot extends external_api {
         if ($bytes === false) {
             throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
         }
-        session_manager::save_snapshot($session, $context, (int)$USER->id, $bytes, $params['opcount']);
-        return helper::state($session, $context, (int)$USER->id);
+        // The version's operation count is the sequence number in the data's own header.
+        session_manager::save_snapshot($session, $context, (int)$USER->id, $bytes);
+        return helper::state($vrsculpt, $session, $context, (int)$USER->id);
     }
 
     /**

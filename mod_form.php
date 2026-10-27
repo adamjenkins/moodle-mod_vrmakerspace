@@ -26,6 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
 
+use mod_vrsculpt\local\companion_manager;
 use mod_vrsculpt\local\session_manager;
 
 /**
@@ -64,10 +65,33 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
         $mform->addHelpButton('workmode', 'workmode', 'vrsculpt');
         $mform->setDefault('workmode', session_manager::MODE_INDIVIDUAL);
 
+        // Pair work is built in and always offered; the companion service only when its plugin is
+        // installed (or the activity already uses it), with a note while it is not configured.
+        $connections = [session_manager::CONNECTION_PAIR => get_string('connection_pair', 'vrsculpt')];
+        $current = (string)($this->current->connectmode ?? '');
+        if (companion_manager::is_installed() || $current === session_manager::CONNECTION_COMPANION) {
+            $connections[session_manager::CONNECTION_COMPANION] = get_string('connection_companion', 'vrsculpt', 8);
+        }
+        $mform->addElement('select', 'connectmode', get_string('connection', 'vrsculpt'), $connections);
+        $mform->addHelpButton('connectmode', 'connection', 'vrsculpt');
+        $mform->setDefault('connectmode', session_manager::CONNECTION_PAIR);
+        $mform->hideIf('connectmode', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
+        if (isset($connections[session_manager::CONNECTION_COMPANION]) && !companion_manager::is_available()) {
+            $mform->addElement(
+                'static',
+                'companionnote',
+                '',
+                html_writer::div(get_string('connection_notconfigured', 'vrsculpt'), 'alert alert-warning mb-0')
+            );
+            $mform->hideIf('companionnote', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
+            $mform->hideIf('companionnote', 'connectmode', 'eq', session_manager::CONNECTION_PAIR);
+        }
+
         $mform->addElement('select', 'maxusers', get_string('maxusers', 'vrsculpt'), array_combine(range(2, 8), range(2, 8)));
         $mform->addHelpButton('maxusers', 'maxusers', 'vrsculpt');
         $mform->setDefault('maxusers', 8);
         $mform->hideIf('maxusers', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
+        $mform->hideIf('maxusers', 'connectmode', 'eq', session_manager::CONNECTION_PAIR);
 
         $mform->addElement('advcheckbox', 'trackcontributions', get_string('trackcontributions', 'vrsculpt'));
         $mform->addHelpButton('trackcontributions', 'trackcontributions', 'vrsculpt');
@@ -79,7 +103,7 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
     }
 
     /**
-     * Validate the form: grades are points only.
+     * Validate the form: grades are points only; the companion service needs its plugin.
      *
      * @param array $data submitted data
      * @param array $files submitted files
@@ -89,6 +113,13 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
         $errors = parent::validation($data, $files);
         if (isset($data['grade']) && (int)$data['grade'] < 0) {
             $errors['grade'] = get_string('errornoscales', 'vrsculpt');
+        }
+        if (
+            (int)($data['workmode'] ?? 0) === session_manager::MODE_GROUP
+                && ($data['connectmode'] ?? '') === session_manager::CONNECTION_COMPANION
+                && !companion_manager::is_installed()
+        ) {
+            $errors['connectmode'] = get_string('connection_notinstalled', 'vrsculpt');
         }
         return $errors;
     }

@@ -60,7 +60,16 @@ function vrsculpt_clean_instance_data(stdClass $data): stdClass {
     $data->startmodel = session_manager::clean_start_model((string)($data->startmodel ?? ''));
     $data->workmode = (int)($data->workmode ?? 0) === session_manager::MODE_GROUP
         ? session_manager::MODE_GROUP : session_manager::MODE_INDIVIDUAL;
+    // Group work only: pair (built in, two people at once) or companion (up to maxusers). Individual
+    // work keeps the default, so switching to group work later starts with pair work.
+    $data->connectmode = session_manager::connection($data);
+    if ($data->workmode !== session_manager::MODE_GROUP) {
+        $data->connectmode = session_manager::CONNECTION_PAIR;
+    }
     $data->maxusers = min(8, max(2, (int)($data->maxusers ?? 8)));
+    if ($data->connectmode === session_manager::CONNECTION_PAIR) {
+        $data->maxusers = 2;
+    }
     $data->trackcontributions = empty($data->trackcontributions) ? 0 : 1;
     $data->grade = max(0, (int)($data->grade ?? 0));
     return $data;
@@ -108,7 +117,7 @@ function vrsculpt_update_instance(stdClass $data, ?mod_vrsculpt_mod_form $mform 
 }
 
 /**
- * Delete an activity with its sessions, versions, files and grades.
+ * Delete an activity with its sessions, versions, files, live connections, contributions and grades.
  *
  * @param int $id The vrsculpt id.
  * @return bool
@@ -124,12 +133,7 @@ function vrsculpt_delete_instance(int $id): bool {
     if ($cm) {
         session_manager::delete_all($vrsculpt, context_module::instance($cm->id));
     } else {
-        $DB->delete_records_select(
-            'vrsculpt_snapshots',
-            'sessionid IN (SELECT id FROM {vrsculpt_sessions} WHERE vrsculptid = ?)',
-            [$id]
-        );
-        $DB->delete_records('vrsculpt_sessions', ['vrsculptid' => $id]);
+        session_manager::delete_rows($id);
     }
     $DB->delete_records('vrsculpt_grades', ['vrsculptid' => $id]);
     grader::grade_item_delete($vrsculpt);
@@ -285,7 +289,8 @@ function vrsculpt_reset_gradebook(int $courseid, string $type = ''): void {
 }
 
 /**
- * Course reset: delete sculptures, versions and grades when asked.
+ * Course reset: delete sculptures with their versions, live connections and contributions, and the
+ * grades, when asked.
  *
  * @param stdClass $data the reset form data
  * @return array status items

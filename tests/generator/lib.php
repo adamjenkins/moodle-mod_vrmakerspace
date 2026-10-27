@@ -39,6 +39,7 @@ class mod_vrsculpt_generator extends testing_module_generator {
         $record = (array)($record ?? []) + [
             'startmodel' => 'lump',
             'workmode' => session_manager::MODE_INDIVIDUAL,
+            'connectmode' => session_manager::CONNECTION_PAIR,
             'maxusers' => 8,
             'trackcontributions' => 0,
             'grade' => 100,
@@ -59,15 +60,38 @@ class mod_vrsculpt_generator extends testing_module_generator {
     }
 
     /**
+     * The bytes of a valid "VRSC" version 1 snapshot: an uncompressed grid of $dim voxels per axis whose
+     * voxel bytes repeat $tag (so different tags give different files).
+     *
+     * @param string $tag the bytes the payload repeats
+     * @param int $seq the edit sequence number in the header (stored as the version's opcount)
+     * @param int $dim the grid size on each axis (8..256)
+     * @return string
+     */
+    public function snapshot_data(string $tag = 'test', int $seq = 1, int $dim = 8): string {
+        $tag = $tag === '' ? "\x7f" : $tag;
+        $count = $dim * $dim * $dim;
+        $payload = substr(str_repeat($tag, intdiv($count, strlen($tag)) + 1), 0, $count);
+        return session_manager::SNAPSHOT_MAGIC
+            . pack('vvvvvv', session_manager::SNAPSHOT_VERSION, 0, $dim, $dim, $dim, 0)
+            . pack('g', 0.004)
+            . pack('g', 0.012)
+            . pack('V', $seq)
+            . str_repeat("\0", 16)
+            . pack('V', strlen($payload))
+            . $payload;
+    }
+
+    /**
      * Save a version of a sculpture.
      *
      * @param stdClass $session the session row
      * @param int $userid who saves it
-     * @param string $payload bytes after the magic number
-     * @param int $opcount operations applied
+     * @param string $tag the bytes the payload repeats (see snapshot_data())
+     * @param int $opcount the edit sequence number in the header
      * @return stdClass the snapshot row
      */
-    public function create_snapshot(stdClass $session, int $userid, string $payload = 'test', int $opcount = 1): stdClass {
+    public function create_snapshot(stdClass $session, int $userid, string $tag = 'test', int $opcount = 1): stdClass {
         global $DB;
         $vrsculpt = $DB->get_record('vrsculpt', ['id' => $session->vrsculptid], '*', MUST_EXIST);
         $cm = get_coursemodule_from_instance('vrsculpt', $vrsculpt->id, $vrsculpt->course, false, MUST_EXIST);
@@ -75,8 +99,32 @@ class mod_vrsculpt_generator extends testing_module_generator {
             $session,
             context_module::instance($cm->id),
             $userid,
-            session_manager::SNAPSHOT_MAGIC . $payload,
-            $opcount
+            $this->snapshot_data($tag, $opcount)
         );
+    }
+
+    /**
+     * Record a member's share of a sculpture directly.
+     *
+     * @param stdClass $session the session row
+     * @param int $userid the member
+     * @param int $ops operations
+     * @param float $added clay added, mm³
+     * @param float $removed clay removed, mm³
+     * @return stdClass the vrsculpt_contrib row
+     */
+    public function create_contribution(stdClass $session, int $userid, int $ops, float $added, float $removed): stdClass {
+        global $DB;
+        $record = (object)[
+            'sessionid' => $session->id,
+            'userid' => $userid,
+            'ops' => $ops,
+            'added' => $added,
+            'removed' => $removed,
+            'timemodified' => time(),
+            'lastreport' => time(),
+        ];
+        $record->id = $DB->insert_record('vrsculpt_contrib', $record);
+        return $record;
     }
 }
