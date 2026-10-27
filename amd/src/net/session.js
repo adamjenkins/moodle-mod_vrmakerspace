@@ -411,8 +411,8 @@ class Session extends Emitter {
     /**
      * Constructor.
      *
-     * @param {Object} config {mode, cmid, sessionid, engine, user: {id, name}, model, snapshoturl, readonly,
-     *     autosavems, contributionms, trackcontributions, strings}.
+     * @param {Object} config {mode, cmid, sessionid, engine, user: {id, name}, model, modelurl, modelformat,
+     *     snapshoturl, readonly, autosavems, contributionms, trackcontributions, strings}.
      */
     constructor(config) {
         super();
@@ -436,6 +436,8 @@ class Session extends Emitter {
             });
         }
         this.textfn = typeof c.strings === 'function' ? c.strings : null;
+        /** @type {Object|null} the uploaded starting model {bytes, format}, once fetched */
+        this.upload = null;
         // Role: 'sequencer' (solo, pair host), 'client' (pair guest, companion), 'detached', 'view'.
         this.role = 'detached';
         this.myauthor = 'u' + this.user.id;
@@ -894,6 +896,22 @@ class Session extends Emitter {
     }
 
     /**
+     * The uploaded starting model, fetched once.
+     *
+     * @returns {Promise<{bytes: Uint8Array, format: string}>}
+     */
+    async uploadedModel() {
+        if (!this.upload) {
+            const bytes = await this.fetchSnapshot(this.config.modelurl);
+            if (!bytes) {
+                throw new Error('The starting model could not be fetched');
+            }
+            this.upload = {bytes: bytes, format: String(this.config.modelformat || '')};
+        }
+        return this.upload;
+    }
+
+    /**
      * Initialise the engine with a version (or the starting model).
      *
      * @param {Uint8Array|null} bytes
@@ -901,10 +919,12 @@ class Session extends Emitter {
      */
     async initEngine(bytes) {
         const header = bytes ? readHeader(bytes) : null;
+        const upload = !bytes && this.config.model === 'upload' ? await this.uploadedModel() : null;
         const result = await this.engine.init({
             dims: DIMS,
             voxel: VOXEL,
             model: this.config.model,
+            upload: upload,
             snapshot: bytes ? toArrayBuffer(bytes) : null,
         });
         const engineseq = Number(result && result.seq) || 0;

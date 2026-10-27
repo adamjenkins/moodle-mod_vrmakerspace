@@ -20,7 +20,7 @@
  * which is passed on to the sibling modules it imports.
  *
  * main → worker:
- *   {type: 'init', dims, voxel, model, snapshot: ArrayBuffer|null}
+ *   {type: 'init', dims, voxel, model, upload: {bytes: ArrayBuffer, format}|null, snapshot: ArrayBuffer|null}
  *       → {type: 'ready', seq, epoch, dims, voxel}, then {type: 'chunks'} with every non-empty chunk
  *   {type: 'local', op}             apply to the display state as a pending op
  *   {type: 'confirmed', op, seq}    apply to the confirmed state in seq order
@@ -268,7 +268,7 @@ async function handle(msg) {
         case 'init': {
             const m = await loadModules();
             engine = await m.engine.Engine.create({dims: msg.dims, voxel: msg.voxel, model: msg.model,
-                snapshot: msg.snapshot || null});
+                upload: msg.upload || null, snapshot: msg.snapshot || null});
             shown.clear();
             const grid = engine.display;
             self.postMessage({type: 'ready', seq: engine.seq, epoch: engine.epoch, dims: grid.nx, voxel: grid.voxel});

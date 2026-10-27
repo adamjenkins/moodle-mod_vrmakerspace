@@ -36,6 +36,7 @@
 
 import {Grid, CHUNK} from './grid.js';
 import {fillModel, isModel} from './models.js';
+import {fillUpload, FORMATS} from './meshimport.js';
 import {READ_MARGIN, applyOp, cleanOp, copyBox, createWork, footprint, isStrokeKind} from './ops.js';
 import {History} from './history.js';
 import {isEpoch, readSnapshot, writeSnapshot, MIN_DIM, MAX_DIM, MIN_VOXEL, MAX_VOXEL} from './snapshot.js';
@@ -131,8 +132,10 @@ export class Engine {
      * Creates an engine from a snapshot, or from a starting model when there is none.
      *
      * @param {{dims: (number|undefined), voxel: (number|undefined), model: (string|undefined),
+     *     upload: ({bytes: (ArrayBuffer|ArrayBufferView), format: string}|null|undefined),
      *     snapshot: (ArrayBuffer|ArrayBufferView|null|undefined)}} [options] dims (8..256, default 128)
-     *     and voxel (metres, default 0.004) for a new grid; model 'lump' (default), 'sphere' or 'cube';
+     *     and voxel (metres, default 0.004) for a new grid; model 'lump' (default), 'sphere', 'cube' or
+     *     'upload' (the uploaded model in upload: an STL, OBJ or glTF binary file, see meshimport.js);
      *     snapshot a VRSC file, whose dimensions, voxel, seq and epoch then win.
      * @returns {Promise<Engine>} The engine. Its epoch is the snapshot's, else a new random one.
      * @throws {Error} For a bad snapshot, model or grid shape.
@@ -153,11 +156,19 @@ export class Engine {
         if (typeof voxel !== 'number' || !(voxel >= MIN_VOXEL && voxel <= MAX_VOXEL)) {
             throw new Error('bad voxel size');
         }
-        if (!isModel(model)) {
+        const upload = model === 'upload' ? options.upload : null;
+        if (model === 'upload' && (!upload || !upload.bytes || FORMATS.indexOf(upload.format) === -1)) {
+            throw new Error('the uploaded model is missing');
+        }
+        if (!upload && !isModel(model)) {
             throw new Error('unknown model: ' + String(model));
         }
         const grid = new Grid(dims, dims, dims, voxel, BAND_VOXELS * voxel);
-        fillModel(grid, model);
+        if (upload) {
+            fillUpload(grid, upload.bytes, upload.format);
+        } else {
+            fillModel(grid, model);
+        }
         return new Engine(grid, 0, randomEpoch());
     }
 

@@ -4,7 +4,8 @@
 
 The first version: sculpt a 3D model of clay alone or together, in VR or in the browser.
 
-- New VR sculpting activity: starting model (clay lump, sphere, cube), individual or group work,
+- New VR sculpting activity: starting model (clay lump, sphere, cube, or an uploaded STL, OBJ or glTF
+  binary model), individual or group work,
   how groups sculpt together, people per group sculpture, contribution tracking, points grade.
 - The sculpting studio: grab, twist, add, carve and smooth with brush size and strength, per-person
   undo and redo, in a WebXR headset (controllers or hand tracking, with a wrist palette) or on the

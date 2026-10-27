@@ -84,11 +84,11 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
-     * Settings, a group sculpture with two versions and their files, a member's share and a grade
-     * survive; live connections do not.
+     * Settings, a group sculpture with two versions and their files, a member's share, a grade and
+     * another activity's uploaded starting model survive; live connections do not.
      */
     public function test_backup_restore_with_user_data(): void {
-        global $DB;
+        global $DB, $USER;
         $this->resetAfterTest();
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
@@ -107,10 +107,23 @@ final class backup_restore_test extends \advanced_testcase {
         $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $session->id, 'userid' => $student->id,
             'peerkey' => str_repeat('a', 32), 'role' => 'host', 'lastseen' => time(), 'timecreated' => time()]);
         grader::save_grade($vrsculpt, (int)$student->id, 75.0, 2);
+        // A second activity starts from an uploaded model.
+        $draftid = file_get_unused_draft_itemid();
+        get_file_storage()->create_file_from_string(['contextid' => \context_user::instance($USER->id)->id,
+            'component' => 'user', 'filearea' => 'draft', 'itemid' => $draftid, 'filepath' => '/',
+            'filename' => 'owl.obj'], "v 0 0 0\n");
+        $this->getDataGenerator()->create_module('vrsculpt', ['course' => $course->id, 'name' => 'Owl',
+            'startmodel' => 'upload', 'startmodelfile' => $draftid]);
 
         $newcourseid = $this->backup_and_restore($course);
 
-        $restored = $DB->get_record('vrsculpt', ['course' => $newcourseid], '*', MUST_EXIST);
+        $owl = $DB->get_record('vrsculpt', ['course' => $newcourseid, 'name' => 'Owl'], '*', MUST_EXIST);
+        $this->assertSame('upload', $owl->startmodel);
+        $owlcm = get_coursemodule_from_instance('vrsculpt', $owl->id, $newcourseid, false, MUST_EXIST);
+        $owlfile = session_manager::start_model_file(\context_module::instance($owlcm->id));
+        $this->assertSame("v 0 0 0\n", $owlfile->get_content());
+
+        $restored = $DB->get_record('vrsculpt', ['course' => $newcourseid, 'startmodel' => 'cube'], '*', MUST_EXIST);
         $this->assertSame('cube', $restored->startmodel);
         $this->assertSame('companion', $restored->connectmode);
         $this->assertSame(4, (int)$restored->maxusers);

@@ -11,7 +11,7 @@
         <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="intro" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="introformat" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-        <FIELD NAME="startmodel" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="lump" SEQUENCE="false" COMMENT="Starting primitive: sphere, cube or lump"/>
+        <FIELD NAME="startmodel" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="lump" SEQUENCE="false" COMMENT="Starting model: sphere, cube, lump or upload (the file in the startmodel file area)"/>
         <FIELD NAME="workmode" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 = one sculpture per user, 1 = one shared sculpture per group"/>
         <FIELD NAME="connectmode" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="pair" SEQUENCE="false" COMMENT="Group work: pair (built in, two people) or companion (the companion service)"/>
         <FIELD NAME="maxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="8" SEQUENCE="false" COMMENT="Most people sculpting one group sculpture at once"/>

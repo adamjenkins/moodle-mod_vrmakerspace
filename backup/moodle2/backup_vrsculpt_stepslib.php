@@ -89,6 +89,7 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
         $usergrade->annotate_ids('user', 'grader');
 
         $vrsculpt->annotate_files('mod_vrsculpt', 'intro', null);
+        $vrsculpt->annotate_files('mod_vrsculpt', 'startmodel', null);
         $snapshot->annotate_files('mod_vrsculpt', 'snapshots', 'id');
 
         return $this->prepare_activity_structure($vrsculpt);

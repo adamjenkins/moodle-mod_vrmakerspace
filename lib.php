@@ -76,6 +76,49 @@ function vrsculpt_clean_instance_data(stdClass $data): stdClass {
 }
 
 /**
+ * Save the uploaded starting model from the form's file manager, or remove it when the activity
+ * starts from a primitive. Without the file manager in the data (generators, web services), nothing
+ * changes.
+ *
+ * @param stdClass $data cleaned form data (with coursemodule)
+ * @return void
+ */
+function vrsculpt_save_start_model(stdClass $data): void {
+    if (!isset($data->startmodelfile) || empty($data->coursemodule)) {
+        return;
+    }
+    $context = context_module::instance($data->coursemodule);
+    if ($data->startmodel === session_manager::MODEL_UPLOAD) {
+        file_save_draft_area_files(
+            $data->startmodelfile,
+            $context->id,
+            'mod_vrsculpt',
+            session_manager::MODEL_FILEAREA,
+            0,
+            vrsculpt_start_model_file_options()
+        );
+    } else {
+        get_file_storage()->delete_area_files($context->id, 'mod_vrsculpt', session_manager::MODEL_FILEAREA);
+    }
+}
+
+/**
+ * The options of the starting model's file manager.
+ *
+ * @return array
+ */
+function vrsculpt_start_model_file_options(): array {
+    return [
+        'subdirs' => 0,
+        'maxfiles' => 1,
+        'maxbytes' => session_manager::MODEL_MAXBYTES,
+        // Moodle's file types know .glb but not .stl or .obj, so the picker would refuse those: it takes
+        // any file, and the form accepts only MODEL_FORMATS (session_manager::start_model_format()).
+        'accepted_types' => '*',
+    ];
+}
+
+/**
  * Add a new activity.
  *
  * @param stdClass $data Form data.
@@ -89,6 +132,7 @@ function vrsculpt_add_instance(stdClass $data, ?mod_vrsculpt_mod_form $mform = n
     $data->timecreated = time();
     $data->timemodified = $data->timecreated;
     $data->id = $DB->insert_record('vrsculpt', $data);
+    vrsculpt_save_start_model($data);
     grader::grade_item_update($data);
     return (int)$data->id;
 }
@@ -107,6 +151,7 @@ function vrsculpt_update_instance(stdClass $data, ?mod_vrsculpt_mod_form $mform 
     $data->id = $data->instance;
     $data->timemodified = time();
     $DB->update_record('vrsculpt', $data);
+    vrsculpt_save_start_model($data);
     $vrsculpt = $DB->get_record('vrsculpt', ['id' => $data->id], '*', MUST_EXIST);
     if (property_exists($data, 'cmidnumber')) {
         $vrsculpt->cmidnumber = $data->cmidnumber;
@@ -317,9 +362,10 @@ function vrsculpt_reset_userdata(stdClass $data): array {
 }
 
 /**
- * Serve the snapshot files.
+ * Serve the snapshot files and the uploaded starting model.
  *
- * Only to users who may see the session; always as a download, never inline.
+ * Snapshots only to users who may see the session, the starting model to users who may view the
+ * activity; always as a download, never inline.
  *
  * @param stdClass $course the course
  * @param stdClass $cm the course module
@@ -333,7 +379,21 @@ function vrsculpt_reset_userdata(stdClass $data): array {
 function vrsculpt_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
     global $DB, $USER;
 
-    if ($context->contextlevel != CONTEXT_MODULE || $filearea !== session_manager::FILEAREA || count($args) !== 2) {
+    if ($context->contextlevel != CONTEXT_MODULE || count($args) !== 2) {
+        return false;
+    }
+    if ($filearea === session_manager::MODEL_FILEAREA) {
+        // The starting model: activity material, for everyone who may see the activity.
+        require_login($course, false, $cm);
+        require_capability('mod/vrsculpt:view', $context);
+        $filename = clean_param($args[1], PARAM_FILE);
+        $file = get_file_storage()->get_file($context->id, 'mod_vrsculpt', $filearea, 0, '/', $filename);
+        if ((int)$args[0] !== 0 || !$file || $file->is_directory()) {
+            return false;
+        }
+        send_stored_file($file, 0, 0, true, $options);
+    }
+    if ($filearea !== session_manager::FILEAREA) {
         return false;
     }
     require_login($course, false, $cm);

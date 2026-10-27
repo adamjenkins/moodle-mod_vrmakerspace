@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
+require_once($CFG->dirroot . '/mod/vrsculpt/lib.php');
 
 use mod_vrsculpt\local\companion_manager;
 use mod_vrsculpt\local\session_manager;
@@ -57,6 +58,16 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
         $mform->addElement('select', 'startmodel', get_string('startmodel', 'vrsculpt'), $models);
         $mform->addHelpButton('startmodel', 'startmodel', 'vrsculpt');
         $mform->setDefault('startmodel', 'lump');
+
+        $mform->addElement(
+            'filemanager',
+            'startmodelfile',
+            get_string('startmodelfile', 'vrsculpt'),
+            null,
+            $this->start_model_file_options()
+        );
+        $mform->addHelpButton('startmodelfile', 'startmodelfile', 'vrsculpt');
+        $mform->hideIf('startmodelfile', 'startmodel', 'neq', session_manager::MODEL_UPLOAD);
 
         $mform->addElement('select', 'workmode', get_string('workmode', 'vrsculpt'), [
             session_manager::MODE_INDIVIDUAL => get_string('workmode_individual', 'vrsculpt'),
@@ -103,7 +114,42 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
     }
 
     /**
-     * Validate the form: grades are points only; the companion service needs its plugin.
+     * The starting model's file manager options, limited to the course's upload limit.
+     *
+     * @return array
+     */
+    protected function start_model_file_options(): array {
+        global $CFG;
+        $options = vrsculpt_start_model_file_options();
+        $coursebytes = get_user_max_upload_file_size($this->context, $CFG->maxbytes, $this->get_course()->maxbytes);
+        if ($coursebytes > 0) {
+            $options['maxbytes'] = min($options['maxbytes'], $coursebytes);
+        }
+        return $options;
+    }
+
+    /**
+     * Load the uploaded starting model into the file manager's draft area.
+     *
+     * @param array $defaultvalues the form's default values, by reference
+     * @return void
+     */
+    public function data_preprocessing(&$defaultvalues) {
+        $draftitemid = file_get_submitted_draft_itemid('startmodelfile');
+        file_prepare_draft_area(
+            $draftitemid,
+            $this->context ? $this->context->id : null,
+            'mod_vrsculpt',
+            session_manager::MODEL_FILEAREA,
+            0,
+            vrsculpt_start_model_file_options()
+        );
+        $defaultvalues['startmodelfile'] = $draftitemid;
+    }
+
+    /**
+     * Validate the form: grades are points only; the companion service needs its plugin; an uploaded
+     * starting model needs its file.
      *
      * @param array $data submitted data
      * @param array $files submitted files
@@ -120,6 +166,13 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
                 && !companion_manager::is_installed()
         ) {
             $errors['connectmode'] = get_string('connection_notinstalled', 'vrsculpt');
+        }
+        if (($data['startmodel'] ?? '') === session_manager::MODEL_UPLOAD) {
+            $files = file_get_drafarea_files((int)($data['startmodelfile'] ?? 0))->list;
+            $models = array_filter($files, fn($file) => session_manager::start_model_format($file->filename) !== '');
+            if (!$models) {
+                $errors['startmodelfile'] = get_string('startmodelfile_required', 'vrsculpt');
+            }
         }
         return $errors;
     }

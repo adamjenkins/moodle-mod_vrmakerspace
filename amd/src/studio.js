@@ -717,8 +717,8 @@ const run = (root, config, strings, extra) => {
 /**
  * Start the studio (js_call_amd from studio.php).
  *
- * @param {Object} config {cmid, sessionid, mode, readonly, user: {id, name}, model, snapshoturl, version, workerurl,
- *     trackcontributions, maxusers, autosavems, contributionms, backurl}
+ * @param {Object} config {cmid, sessionid, mode, readonly, user: {id, name}, model, modelurl, modelformat, snapshoturl,
+ *     version, workerurl, trackcontributions, maxusers, autosavems, contributionms, backurl}
  * @returns {Promise<Object|null>} {stop()} once running, or null.
  */
 export const init = (config) => {

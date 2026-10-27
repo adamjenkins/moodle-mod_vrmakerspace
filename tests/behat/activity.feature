@@ -30,6 +30,20 @@ Feature: Create a VR sculpting activity and see the sculptures
     And I should see "Nobody has started a sculpture yet."
     And I should not see "Your sculpture"
 
+  @javascript @_file_upload
+  Scenario: A teacher starts the sculptures from an uploaded model
+    Given I log in as "teacher1"
+    And I add a vrsculpt activity to course "Sculpting" section "1" and I fill the form with:
+      | Name           | Clay owls      |
+      | Starting model | Uploaded model |
+    And I should see "Upload an STL, OBJ or glTF binary (.glb) file, or choose another starting model."
+    When I upload "mod/vrsculpt/tests/fixtures/tetrahedron.stl" file to "Model file" filemanager
+    And I press "Save and display"
+    Then I should see "Uploaded model"
+    And I navigate to "Settings" in current page administration
+    And I expand all fieldsets
+    And I should see "tetrahedron.stl"
+
   Scenario: A student gets their own sculpture and the teacher sees it
     Given the following "activities" exist:
       | activity | name         | course | idnumber | startmodel |

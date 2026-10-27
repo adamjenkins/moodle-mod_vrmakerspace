@@ -99,7 +99,7 @@ class helper {
         return new external_single_structure([
             'sessionid' => new external_value(PARAM_INT, 'Session id'),
             'connection' => new external_value(PARAM_ALPHA, 'Group work: pair or companion; empty for individual work'),
-            'startmodel' => new external_value(PARAM_ALPHA, 'Starting model: lump, sphere or cube'),
+            'startmodel' => new external_value(PARAM_ALPHA, 'Starting model: lump, sphere, cube or upload'),
             'status' => new external_value(PARAM_INT, '0 = open, 1 = closed'),
             'cansculpt' => new external_value(PARAM_BOOL, 'Whether the user may save versions'),
             'version' => new external_value(PARAM_INT, 'Latest saved version, 0 when none'),

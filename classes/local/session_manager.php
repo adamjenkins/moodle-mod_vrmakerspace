@@ -42,8 +42,20 @@ class session_manager {
     /** @var int Read-only. */
     public const STATUS_CLOSED = 1;
 
-    /** @var string[] The starting primitives. */
-    public const START_MODELS = ['lump', 'sphere', 'cube'];
+    /** @var string The starting model the teacher uploads (a file in MODEL_FILEAREA). */
+    public const MODEL_UPLOAD = 'upload';
+
+    /** @var string[] The starting models: three primitives and an uploaded model. */
+    public const START_MODELS = ['lump', 'sphere', 'cube', self::MODEL_UPLOAD];
+
+    /** @var string The file area holding the uploaded starting model (item 0). */
+    public const MODEL_FILEAREA = 'startmodel';
+
+    /** @var string[] File types an uploaded starting model may have (js/engine/meshimport.js reads them). */
+    public const MODEL_FORMATS = ['stl', 'obj', 'glb'];
+
+    /** @var int Largest uploaded starting model, in bytes (the studio fetches at most 32 MB). */
+    public const MODEL_MAXBYTES = 33554432;
 
     /** @var string First bytes of every snapshot file (the sculpture format's magic number). */
     public const SNAPSHOT_MAGIC = 'VRSC';
@@ -397,6 +409,33 @@ class session_manager {
             self::snapshot_filename($snapshot)
         );
         return $file ?: null;
+    }
+
+    /**
+     * The activity's uploaded starting model, if it has one of a known type.
+     *
+     * @param \context_module $context the activity context
+     * @return \stored_file|null
+     */
+    public static function start_model_file(\context_module $context): ?\stored_file {
+        $files = get_file_storage()->get_area_files($context->id, 'mod_vrsculpt', self::MODEL_FILEAREA, 0, 'id', false);
+        foreach ($files as $file) {
+            if (self::start_model_format($file->get_filename()) !== '') {
+                return $file;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The format of an uploaded starting model, from its file name.
+     *
+     * @param string $filename the file name
+     * @return string one of MODEL_FORMATS, or '' for any other file
+     */
+    public static function start_model_format(string $filename): string {
+        $extension = \core_text::strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        return in_array($extension, self::MODEL_FORMATS, true) ? $extension : '';
     }
 
     /**

@@ -34,7 +34,10 @@ Nothing else: individual work and pair work need no server besides Moodle.
 
 ## Settings of an activity
 
-- **Starting model**: clay lump, sphere or cube. Every new sculpture starts from it.
+- **Starting model**: clay lump, sphere, cube or an uploaded model. Every new sculpture starts from it.
+- **Model file** (uploaded model): an STL, OBJ or glTF binary (.glb) file of up to 32 MB and 500 000
+  triangles. It is centred, scaled so its longest side is 22 cm, and turned into clay of about 4 mm
+  detail in each browser (colours and textures are dropped; closed models work best).
 - **Work**: individually (one sculpture per student) or in groups (one shared sculpture per group;
   the groups come from the activity's grouping, or from the course when it has none).
 - **Sculpting together** (group work): *With one partner (built in)* or *With up to 8 people

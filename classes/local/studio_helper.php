@@ -134,6 +134,23 @@ final class studio_helper {
             $maxusers = session_manager::connection($vrsculpt) === session_manager::CONNECTION_COMPANION
                 ? min(8, max(2, (int)$vrsculpt->maxusers)) : pair_manager::MAX_PEERS;
         }
+        // An uploaded starting model that has gone (the activity now starts from a primitive) falls back
+        // to the clay lump, as an unknown model does.
+        $model = session_manager::clean_start_model((string)$session->startmodel);
+        $modelfile = $model === session_manager::MODEL_UPLOAD ? session_manager::start_model_file($context) : null;
+        if ($model === session_manager::MODEL_UPLOAD && !$modelfile) {
+            $model = session_manager::START_MODELS[0];
+        }
+        $modelurl = $modelfile ? \moodle_url::make_pluginfile_url(
+            $context->id,
+            'mod_vrsculpt',
+            session_manager::MODEL_FILEAREA,
+            0,
+            '/',
+            $modelfile->get_filename(),
+            true
+        )->out(false) : '';
+
         // Served by engine.php under a versioned path, so the worker's relative imports are versioned too.
         $workerurl = new \moodle_url('/mod/vrsculpt/engine.php/' . (int)get_config('mod_vrsculpt', 'version') . '/worker.js');
 
@@ -143,7 +160,9 @@ final class studio_helper {
             'mode' => $mode,
             'readonly' => $readonly,
             'user' => ['id' => (int)$user->id, 'name' => pair_manager::display_name(fullname($user))],
-            'model' => session_manager::clean_start_model((string)$session->startmodel),
+            'model' => $model,
+            'modelurl' => $modelurl,
+            'modelformat' => $modelfile ? session_manager::start_model_format($modelfile->get_filename()) : '',
             // Looking only: the version shown, fetched directly. Sculpting: the session fetches its state.
             'snapshoturl' => $readonly && $snapshot ? session_manager::snapshot_url($snapshot, $context)->out(false) : '',
             'version' => $snapshot ? (int)$snapshot->version : 0,

@@ -376,7 +376,7 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
         /**
          * Start (or restart) the engine from a model or a snapshot.
          *
-         * @param {Object} options {dims, voxel, model, snapshot: ArrayBuffer|Uint8Array|null}
+         * @param {Object} options {dims, voxel, model, upload: {bytes, format}|null, snapshot: ArrayBuffer|Uint8Array|null}
          * @returns {Promise<Object>} {seq, epoch}
          */
         init: (options) => {
@@ -388,6 +388,9 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
             }
             clearChunks();
             const snapshot = toBuffer(options.snapshot || null);
+            // A copy of the uploaded model each time: the caller keeps its bytes for a restart.
+            const upload = options.upload ? {bytes: toBuffer(options.upload.bytes), format: options.upload.format} : null;
+            const transfer = [snapshot, upload && upload.bytes].filter((b) => b);
             return new Promise((resolve, reject) => {
                 initwait = {resolve, reject};
                 worker.postMessage({
@@ -395,8 +398,9 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
                     dims: Number(options.dims) || 128,
                     voxel: Number(options.voxel) || 0.004,
                     model: options.model || 'lump',
+                    upload: upload,
                     snapshot: snapshot,
-                }, snapshot ? [snapshot] : []);
+                }, transfer);
             });
         },
 
