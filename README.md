@@ -108,7 +108,8 @@ checked by Moodle before they are stored.
   may access all groups) with its versions, status and, when tracked, the members' shares.
 - **Grade sculptures** opens the grading page: each sculpture with its latest version, the shares, and
   a grade field per student; a group's sculpture also has "Give every member of the group this grade".
-  Grades go to the gradebook.
+  Grades go to the gradebook. **Quick view** opens the latest version in a popup: drag to turn it,
+  scroll or pinch (or the Zoom buttons) to zoom, right-drag, Shift+drag or the arrow keys to move it.
 - Users with *Open, close and reset sculptures* (`mod/vrsculpt:managesessions`) close a sculpture (it
   can be viewed and graded, not changed), reopen it, or reset it (every version and the recorded
   contributions are deleted), each after a confirmation.

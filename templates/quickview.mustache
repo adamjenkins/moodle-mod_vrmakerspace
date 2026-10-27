@@ -1,0 +1,54 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_vrsculpt/quickview
+
+    The body of the grading page's quick view popup: a 3D view of one saved version that turns and
+    zooms, with zoom and reset buttons.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * data-region stage, canvas, loading, message
+    * data-action zoomin, zoomout, reset
+
+    Context variables required for this template:
+    * uniqid - unique id for the help text
+    * title - plain-text name of the version shown (the canvas's label)
+
+    Example context (json):
+    {
+        "uniqid": "abc123",
+        "title": "Sam Student, version 3"
+    }
+}}
+<div class="mod_vrsculpt-quickview">
+    <p class="small text-muted mb-2" id="mod_vrsculpt-quickview-help-{{uniqid}}">{{#str}} quickview_help, mod_vrsculpt {{/str}}</p>
+    <div class="mod_vrsculpt-quickview-stage position-relative" data-region="stage">
+        <canvas class="mod_vrsculpt-quickview-canvas" data-region="canvas" tabindex="0" role="application"
+            aria-label="{{title}}" aria-describedby="mod_vrsculpt-quickview-help-{{uniqid}}"></canvas>
+        <div class="mod_vrsculpt-quickview-loading position-absolute top-50 start-50 translate-middle" data-region="loading"
+            role="status">{{#str}} studio_loading, mod_vrsculpt {{/str}}</div>
+    </div>
+    <div class="alert alert-warning d-none mt-2 mb-0" data-region="message" role="alert"></div>
+    <div class="mt-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="zoomin">{{#str}} zoomin, mod_vrsculpt {{/str}}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="zoomout">{{#str}} zoomout, mod_vrsculpt {{/str}}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="reset">{{#str}} resetview, mod_vrsculpt {{/str}}</button>
+    </div>
+</div>

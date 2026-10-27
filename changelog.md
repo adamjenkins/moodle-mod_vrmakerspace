@@ -23,6 +23,9 @@ All notable changes to this plugin are documented here. The format follows
   `mod_vrsculpt_set_session_status`; studio and 3D-view links on the activity page.
 - Scheduled task `\mod_vrsculpt\task\cleanup` (expired pair-work connections).
 - Dependency on `vrroomruntime_builtin` 2026101100.
+- Grading page quick view: `amd/src/quickview.js` and `templates/quickview.mustache` (a core modal
+  with the engine worker's mesh and three.js OrbitControls), `studio_helper::worker_url()`, the
+  grading rows' `snapshoturl` and `quickviewtitle`; Behat generator entity `mod_vrsculpt > versions`.
 - Uploaded starting models: `startmodel` value `upload`, the `startmodel` file area (one STL, OBJ or
   glTF binary file, backed up and restored), served by `vrsculpt_pluginfile()` to users who may view
   the activity, and read and voxelised in the engine worker by `js/engine/meshimport.js`.

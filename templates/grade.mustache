@@ -25,7 +25,8 @@
     * none
 
     Data attributes required for JS:
-    * none
+    * data-action="mod_vrsculpt-quickview" with data-url (the version's file) and data-title: opens the
+      quick view (mod_vrsculpt/quickview)
 
     Context variables required for this template:
     * cmid - course module id
@@ -34,7 +35,7 @@
     * maxgrade - the highest grade, formatted
     * tracked - whether contributions are tracked
     * hassculptures, sculptures - sessionid, owner, isgroup, status, version, hasversion, lastsaved,
-      viewurl, hasmembers, members (userid, name, inputid, label, value, haserror, error), grouplabel,
+      viewurl, snapshoturl, quickviewtitle, hasmembers, members (userid, name, inputid, label, value, haserror, error), grouplabel,
       groupinputid, hascontributions, contributions (name, ops, share, added, removed),
       hasmanagelinks, managelinks (action, label, url)
 
@@ -56,6 +57,8 @@
                 "hasversion": true,
                 "lastsaved": "Tuesday, 27 October 2026, 10:00 AM",
                 "viewurl": "#",
+                "snapshoturl": "#",
+                "quickviewtitle": "Group A, version 4",
                 "hasmembers": true,
                 "members": [
                     {"userid": 7, "name": "Sam Student", "inputid": "mod_vrsculpt-grade-3-7",
@@ -89,7 +92,12 @@
                             {{#str}} status, mod_vrsculpt {{/str}}: {{status}}.
                             {{#hasversion}}
                                 {{#str}} latestversion, mod_vrsculpt, {{version}} {{/str}} ({{lastsaved}}).
-                                <a href="{{viewurl}}">{{#str}} viewin3d, mod_vrsculpt {{/str}}</a>
+                                <button type="button" class="btn btn-secondary btn-sm ms-1" data-action="mod_vrsculpt-quickview"
+                                    data-url="{{snapshoturl}}" data-title="{{quickviewtitle}}"
+                                    aria-label="{{#str}} quickview_label, mod_vrsculpt, {{quickviewtitle}} {{/str}}">
+                                    {{#str}} quickview, mod_vrsculpt {{/str}}
+                                </button>
+                                <a class="ms-1" href="{{viewurl}}">{{#str}} viewin3d, mod_vrsculpt {{/str}}</a>
                             {{/hasversion}}
                             {{^hasversion}}
                                 {{#str}} noversions, mod_vrsculpt {{/str}}

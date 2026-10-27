@@ -151,8 +151,7 @@ final class studio_helper {
             true
         )->out(false) : '';
 
-        // Served by engine.php under a versioned path, so the worker's relative imports are versioned too.
-        $workerurl = new \moodle_url('/mod/vrsculpt/engine.php/' . (int)get_config('mod_vrsculpt', 'version') . '/worker.js');
+        $workerurl = self::worker_url();
 
         return [
             'cmid' => (int)$context->instanceid,
@@ -174,6 +173,17 @@ final class studio_helper {
             'contributionms' => self::CONTRIBUTION_MS,
             'backurl' => (new \moodle_url('/mod/vrsculpt/view.php', ['id' => $context->instanceid]))->out(false),
         ];
+    }
+
+    /**
+     * The URL of the sculpting engine's worker, for the studio and the grading page's quick view.
+     *
+     * Served by engine.php under a versioned path, so the worker's relative imports are versioned too.
+     *
+     * @return \moodle_url
+     */
+    public static function worker_url(): \moodle_url {
+        return new \moodle_url('/mod/vrsculpt/engine.php/' . (int)get_config('mod_vrsculpt', 'version') . '/worker.js');
     }
 
     /**

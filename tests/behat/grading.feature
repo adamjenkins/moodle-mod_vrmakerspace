@@ -59,3 +59,22 @@ Feature: Grade sculptures
     Then I should see "Grades saved (2 changed)."
     And the field "Grade for Sam Student" matches value "40.00"
     And the field "Grade for Sue Student" matches value "40.00"
+
+  @javascript
+  Scenario: A teacher looks at a saved version in the quick view
+    Given the following "activities" exist:
+      | activity | name         | course | idnumber | grade |
+      | vrsculpt | Clay animals | SCULPT | sculpt1  | 100   |
+    And the following "mod_vrsculpt > versions" exist:
+      | activity | user     |
+      | sculpt1  | student1 |
+    When I am on the "Clay animals" "vrsculpt activity" page logged in as "teacher1"
+    And I follow "Grade sculptures"
+    And I click on "Quick view of Sam Student, version 1" "button"
+    Then I should see "Sam Student, version 1" in the ".modal-title" "css_element"
+    And I should see "Drag to turn the sculpture" in the ".modal-body" "css_element"
+    And "Zoom in" "button" should exist in the ".modal-body" "css_element"
+    And I click on "Zoom in" "button" in the ".modal-body" "css_element"
+    And I click on "Reset view" "button" in the ".modal-body" "css_element"
+    And I click on "Close" "button" in the ".modal-dialog" "css_element"
+    And ".modal-body" "css_element" should not exist

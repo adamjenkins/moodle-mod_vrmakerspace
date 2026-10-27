@@ -17,7 +17,8 @@ The first version: sculpt a 3D model of clay alone or together, in VR or in the 
 - Saved versions (automatic, on demand, on leaving) with a version history; every sculpture and
   version can be viewed in 3D. Saved files are checked before they are stored.
 - Grading page: each sculpture with its latest version and the members' shares, a grade per student
-  and "give every member this grade" for groups; grades go to the gradebook.
+  and "give every member this grade" for groups; grades go to the gradebook. "Quick view" opens the
+  latest version in a popup to turn, zoom and move with the mouse, touch or keyboard.
 - Teachers close, reopen and reset sculptures.
 - Contribution tracking: each member's operations and clay added and removed, bounded on the server.
 - Privacy provider (including what is sent to the partner's browser and to the companion service),

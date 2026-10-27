@@ -99,6 +99,9 @@ final class grading_helper_test extends \advanced_testcase {
         $this->assertSame('20.00', $data['maxgrade']);
         $this->assertTrue($data['sculptures'][0]['hasversion']);
         $this->assertStringContainsString('studio.php', $data['sculptures'][0]['viewurl']);
+        $this->assertStringContainsString('/mod_vrsculpt/snapshots/', $data['sculptures'][0]['snapshoturl']);
+        $this->assertSame(fullname($one) . ', version 1', $data['sculptures'][0]['quickviewtitle']);
+        $this->assertSame('', $data['sculptures'][1]['snapshoturl']);
         $this->assertFalse($data['sculptures'][1]['hasversion']);
         $this->assertSame(get_string('gradefor', 'vrsculpt', fullname($one)), $data['sculptures'][0]['members'][0]['label']);
     }

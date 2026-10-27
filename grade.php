@@ -27,6 +27,7 @@
 require_once(__DIR__ . '/../../config.php');
 
 use mod_vrsculpt\local\grading_helper;
+use mod_vrsculpt\local\studio_helper;
 
 $id = required_param('id', PARAM_INT);
 [$course, $cm] = get_course_and_cm_from_cmid($id, 'vrsculpt');
@@ -62,6 +63,8 @@ if ((int)$vrsculpt->grade > 0 && optional_param('savegrades', '', PARAM_RAW) !==
     }
     \core\notification::error(get_string('gradesnotallsaved', 'vrsculpt', count($errors)));
 }
+
+$PAGE->requires->js_call_amd('mod_vrsculpt/quickview', 'init', [studio_helper::worker_url()->out(false)]);
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('grading', 'vrsculpt'), 3);

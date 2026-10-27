@@ -119,3 +119,22 @@
         height: 60vh;
     }
 }
+
+/* The grading page's quick view popup. */
+.mod_vrsculpt-quickview .mod_vrsculpt-quickview-stage {
+    height: 65vh;
+    min-height: 280px;
+    background: #c9ccd1;
+}
+
+.mod_vrsculpt-quickview .mod_vrsculpt-quickview-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    outline: none;
+}
+
+.mod_vrsculpt-quickview .mod_vrsculpt-quickview-canvas:focus-visible {
+    box-shadow: inset 0 0 0 3px #0f6cbf;
+}

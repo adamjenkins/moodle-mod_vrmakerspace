@@ -104,6 +104,17 @@ class mod_vrsculpt_generator extends testing_module_generator {
     }
 
     /**
+     * Save a version of a user's own sculpture (created when needed), for Behat's "versions" entity.
+     *
+     * @param array $record vrsculptid and userid
+     * @return stdClass the snapshot row
+     */
+    public function create_version(array $record): stdClass {
+        $session = $this->create_session(['vrsculptid' => $record['vrsculptid'], 'userid' => $record['userid']]);
+        return $this->create_snapshot($session, (int)$record['userid']);
+    }
+
+    /**
      * Record a member's share of a sculpture directly.
      *
      * @param stdClass $session the session row

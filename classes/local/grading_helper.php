@@ -168,6 +168,10 @@ final class grading_helper {
             $contributions = $tracked ? view_helper::contribution_rows((int)$sessionid, $context, $names) : [];
             $owner = view_helper::owner_name($session, $context, $names);
             $managelinks = $canmanage ? view_helper::manage_links($session, $context, 'grade') : [];
+            $quickviewtitle = $latest ? get_string('quickviewtitle', 'vrsculpt', [
+                'owner' => $owner,
+                'version' => (int)$latest->version,
+            ]) : '';
             $sculptures[] = [
                 'sessionid' => (int)$sessionid,
                 'owner' => $owner,
@@ -177,6 +181,8 @@ final class grading_helper {
                 'hasversion' => (bool)$latest,
                 'lastsaved' => $latest ? userdate($latest->timecreated) : '',
                 'viewurl' => $latest ? view_helper::studio_url($context, (int)$sessionid)->out(false) : '',
+                'snapshoturl' => $latest ? session_manager::snapshot_url($latest, $context)->out(false) : '',
+                'quickviewtitle' => $quickviewtitle,
                 'members' => $members,
                 'hasmembers' => !empty($members),
                 'grouplabel' => get_string('gradeallmembers', 'vrsculpt', $owner),
