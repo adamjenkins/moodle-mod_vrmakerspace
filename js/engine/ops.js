@@ -16,8 +16,8 @@
 /**
  * Sculpting operations: the op wire format, its validation, footprints and the field updates.
  *
- * Wire format: a plain object with the keys k, a, s, i, p, r, st, d, x, g, t (in that order, only
- * those the kind uses), JSON at most 600 bytes. cleanOp() rebuilds an op from known keys only,
+ * Wire format: a plain object with the keys k, a, s, i, p, r, st, d, x, g, t, m, sh, tx (in that
+ * order, only those the kind uses), JSON at most 600 bytes. cleanOp() rebuilds an op from known keys only,
  * applies the R3/R4/R5 rounding (idempotent) and checks every range; ops come from other people's
  * browsers, so nothing else is ever trusted.
  *
@@ -26,7 +26,14 @@
  * - carve:  d ← d + st · (smax(d, r − |q − p|, k) − d) (smooth subtraction);
  * - smooth: d ← d + st · w · (mean of the 6 neighbours − d), Jacobi (reads a copy);
  * - grab:   d(q) ← d₀(q − w · d) (semi-Lagrangian, trilinear reads from a copy); st is not used;
- * - twist:  d(q) ← d₀(p + Rot(axis, −g · w)(q − p)) (trilinear reads from a copy); st is not used.
+ * - twist:  d(q) ← d₀(p + Rot(axis, −g · w)(q − p)) (trilinear reads from a copy); st is not used;
+ * - inflate: d ← d − 0.1 · r · st · w (the surface moves outwards along its normal);
+ * - pinch:  d(q) ← d₀(p + (1 + 0.25 · st · w)(q − p)) (pulls the clay towards p, sharpening creases);
+ * - flatten: d ← d + st · w · (x̂ · q − g − d), towards the plane x̂ · q = g (x the plane normal,
+ *   g its offset, the same for the whole stroke);
+ * - shape / cutshape: d ← smin(d, s(q), k) / smax(d, −s(q), k), s the shape sh (shapes.js, text tx)
+ *   of size r centred on p and turned by g about x, k = (0.02 + 0.3 st) r; one op per stroke.
+ * With m = 1 a stroke op also applies its mirror image across the plane x = 0 (Blender's X symmetry).
  * Every written value is quantised to one of the grid's 255 levels and so clamped to the band.
  * An op writes only inside footprint(op) and reads only inside footprint(op) ± 2 voxels.
  *
@@ -37,15 +44,32 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {R3, R4, R5, sin, cos, falloff} from './mathx.js';
+import {PI, R3, R4, R5, sin, cos, falloff} from './mathx.js';
 import {BORDER, QMAX, trilinear} from './grid.js';
-
-/** Every op kind. */
-export const KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist', 'end', 'undo', 'redo', 'lock',
-    'unlock', 'save']);
+import {isShape, boundingRadius, prepare} from './shapes.js';
+import {isText} from './font.js';
 
 /** Kinds that change the field as part of a stroke. */
-export const STROKE_KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist']);
+export const STROKE_KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist', 'inflate', 'pinch', 'flatten',
+    'shape', 'cutshape']);
+
+/** Every op kind. */
+export const KINDS = Object.freeze(STROKE_KINDS.concat(['end', 'undo', 'redo', 'lock', 'unlock', 'save']));
+
+/** Kinds whose ops carry an axis x and an angle g that turn about it (mirrored as an axial vector). */
+const TURNING_KINDS = Object.freeze(['twist', 'shape', 'cutshape']);
+
+/** Inflate: how far one dab moves the surface, as a share of the radius at full strength. */
+export const INFLATE_RATE = 0.1;
+
+/** Pinch: how far one dab pulls, as a share of the distance to the centre at full strength. */
+export const PINCH_RATE = 0.25;
+
+/** Largest absolute flatten plane offset in metres. */
+export const MAX_PLANE = 1;
+
+/** Largest reach of a shape op (its bounding radius) in metres. */
+export const MAX_SHAPE_REACH = 0.3;
 
 /** Largest stroke id, op index and undo target. */
 export const MAX_ID = 2147483647;
@@ -86,10 +110,20 @@ const DEFAULT_GRID = Object.freeze({nx: 128, ny: 128, nz: 128, voxel: 0.004, ban
  * Whether a kind is one of the field-changing stroke kinds.
  *
  * @param {string} k Kind.
- * @returns {boolean} True for add, carve, smooth, grab and twist.
+ * @returns {boolean} True for the kinds of STROKE_KINDS.
  */
 export function isStrokeKind(k) {
-    return k === 'add' || k === 'carve' || k === 'smooth' || k === 'grab' || k === 'twist';
+    return STROKE_KINDS.indexOf(k) !== -1;
+}
+
+/**
+ * The blend width of a shape op.
+ *
+ * @param {object} op A clean shape or cutshape op.
+ * @returns {number} Metres.
+ */
+function shapeBlend(op) {
+    return (0.02 + 0.3 * op.st) * op.r;
 }
 
 /**
@@ -212,13 +246,15 @@ export function cleanOp(obj) {
         }
         out.d = d;
     }
-    if (k === 'twist') {
+    if (k === 'twist' || k === 'flatten' || k === 'shape' || k === 'cutshape') {
         const x = vec3(obj.x, R4, MAX_AXIS);
         if (!x || (x[0] === 0 && x[1] === 0 && x[2] === 0) || !isNum(obj.g)) {
             return null;
         }
-        const g = R4(obj.g);
-        if (g < -MAX_TWIST || g > MAX_TWIST) {
+        // twist: angle per op; flatten: plane offset (m); shapes: the turn (rad).
+        const g = k === 'flatten' ? R5(obj.g) : R4(obj.g);
+        const limit = k === 'twist' ? MAX_TWIST : (k === 'flatten' ? MAX_PLANE : PI);
+        if (g < -limit || g > limit) {
             return null;
         }
         out.x = x;
@@ -229,6 +265,27 @@ export function cleanOp(obj) {
             return null;
         }
         out.t = obj.t;
+    }
+    if (stroke && obj.m !== undefined) {
+        if (obj.m !== 1) {
+            return null;
+        }
+        out.m = 1;
+    }
+    if (k === 'shape' || k === 'cutshape') {
+        if (!isShape(obj.sh)) {
+            return null;
+        }
+        out.sh = obj.sh;
+        if (obj.sh === 'text') {
+            if (!isText(obj.tx)) {
+                return null;
+            }
+            out.tx = obj.tx;
+        }
+        if (boundingRadius(out.sh, out.r, out.tx) > MAX_SHAPE_REACH) {
+            return null;
+        }
     }
     if (JSON.stringify(out).length > MAX_BYTES) {
         return null;
@@ -254,14 +311,59 @@ function reach(op, band) {
             const d = op.d;
             return op.r + band + Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         }
+        case 'pinch':
+            // Reads reach (1 + PINCH_RATE) r from p.
+            return (1 + PINCH_RATE) * op.r + band;
+        case 'shape':
+        case 'cutshape':
+            return boundingRadius(op.sh, op.r, op.tx) + band + shapeBlend(op);
         default:
             return op.r + band;
     }
 }
 
 /**
+ * The mirror image of a stroke op across the plane x = 0.
+ *
+ * Positions and displacements are mirrored as points; a flatten normal as a vector; the turning axis
+ * of twist and the shapes as an axial vector (a mirrored turn is a turn about (x, −y, −z)).
+ *
+ * @param {object} op A clean stroke op.
+ * @returns {object} The mirrored op, without m.
+ */
+export function mirrorOp(op) {
+    const out = Object.assign({}, op);
+    delete out.m;
+    out.p = [op.p[0] === 0 ? 0 : -op.p[0], op.p[1], op.p[2]];
+    if (op.d) {
+        out.d = [op.d[0] === 0 ? 0 : -op.d[0], op.d[1], op.d[2]];
+    }
+    if (op.x) {
+        const axial = TURNING_KINDS.indexOf(op.k) !== -1;
+        out.x = axial ? [op.x[0], op.x[1] === 0 ? 0 : -op.x[1], op.x[2] === 0 ? 0 : -op.x[2]]
+            : [op.x[0] === 0 ? 0 : -op.x[0], op.x[1], op.x[2]];
+    }
+    return out;
+}
+
+/**
+ * The smallest voxel box holding two (either may be null).
+ *
+ * @param {{min: number[], max: number[]}|null} a Box.
+ * @param {{min: number[], max: number[]}|null} b Box.
+ * @returns {{min: number[], max: number[]}|null} Their union.
+ */
+function unionBox(a, b) {
+    if (!a || !b) {
+        return a || b;
+    }
+    return {min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],
+        max: [Math.max(a.max[0], b.max[0]), Math.max(a.max[1], b.max[1]), Math.max(a.max[2], b.max[2])]};
+}
+
+/**
  * The voxel box an op may write: its reach around p, clipped to the interior (the outer 2 voxels
- * of every face are never written).
+ * of every face are never written); with m, the box holding the op and its mirror image.
  *
  * @param {object} op A clean op.
  * @param {{nx: number, ny: number, nz: number, voxel: number, band: number, cx: number, cy: number,
@@ -274,6 +376,20 @@ export function footprint(op, grid) {
         return null;
     }
     const g = grid || DEFAULT_GRID;
+    if (op.m === 1) {
+        return unionBox(footprintOne(op, g), footprintOne(mirrorOp(op), g));
+    }
+    return footprintOne(op, g);
+}
+
+/**
+ * The voxel box one op (not its mirror image) may write.
+ *
+ * @param {object} op A clean stroke op.
+ * @param {object} g The grid.
+ * @returns {{min: number[], max: number[]}|null} Inclusive voxel box or null.
+ */
+function footprintOne(op, g) {
     const rv = reach(op, g.band) / g.voxel;
     const c = [op.p[0] / g.voxel + g.cx, op.p[1] / g.voxel + g.cy, op.p[2] / g.voxel + g.cz];
     const n = [g.nx, g.ny, g.nz];
@@ -616,6 +732,201 @@ function applyTwist(grid, op, box, work) {
 }
 
 /**
+ * inflate: moves the surface outwards along its normal (subtracts from the distance).
+ *
+ * @param {import('./grid.js').Grid} grid The grid.
+ * @param {object} op Clean inflate op.
+ * @param {{min: number[], max: number[]}} box Its footprint.
+ * @returns {void}
+ */
+function applyInflate(grid, op, box) {
+    const {nx, ny, voxel, data, levels, inv} = grid;
+    const r = op.r;
+    const r2 = r * r;
+    const amount = INFLATE_RATE * r * op.st;
+    const [px, py, pz] = op.p;
+    for (let k = box.min[2]; k <= box.max[2]; k++) {
+        const dz = (k - grid.cz) * voxel - pz;
+        for (let j = box.min[1]; j <= box.max[1]; j++) {
+            const dy = (j - grid.cy) * voxel - py;
+            const dyz = dy * dy + dz * dz;
+            let idx = box.min[0] + nx * (j + ny * k);
+            for (let i = box.min[0]; i <= box.max[0]; i++, idx++) {
+                const dx = (i - grid.cx) * voxel - px;
+                const d2 = dx * dx + dyz;
+                if (d2 >= r2) {
+                    continue;
+                }
+                const w = falloff(Math.sqrt(d2) / r);
+                if (w === 0) {
+                    continue;
+                }
+                const v = data[idx] - amount * w;
+                let q = Math.round(v * inv);
+                q = q < -QMAX ? -QMAX : (q > QMAX ? QMAX : q);
+                data[idx] = levels[q + QMAX];
+            }
+        }
+    }
+}
+
+/**
+ * pinch: pulls the clay towards p (trilinear reads from a copy, from farther out).
+ *
+ * @param {import('./grid.js').Grid} grid The grid.
+ * @param {object} op Clean pinch op.
+ * @param {{min: number[], max: number[]}} box Its footprint.
+ * @param {object} work Working memory.
+ * @returns {void}
+ */
+function applyPinch(grid, op, box, work) {
+    if (op.st === 0) {
+        return;
+    }
+    copyRegion(grid, box, READ_MARGIN, work);
+    const {nx, ny, voxel, data, levels, inv} = grid;
+    const reg = work.region;
+    const {ox, oy, oz, sx, sy, sz} = work;
+    const r = op.r;
+    const r2 = r * r;
+    const rate = PINCH_RATE * op.st;
+    const [px, py, pz] = op.p;
+    for (let k = box.min[2]; k <= box.max[2]; k++) {
+        const dz = (k - grid.cz) * voxel - pz;
+        for (let j = box.min[1]; j <= box.max[1]; j++) {
+            const dy = (j - grid.cy) * voxel - py;
+            const dyz = dy * dy + dz * dz;
+            let idx = box.min[0] + nx * (j + ny * k);
+            for (let i = box.min[0]; i <= box.max[0]; i++, idx++) {
+                const dx = (i - grid.cx) * voxel - px;
+                const d2 = dx * dx + dyz;
+                if (d2 >= r2) {
+                    continue;
+                }
+                const w = falloff(Math.sqrt(d2) / r);
+                if (w === 0) {
+                    continue;
+                }
+                const f = 1 + rate * w;
+                const v = trilinear(reg, ox, oy, oz, sx, sy, sz, (px + dx * f) / voxel + grid.cx,
+                    (py + dy * f) / voxel + grid.cy, (pz + dz * f) / voxel + grid.cz);
+                let q = Math.round(v * inv);
+                q = q < -QMAX ? -QMAX : (q > QMAX ? QMAX : q);
+                data[idx] = levels[q + QMAX];
+            }
+        }
+    }
+}
+
+/**
+ * flatten: blends the field towards the distance to the plane x̂ · q = g.
+ *
+ * @param {import('./grid.js').Grid} grid The grid.
+ * @param {object} op Clean flatten op.
+ * @param {{min: number[], max: number[]}} box Its footprint.
+ * @returns {void}
+ */
+function applyFlatten(grid, op, box) {
+    const {nx, ny, voxel, data, levels, inv} = grid;
+    const al = Math.sqrt(op.x[0] * op.x[0] + op.x[1] * op.x[1] + op.x[2] * op.x[2]);
+    const nxv = op.x[0] / al;
+    const nyv = op.x[1] / al;
+    const nzv = op.x[2] / al;
+    const r = op.r;
+    const r2 = r * r;
+    const st = op.st;
+    const [px, py, pz] = op.p;
+    for (let k = box.min[2]; k <= box.max[2]; k++) {
+        const z = (k - grid.cz) * voxel;
+        const dz = z - pz;
+        for (let j = box.min[1]; j <= box.max[1]; j++) {
+            const y = (j - grid.cy) * voxel;
+            const dy = y - py;
+            const dyz = dy * dy + dz * dz;
+            const plane = nyv * y + nzv * z - op.g;
+            let idx = box.min[0] + nx * (j + ny * k);
+            for (let i = box.min[0]; i <= box.max[0]; i++, idx++) {
+                const x = (i - grid.cx) * voxel;
+                const dx = x - px;
+                const d2 = dx * dx + dyz;
+                if (d2 >= r2) {
+                    continue;
+                }
+                const w = falloff(Math.sqrt(d2) / r) * st;
+                if (w === 0) {
+                    continue;
+                }
+                const a = data[idx];
+                const v = a + w * (nxv * x + plane - a);
+                let q = Math.round(v * inv);
+                q = q < -QMAX ? -QMAX : (q > QMAX ? QMAX : q);
+                data[idx] = levels[q + QMAX];
+            }
+        }
+    }
+}
+
+/**
+ * shape and cutshape: smooth union with (or subtraction of) a turned shape.
+ *
+ * @param {import('./grid.js').Grid} grid The grid.
+ * @param {object} op Clean shape or cutshape op.
+ * @param {{min: number[], max: number[]}} box Its footprint.
+ * @param {boolean} cut True to subtract.
+ * @returns {void}
+ */
+function applyShape(grid, op, box, cut) {
+    const {nx, ny, voxel, data, levels, inv} = grid;
+    const k = shapeBlend(op);
+    const quarterK = 0.25 * k;
+    const sdf = prepare(op.sh, op.r, op.tx, grid.band + k);
+    // Local = Rᵀ (q − p), R the turn by g about x̂ (Rodrigues).
+    const al = Math.sqrt(op.x[0] * op.x[0] + op.x[1] * op.x[1] + op.x[2] * op.x[2]);
+    const ax = op.x[0] / al;
+    const ay = op.x[1] / al;
+    const az = op.x[2] / al;
+    const c = cos(op.g);
+    const s = sin(op.g);
+    const t = 1 - c;
+    const m00 = c + ax * ax * t;
+    const m01 = ax * ay * t - az * s;
+    const m02 = ax * az * t + ay * s;
+    const m10 = ay * ax * t + az * s;
+    const m11 = c + ay * ay * t;
+    const m12 = ay * az * t - ax * s;
+    const m20 = az * ax * t - ay * s;
+    const m21 = az * ay * t + ax * s;
+    const m22 = c + az * az * t;
+    const [px, py, pz] = op.p;
+    for (let kk = box.min[2]; kk <= box.max[2]; kk++) {
+        const dz = (kk - grid.cz) * voxel - pz;
+        for (let j = box.min[1]; j <= box.max[1]; j++) {
+            const dy = (j - grid.cy) * voxel - py;
+            let idx = box.min[0] + nx * (j + ny * kk);
+            for (let i = box.min[0]; i <= box.max[0]; i++, idx++) {
+                const dx = (i - grid.cx) * voxel - px;
+                const lx = m00 * dx + m10 * dy + m20 * dz;
+                const ly = m01 * dx + m11 * dy + m21 * dz;
+                const lz = m02 * dx + m12 * dy + m22 * dz;
+                const b = sdf(lx, ly, lz);
+                const a = data[idx];
+                let m;
+                if (cut) {
+                    const h = Math.max(k - Math.abs(a + b), 0) / k;
+                    m = Math.max(a, -b) + h * h * quarterK;
+                } else {
+                    const h = Math.max(k - Math.abs(a - b), 0) / k;
+                    m = Math.min(a, b) - h * h * quarterK;
+                }
+                let q = Math.round(m * inv);
+                q = q < -QMAX ? -QMAX : (q > QMAX ? QMAX : q);
+                data[idx] = levels[q + QMAX];
+            }
+        }
+    }
+}
+
+/**
  * Applies a clean stroke op to a grid, writing only inside its footprint.
  *
  * @param {import('./grid.js').Grid} grid The grid (changed in place).
@@ -630,6 +941,34 @@ export function applyOp(grid, op, work, box) {
     if (!fp) {
         return null;
     }
+    if (op.m === 1) {
+        // The op, then its mirror image, each in its own box.
+        const own = Object.assign({}, op);
+        delete own.m;
+        const ownbox = footprintOne(own, grid);
+        if (ownbox) {
+            applyOne(grid, own, work, ownbox);
+        }
+        const mirror = mirrorOp(op);
+        const mirrorbox = footprintOne(mirror, grid);
+        if (mirrorbox) {
+            applyOne(grid, mirror, work, mirrorbox);
+        }
+        return fp;
+    }
+    return applyOne(grid, op, work, fp) ? fp : null;
+}
+
+/**
+ * Applies one op (no mirror image) inside a box.
+ *
+ * @param {import('./grid.js').Grid} grid The grid (changed in place).
+ * @param {object} op A clean op without m.
+ * @param {object} work Working memory.
+ * @param {{min: number[], max: number[]}} fp Its footprint.
+ * @returns {boolean} Whether the kind changes the field.
+ */
+function applyOne(grid, op, work, fp) {
     switch (op.k) {
         case 'add':
             applyBlob(grid, op, fp, false);
@@ -646,8 +985,23 @@ export function applyOp(grid, op, work, box) {
         case 'twist':
             applyTwist(grid, op, fp, work);
             break;
+        case 'inflate':
+            applyInflate(grid, op, fp);
+            break;
+        case 'pinch':
+            applyPinch(grid, op, fp, work);
+            break;
+        case 'flatten':
+            applyFlatten(grid, op, fp);
+            break;
+        case 'shape':
+            applyShape(grid, op, fp, false);
+            break;
+        case 'cutshape':
+            applyShape(grid, op, fp, true);
+            break;
         default:
-            return null;
+            return false;
     }
-    return fp;
+    return true;
 }

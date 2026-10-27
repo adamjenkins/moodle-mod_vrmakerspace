@@ -134,8 +134,8 @@ export class Engine {
      * @param {{dims: (number|undefined), voxel: (number|undefined), model: (string|undefined),
      *     upload: ({bytes: (ArrayBuffer|ArrayBufferView), format: string}|null|undefined),
      *     snapshot: (ArrayBuffer|ArrayBufferView|null|undefined)}} [options] dims (8..256, default 128)
-     *     and voxel (metres, default 0.004) for a new grid; model 'lump' (default), 'sphere', 'cube' or
-     *     'upload' (the uploaded model in upload: an STL, OBJ or glTF binary file, see meshimport.js);
+     *     and voxel (metres, default 0.004) for a new grid; model 'lump' (default), 'sphere', 'cube',
+     *     'empty' or 'upload' (the uploaded model in upload: an STL, OBJ or glTF binary file, see meshimport.js);
      *     snapshot a VRSC file, whose dimensions, voxel, seq and epoch then win.
      * @returns {Promise<Engine>} The engine. Its epoch is the snapshot's, else a new random one.
      * @throws {Error} For a bad snapshot, model or grid shape.

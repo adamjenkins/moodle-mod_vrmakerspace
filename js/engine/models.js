@@ -14,7 +14,8 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Starting models of a sculpture: a clay lump, a sphere and a rounded cube.
+ * Starting models of a sculpture: a clay lump, a sphere, a rounded cube, or nothing (empty, for
+ * building with the shape tools).
  *
  * Each model is a signed-distance function in sculpture-local metres, evaluated with the
  * deterministic maths of mathx.js only, so every client builds the same starting grid bit for bit.
@@ -30,7 +31,7 @@ import {sin} from './mathx.js';
 import {BORDER} from './grid.js';
 
 /** Names of the starting models. */
-export const MODELS = Object.freeze(['lump', 'sphere', 'cube']);
+export const MODELS = Object.freeze(['lump', 'sphere', 'cube', 'empty']);
 
 /** Lump ellipsoid radii in metres. */
 const LUMP_R = [0.11, 0.09, 0.10];
@@ -103,14 +104,23 @@ export function cube(x, y, z) {
     return outside + inside - CUBE_ROUND;
 }
 
+/**
+ * Signed distance of empty space: no clay anywhere.
+ *
+ * @returns {number} A distance beyond every band.
+ */
+export function empty() {
+    return 1;
+}
+
 /** Distance functions by model name. */
-const FUNCTIONS = Object.freeze({lump, sphere, cube});
+const FUNCTIONS = Object.freeze({lump, sphere, cube, empty});
 
 /**
  * Whether a model name is known.
  *
  * @param {string} name Model name.
- * @returns {boolean} True for lump, sphere and cube.
+ * @returns {boolean} True for lump, sphere, cube and empty.
  */
 export function isModel(name) {
     return MODELS.indexOf(name) !== -1;
@@ -121,7 +131,7 @@ export function isModel(name) {
  * border voxels of every face.
  *
  * @param {import('./grid.js').Grid} grid The grid to fill (overwritten).
- * @param {string} name 'lump', 'sphere' or 'cube'.
+ * @param {string} name 'lump', 'sphere', 'cube' or 'empty'.
  * @returns {import('./grid.js').Grid} The grid.
  */
 export function fillModel(grid, name) {

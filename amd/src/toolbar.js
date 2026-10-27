@@ -14,8 +14,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The studio toolbar (templates/studio.mustache): tool buttons (aria-pressed), brush size and
- * strength sliders, undo and redo, save now, the export menu, Enter VR, full screen, and the status
+ * The studio toolbar (templates/studio.mustache): tool buttons (aria-pressed), the mirror switch,
+ * the shape tools' shape and letters (shown while a shape tool is chosen), brush size and strength
+ * sliders, undo and redo, save now, the export menu, Enter VR, full screen, and the status
  * region (a polite live region) with the connection state and the latest message.
  *
  * The toolbar only binds to the markup the template rendered; every label comes from the template
@@ -73,6 +74,11 @@ export const createToolbar = (root, options) => {
     const undobutton = root.querySelector('[data-action="undo"]');
     const redobutton = root.querySelector('[data-action="redo"]');
     const vrhelp = region(root, 'vrhelp');
+    const mirrorbutton = root.querySelector('[data-action="mirror"]');
+    const shapeoptions = region(root, 'shapeoptions');
+    const shapeselect = region(root, 'shape');
+    const textinput = region(root, 'text');
+    const textfield = region(root, 'textfield');
     let messagetimer = null;
     let saving = false;
     let saveallowed = true;
@@ -124,6 +130,11 @@ export const createToolbar = (root, options) => {
                     tools.redo();
                 }
                 break;
+            case 'mirror':
+                if (tools) {
+                    tools.setMirror(!tools.mirror);
+                }
+                break;
             case 'save':
                 run('save');
                 break;
@@ -155,6 +166,10 @@ export const createToolbar = (root, options) => {
             tools.setSize(Number(size.value) / 1000);
         } else if (event.target === strength) {
             tools.setStrength(Number(strength.value) / 100);
+        } else if (event.target === shapeselect) {
+            tools.setShape(shapeselect.value);
+        } else if (event.target === textinput) {
+            tools.setText(textinput.value);
         }
     };
 
@@ -184,6 +199,19 @@ export const createToolbar = (root, options) => {
         }
         if (redobutton) {
             redobutton.disabled = !tools.canRedo();
+        }
+        if (mirrorbutton) {
+            mirrorbutton.setAttribute('aria-pressed', tools.mirror ? 'true' : 'false');
+            mirrorbutton.classList.toggle('active', tools.mirror);
+        }
+        const shapetool = tools.tool === 'shape' || tools.tool === 'cutshape';
+        show(shapeoptions, shapetool);
+        if (shapeselect && document.activeElement !== shapeselect) {
+            shapeselect.value = tools.shape;
+        }
+        show(textfield, shapetool && tools.shape === 'text');
+        if (textinput && document.activeElement !== textinput) {
+            textinput.value = tools.text;
         }
     };
 

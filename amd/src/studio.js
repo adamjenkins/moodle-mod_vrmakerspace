@@ -42,7 +42,8 @@ import {createSession} from 'mod_vrsculpt/net/session';
 /** Every string of the studio and the modules it hands its strings to (contract §9). */
 const STRING_KEYS = [
     'studio_loading', 'studio_nowebgl', 'studio_readonly', 'studio_failed', 'tools', 'tool_grab', 'tool_twist',
-    'tool_add', 'tool_carve', 'tool_smooth', 'brushsize', 'brushstrength', 'undo', 'redo', 'savenow',
+    'tool_add', 'tool_carve', 'tool_smooth', 'tool_inflate', 'tool_pinch', 'tool_flatten', 'tool_shape', 'tool_cutshape',
+    'mirror', 'brushsize', 'brushstrength', 'undo', 'redo', 'savenow',
     'savedversion', 'saving', 'savefailed', 'export', 'export_stl', 'export_glb', 'export_3mf', 'exportreport',
     'exportwatertight', 'exportproblems', 'entervr', 'exitvr', 'status_solo', 'status_connecting',
     'status_connected', 'status_waiting', 'status_reconnecting', 'status_resyncing', 'status_full',

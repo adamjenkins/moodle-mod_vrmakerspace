@@ -582,6 +582,8 @@ export const createXrSculpt = (options = {}) => {
             history(false);
         } else if (hit.region === 'redo') {
             history(true);
+        } else if (hit.region === 'mirror') {
+            tools.setMirror(!tools.mirror);
         }
     };
 
@@ -965,7 +967,7 @@ export const createXrSculpt = (options = {}) => {
             updateLeft();
             refreshRoot();
             if (tools) {
-                palette.setState(tools.tool, tools.size, tools.strength, tools.canUndo(), tools.canRedo());
+                palette.setState(tools.tool, tools.size, tools.strength, tools.canUndo(), tools.canRedo(), tools.mirror);
             }
             updateRight(step);
         },

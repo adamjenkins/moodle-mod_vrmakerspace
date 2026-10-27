@@ -45,8 +45,8 @@ class session_manager {
     /** @var string The starting model the teacher uploads (a file in MODEL_FILEAREA). */
     public const MODEL_UPLOAD = 'upload';
 
-    /** @var string[] The starting models: three primitives and an uploaded model. */
-    public const START_MODELS = ['lump', 'sphere', 'cube', self::MODEL_UPLOAD];
+    /** @var string[] The starting models: three primitives, nothing, and an uploaded model. */
+    public const START_MODELS = ['lump', 'sphere', 'cube', 'empty', self::MODEL_UPLOAD];
 
     /** @var string The file area holding the uploaded starting model (item 0). */
     public const MODEL_FILEAREA = 'startmodel';

@@ -15,7 +15,8 @@
 
 /**
  * The wrist palette of the VR studio: a canvas board shown above the left controller or hand with
- * the five tools, the brush size and strength bars, undo, redo and Exit VR, and a short help text.
+ * the ten tools (two rows), the brush size and strength bars, undo, redo, mirror and Exit VR, and a
+ * short help text.
  *
  * Everything is drawn with canvas calls (fillText: plain text, never HTML) into one texture, which
  * is redrawn only when what it shows changes. Hit tests are done in the board's own plane with
@@ -30,8 +31,12 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-/** The tools in palette order (the same order as the desktop keys 1–5). */
-export const TOOLS = Object.freeze(['grab', 'twist', 'add', 'carve', 'smooth']);
+/** The tools in palette order (the same order as the desktop keys 1–9 and 0), five to a row. */
+export const TOOLS = Object.freeze(['grab', 'twist', 'add', 'carve', 'smooth', 'inflate', 'pinch', 'flatten', 'shape',
+    'cutshape']);
+
+/** Tool buttons per row. */
+const TOOLS_PER_ROW = 5;
 
 /** Smallest and largest brush radius (m), as the op format allows. */
 export const SIZE_MIN = 0.004;
@@ -42,7 +47,7 @@ const CANVAS_WIDTH = 1024;
 const BOARD_WIDTH = 0.2;
 
 /** Canvas height of the full palette and of the view-only palette (px). */
-const CANVAS_HEIGHT = 704;
+const CANVAS_HEIGHT = 820;
 const CANVAS_HEIGHT_READONLY = 176;
 
 /** Outer margin and gap between controls (px). */
@@ -74,7 +79,7 @@ const noRaycast = () => undefined;
 /**
  * A rectangle of the canvas that reacts to the pointer.
  *
- * @param {string} region 'tool', 'size', 'strength', 'undo', 'redo' or 'exit'.
+ * @param {string} region 'tool', 'size', 'strength', 'undo', 'redo', 'mirror' or 'exit'.
  * @param {string|null} tool Tool name for a tool button.
  * @param {number} x Left (px).
  * @param {number} y Top (px).
@@ -100,28 +105,67 @@ const layout = (readonly) => {
         };
     }
     const areas = [];
-    const toolwidth = (CANVAS_WIDTH - PAD * (TOOLS.length + 1)) / TOOLS.length;
+    const toolwidth = (CANVAS_WIDTH - PAD * (TOOLS_PER_ROW + 1)) / TOOLS_PER_ROW;
     TOOLS.forEach((tool, i) => {
-        areas.push(area('tool', tool, PAD + i * (toolwidth + PAD), PAD, toolwidth, 150));
+        const column = i % TOOLS_PER_ROW;
+        const row = Math.floor(i / TOOLS_PER_ROW);
+        areas.push(area('tool', tool, PAD + column * (toolwidth + PAD), PAD + row * (120 + PAD), toolwidth, 120));
     });
     const labelwidth = 230;
     const barx = PAD + labelwidth + PAD;
     const barwidth = CANVAS_WIDTH - barx - PAD;
-    areas.push(area('size', null, barx, 186, barwidth, 90));
-    areas.push(area('strength', null, barx, 292, barwidth, 90));
-    const buttonwidth = (CANVAS_WIDTH - 4 * PAD) / 3;
-    areas.push(area('undo', null, PAD, 400, buttonwidth, 100));
-    areas.push(area('redo', null, 2 * PAD + buttonwidth, 400, buttonwidth, 100));
-    areas.push(area('exit', null, 3 * PAD + 2 * buttonwidth, 400, buttonwidth, 100));
+    areas.push(area('size', null, barx, 302, barwidth, 90));
+    areas.push(area('strength', null, barx, 408, barwidth, 90));
+    const buttonwidth = (CANVAS_WIDTH - 5 * PAD) / 4;
+    areas.push(area('undo', null, PAD, 516, buttonwidth, 100));
+    areas.push(area('redo', null, 2 * PAD + buttonwidth, 516, buttonwidth, 100));
+    areas.push(area('mirror', null, 3 * PAD + 2 * buttonwidth, 516, buttonwidth, 100));
+    areas.push(area('exit', null, 4 * PAD + 3 * buttonwidth, 516, buttonwidth, 100));
     return {
         height: CANVAS_HEIGHT,
         areas: areas,
         labels: {
-            size: {x: PAD, y: 186, w: labelwidth, h: 90},
-            strength: {x: PAD, y: 292, w: labelwidth, h: 90},
+            size: {x: PAD, y: 302, w: labelwidth, h: 90},
+            strength: {x: PAD, y: 408, w: labelwidth, h: 90},
         },
-        help: {x: PAD, y: 520, w: CANVAS_WIDTH - 2 * PAD, h: CANVAS_HEIGHT - 520 - PAD},
+        help: {x: PAD, y: 636, w: CANVAS_WIDTH - 2 * PAD, h: CANVAS_HEIGHT - 636 - PAD},
     };
+};
+
+/**
+ * Whether a button of the board can be used now.
+ *
+ * @param {string} region 'undo', 'redo', 'mirror' or 'exit'.
+ * @param {Object} state The board state.
+ * @returns {boolean}
+ */
+const buttonEnabled = (region, state) => {
+    if (region === 'undo') {
+        return state.canundo;
+    }
+    return region === 'redo' ? state.canredo : true;
+};
+
+/**
+ * The colour of a button of the board.
+ *
+ * @param {string} region 'undo', 'redo', 'mirror' or 'exit'.
+ * @param {Object} state The board state.
+ * @param {boolean} enabled Whether it can be used.
+ * @param {boolean} hovered Whether the pointer is on it.
+ * @returns {string} CSS colour.
+ */
+const buttonFill = (region, state, enabled, hovered) => {
+    if (region === 'exit') {
+        return hovered ? COLOURS.exithover : COLOURS.exit;
+    }
+    if (region === 'mirror' && state.mirror) {
+        return COLOURS.selected;
+    }
+    if (!enabled) {
+        return COLOURS.disabled;
+    }
+    return hovered ? COLOURS.hover : COLOURS.button;
 };
 
 /**
@@ -223,8 +267,8 @@ const wrapText = (ctx, text, box, size, colour) => {
 /**
  * Create the wrist palette.
  *
- * Options: strings (an object of the mod_vrsculpt strings by key: tool_grab … tool_smooth,
- * brushsize, brushstrength, undo, redo, exitvr, vrhelp), readonly (only Exit VR is shown).
+ * Options: strings (an object of the mod_vrsculpt strings by key: tool_grab … tool_cutshape,
+ * brushsize, brushstrength, undo, redo, mirror, exitvr, vrhelp), readonly (only Exit VR is shown).
  *
  * The board lies in the x/y plane of its object (facing +z), centred on the object's origin. The
  * caller places the object (it sets object.matrix itself; matrixAutoUpdate is off) and keeps
@@ -276,7 +320,7 @@ export const createPalette = (THREE, options = {}) => {
     const localpoint = new THREE.Vector3();
     const hit = {region: '', tool: null, key: '', value: 0, distance: 0};
 
-    const state = {tool: '', size: -1, strength: -1, canundo: false, canredo: false, hover: null};
+    const state = {tool: '', size: -1, strength: -1, canundo: false, canredo: false, mirror: false, hover: null};
     let drawn = false;
     let disposed = false;
 
@@ -324,14 +368,8 @@ export const createPalette = (THREE, options = {}) => {
                 ctx.arc(a.x + Math.max(18, Math.min(a.w - 18, a.w * share)), a.y + a.h / 2, 14, 0, Math.PI * 2);
                 ctx.fill();
             } else {
-                const enabled = a.region === 'exit' || (a.region === 'undo' ? state.canundo : state.canredo);
-                let fill = COLOURS.disabled;
-                if (a.region === 'exit') {
-                    fill = hovered ? COLOURS.exithover : COLOURS.exit;
-                } else if (enabled) {
-                    fill = hovered ? COLOURS.hover : COLOURS.button;
-                }
-                ctx.fillStyle = fill;
+                const enabled = buttonEnabled(a.region, state);
+                ctx.fillStyle = buttonFill(a.region, state, enabled, hovered);
                 roundRect(ctx, a.x, a.y, a.w, a.h, 18);
                 ctx.fill();
                 fitText(ctx, text(a.region === 'exit' ? 'exitvr' : a.region), a, 42,
@@ -407,8 +445,9 @@ export const createPalette = (THREE, options = {}) => {
          * @param {number} strength 0..1.
          * @param {boolean} canundo Whether Undo is possible.
          * @param {boolean} canredo Whether Redo is possible.
+         * @param {boolean} [mirror] Whether mirroring is on.
          */
-        setState(tool, size, strength, canundo, canredo) {
+        setState(tool, size, strength, canundo, canredo, mirror) {
             if (disposed) {
                 return;
             }
@@ -417,9 +456,10 @@ export const createPalette = (THREE, options = {}) => {
             const qstrength = Math.round(Number(strength) * 200) / 200;
             const name = String(tool || '');
             if (drawn && name === state.tool && qsize === state.size && qstrength === state.strength &&
-                    !!canundo === state.canundo && !!canredo === state.canredo) {
+                    !!canundo === state.canundo && !!canredo === state.canredo && !!mirror === state.mirror) {
                 return;
             }
+            state.mirror = !!mirror;
             state.tool = name;
             state.size = qsize;
             state.strength = qstrength;

@@ -70,7 +70,11 @@ const DIMS = 128;
 const VOXEL = 0.004;
 
 /** Op kinds (contract §3). */
-const KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist', 'end', 'undo', 'redo', 'lock', 'unlock', 'save']);
+const KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist', 'inflate', 'pinch', 'flatten', 'shape', 'cutshape',
+    'end', 'undo', 'redo', 'lock', 'unlock', 'save']);
+
+/** Longest string value of an op (sh, tx). */
+const MAX_OP_STRING = 40;
 
 /** Largest op JSON accepted from the network, in characters. */
 const MAX_OP_TEXT = 1024;
@@ -333,7 +337,8 @@ const rebuildOp = (source, author) => {
     op.i = source.i;
     const vectors = ['p', 'd', 'x'];
     const numbers = ['r', 'st', 'g'];
-    ['p', 'r', 'st', 'd', 'x', 'g', 't'].forEach((key) => {
+    const strings = ['sh', 'tx'];
+    ['p', 'r', 'st', 'd', 'x', 'g', 't', 'm', 'sh', 'tx'].forEach((key) => {
         if (source[key] === undefined) {
             return;
         }
@@ -341,6 +346,9 @@ const rebuildOp = (source, author) => {
             op[key] = isVec3(source[key]) ? source[key].slice() : undefined;
         } else if (numbers.indexOf(key) !== -1) {
             op[key] = typeof source[key] === 'number' && isFinite(source[key]) ? source[key] : undefined;
+        } else if (strings.indexOf(key) !== -1) {
+            const value = source[key];
+            op[key] = typeof value === 'string' && value.length <= MAX_OP_STRING ? value : undefined;
         } else {
             op[key] = isIndex(source[key]) ? source[key] : undefined;
         }

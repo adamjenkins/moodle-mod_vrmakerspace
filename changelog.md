@@ -23,6 +23,11 @@ All notable changes to this plugin are documented here. The format follows
   `mod_vrsculpt_set_session_status`; studio and 3D-view links on the activity page.
 - Scheduled task `\mod_vrsculpt\task\cleanup` (expired pair-work connections).
 - Dependency on `vrroomruntime_builtin` 2026101100.
+- Sculpting and modelling tools: op kinds `inflate`, `pinch`, `flatten`, `shape` and `cutshape`, op keys
+  `m` (mirror), `sh` (shape) and `tx` (letters) (`js/engine/ops.js`, `js/engine/shapes.js`,
+  `js/engine/font.js`); the start model `empty`; the toolbar's modelling group, shape and letters fields
+  and Mirror switch; ten tools in two rows on the VR palette, with Mirror. Needs the matching
+  `vrroom-sync` for companion work.
 - Grading page quick view: `amd/src/quickview.js` and `templates/quickview.mustache` (a core modal
   with the engine worker's mesh and three.js OrbitControls), `studio_helper::worker_url()`, the
   grading rows' `snapshoturl` and `quickviewtitle`; Behat generator entity `mod_vrsculpt > versions`.

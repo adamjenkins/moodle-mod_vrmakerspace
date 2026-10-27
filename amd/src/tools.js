@@ -17,7 +17,11 @@
  * The sculpting tools: turn a stroke of brush positions (from the mouse or a VR controller, in the
  * sculpture-local frame) into the ops of the wire format and hand them to the session.
  *
- * Add, carve and smooth place a dab every 0.3 × the brush radius along the path. Grab sends the
+ * Add, carve, smooth, inflate, pinch and flatten place a dab every 0.3 × the brush radius along the
+ * path (flatten keeps the plane of the stroke's first point, at right angles to the surface normal
+ * there). Shape and cut shape place one shape (or a word of letters) where the stroke begins, its up
+ * along the surface normal (letters face along it). With mirror on, every op also works on the
+ * mirror image across the sculpture's x = 0 plane (the engine applies it). Grab sends the
  * displacement since its previous op (never more than the radius per op), twist the angle since its
  * previous op (at most 0.5 rad per op). Every value is rounded (positions and radii to 1e-5,
  * strength to 1e-3, axis and angle to 1e-4) before it is sent and applied, so every client applies
@@ -36,11 +40,24 @@
 
 import Log from 'core/log';
 
-/** Tool names, in the order of the keyboard shortcuts 1 to 5. */
-export const TOOLS = ['grab', 'twist', 'add', 'carve', 'smooth'];
+/** Tool names, in the order of the keyboard shortcuts 1 to 9 and 0. */
+export const TOOLS = ['grab', 'twist', 'add', 'carve', 'smooth', 'inflate', 'pinch', 'flatten', 'shape', 'cutshape'];
 
 /** Tools that lock the region they work in. */
 const LOCKING = ['grab', 'twist'];
+
+/** Tools that place one shape per stroke. */
+export const SHAPE_TOOLS = ['shape', 'cutshape'];
+
+/** Shapes of the shape tools (js/engine/shapes.js). */
+export const SHAPES = ['sphere', 'cube', 'cylinder', 'cone', 'torus', 'text'];
+
+/** Characters the letters can be made of (js/engine/font.js), and the most of them. */
+const TEXT_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-!?\'';
+const MAX_TEXT = 16;
+
+/** Largest reach of a shape op (m), as js/engine/ops.js MAX_SHAPE_REACH. */
+const MAX_SHAPE_REACH = 0.3;
 
 /** Brush radius range (m) and the default. */
 export const MIN_SIZE = 0.004;
@@ -221,8 +238,8 @@ const makeCounter = (name) => {
  * Create the tools.
  *
  * @param {Object} options {session, lockOwner(p, r) → name|null, onChange(), onRefused(name)}
- * @returns {Object} Tools {tool, size, strength, active, setTool, setSize, setStrength, begin, move, end,
- *     undo, redo, canUndo, canRedo, cursorRadius}
+ * @returns {Object} Tools {tool, size, strength, mirror, shape, text, active, setTool, setSize, setStrength,
+ *     setMirror, setShape, setText, begin, move, end, undo, redo, canUndo, canRedo, cursorRadius}
  */
 export const createTools = (options) => {
     const session = options.session;
@@ -235,6 +252,9 @@ export const createTools = (options) => {
     const undostack = [];
     const redostack = [];
     let tool = 'add';
+    let mirror = false;
+    let shape = 'sphere';
+    let text = 'ABC';
     let size = DEFAULT_SIZE;
     let strength = DEFAULT_STRENGTH;
     let tokens = BURST;
@@ -383,7 +403,21 @@ export const createTools = (options) => {
     };
 
     /**
-     * Send one add, carve or smooth dab of a stroke.
+     * The op with the mirror flag of its stroke.
+     *
+     * @param {Object} op The op, keys in wire order.
+     * @param {Object} current The stroke.
+     * @returns {Object} The op.
+     */
+    const withMirror = (op, current) => {
+        if (current.mirror) {
+            op.m = 1;
+        }
+        return op;
+    };
+
+    /**
+     * Send one dab of a stroke (add, carve, smooth, inflate, pinch, flatten).
      *
      * @param {Object} current The stroke.
      * @param {number[]} p Dab centre.
@@ -402,14 +436,19 @@ export const createTools = (options) => {
         if (!takeToken() && !last) {
             return false;
         }
-        send({k: current.kind, a: author(), s: current.s, i: nextIndex(author()), p: roundPoint(p), r: current.r,
-            st: current.st});
+        const op = {k: current.kind, a: author(), s: current.s, i: nextIndex(author()), p: roundPoint(p), r: current.r,
+            st: current.st};
+        if (current.kind === 'flatten') {
+            op.x = current.normal;
+            op.g = current.plane;
+        }
+        send(withMirror(op, current));
         current.ops++;
         return true;
     }
 
     /**
-     * Move an add, carve or smooth stroke towards a point, placing dabs along the way.
+     * Move a dab stroke towards a point, placing dabs along the way.
      *
      * @param {number[]} target Where the pointer is now.
      */
@@ -482,8 +521,8 @@ export const createTools = (options) => {
             return;
         }
         const p = roundPoint(current.point);
-        send({k: 'grab', a: author(), s: current.s, i: nextIndex(author()), p: p, r: current.r, st: current.st,
-            d: d});
+        send(withMirror({k: 'grab', a: author(), s: current.s, i: nextIndex(author()), p: p, r: current.r,
+            st: current.st, d: d}, current));
         current.ops++;
         current.point = roundPoint([p[0] + d[0], p[1] + d[1], p[2] + d[2]]);
         // Keep the region locked where the material now is.
@@ -558,10 +597,128 @@ export const createTools = (options) => {
         if (g === 0) {
             return;
         }
-        send({k: 'twist', a: author(), s: current.s, i: nextIndex(author()), p: current.centre, r: current.r,
-            st: current.st, x: axis, g: g});
+        send(withMirror({k: 'twist', a: author(), s: current.s, i: nextIndex(author()), p: current.centre,
+            r: current.r, st: current.st, x: axis, g: g}, current));
         current.ops++;
         current.emitted += g;
+    };
+
+    /**
+     * The size of a shape: the brush radius, smaller for a word too long to fit (letters are 2r high
+     * and 2r / 3 wide per unit of the font; see js/engine/shapes.js boundingRadius()).
+     *
+     * @param {string} name Shape name.
+     * @param {string} word The letters of a text shape.
+     * @returns {number} Radius (m).
+     */
+    const shapeSize = (name, word) => {
+        if (name !== 'text') {
+            return size;
+        }
+        const width = (word.length - 1) * 6 + 4;
+        const fit = MAX_SHAPE_REACH / (Math.sqrt((width / 6) * (width / 6) + 1) + 0.2) * 0.98;
+        return r5(Math.max(MIN_SIZE, Math.min(size, fit)));
+    };
+
+    /**
+     * The turn (axis, angle) taking the shape's own frame to the frame at a surface: up (local Y) along
+     * the normal, and for letters, facing (local Z) along the normal and upright (local X level).
+     *
+     * @param {number[]} n Unit normal.
+     * @param {boolean} letters Whether the shape is text.
+     * @returns {{x: number[], g: number}} Axis and angle, rounded as the wire format wants.
+     */
+    const turnTo = (n, letters) => {
+        // Columns of the rotation matrix: the local X, Y and Z axes in the sculpture frame.
+        let ex;
+        let ey;
+        let ez;
+        if (letters) {
+            ez = n;
+            // Level: local X = up × normal (or, looking straight down or up, the sculpture's x).
+            ex = [n[2], 0, -n[0]];
+            const length = Math.hypot(ex[0], ex[2]);
+            ex = length < 1e-6 ? [1, 0, 0] : [ex[0] / length, 0, ex[2] / length];
+            ey = [ez[1] * ex[2] - ez[2] * ex[1], ez[2] * ex[0] - ez[0] * ex[2], ez[0] * ex[1] - ez[1] * ex[0]];
+        } else {
+            ey = n;
+            ex = [n[1], -n[0], 0];
+            let length = Math.hypot(ex[0], ex[1]);
+            if (length < 1e-6) {
+                ex = [1, 0, 0];
+                length = 1;
+            }
+            ex = [ex[0] / length, ex[1] / length, 0];
+            ez = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2], ex[0] * ey[1] - ex[1] * ey[0]];
+        }
+        // Axis and angle of the matrix [ex ey ez].
+        const trace = ex[0] + ey[1] + ez[2];
+        const angle = Math.acos(clamp((trace - 1) / 2, -1, 1));
+        let axis = [ey[2] - ez[1], ez[0] - ex[2], ex[1] - ey[0]];
+        if (Math.hypot(axis[0], axis[1], axis[2]) < 1e-6) {
+            if (angle < 1e-3) {
+                return {x: [0, 1, 0], g: 0};
+            }
+            // A half turn: the axis is the column of (M + I) with the largest length.
+            const columns = [[ex[0] + 1, ex[1], ex[2]], [ey[0], ey[1] + 1, ey[2]], [ez[0], ez[1], ez[2] + 1]];
+            axis = columns.reduce((best, c) => (Math.hypot(...c) > Math.hypot(...best) ? c : best));
+        }
+        return {x: toAxis(axis) || [0, 1, 0], g: r4(clamp(angle, -Math.PI + 1e-4, Math.PI - 1e-4))};
+    };
+
+    /**
+     * Place one shape (or word) at a point: a whole stroke of one op.
+     *
+     * @param {number[]} point Where (sculpture-local).
+     * @param {number[]} normal Unit surface normal there.
+     * @returns {boolean} Whether it was placed.
+     */
+    const placeShape = (point, normal) => {
+        const word = text;
+        const letters = shape === 'text';
+        const radius = shapeSize(shape, word);
+        const owner = otherOwner(point, radius);
+        if (owner !== null) {
+            try {
+                onRefused(owner);
+            } catch (e) {
+                Log.debug(e);
+            }
+            return false;
+        }
+        const turn = turnTo(normal, letters);
+        const s = nextStroke(author());
+        const op = {k: tool, a: author(), s: s, i: nextIndex(author()), p: roundPoint(point), r: radius,
+            st: strength, x: turn.x, g: turn.g};
+        if (mirror) {
+            op.m = 1;
+        }
+        op.sh = shape;
+        if (letters) {
+            op.tx = word;
+        }
+        send(op);
+        send({k: 'end', a: author(), s: s, i: nextIndex(author())});
+        undostack.push(s);
+        if (undostack.length > MAX_UNDO) {
+            undostack.shift();
+        }
+        redostack.length = 0;
+        changed();
+        return true;
+    };
+
+    /**
+     * A unit normal from stroke options: the surface normal (desktop), else back along the controller's
+     * forward axis, towards the person (VR), else the direction from the sculpture's centre.
+     *
+     * @param {Object} opts Stroke options, maybe with normal or axis.
+     * @param {number[]} point The stroke's point.
+     * @returns {number[]} Unit vector, rounded to 1e-4.
+     */
+    const normalOf = (opts, point) => {
+        const back = opts.axis ? toAxis(opts.axis) : null;
+        return toAxis(opts.normal) || (back ? back.map((v) => (v === 0 ? 0 : -v)) : null) || toAxis(point) || [0, 1, 0];
     };
 
     return {
@@ -573,6 +730,59 @@ export const createTools = (options) => {
         /** @returns {number} The brush radius (m). */
         get size() {
             return size;
+        },
+
+        /** @returns {boolean} Whether strokes also work on their mirror image (x = 0). */
+        get mirror() {
+            return mirror;
+        },
+
+        /** @returns {string} The shape of the shape tools. */
+        get shape() {
+            return shape;
+        },
+
+        /** @returns {string} The letters the text shape writes. */
+        get text() {
+            return text;
+        },
+
+        /**
+         * Turn mirroring on or off.
+         *
+         * @param {boolean} on Whether it is on.
+         */
+        setMirror: (on) => {
+            mirror = !!on;
+            changed();
+        },
+
+        /**
+         * Choose the shape of the shape tools.
+         *
+         * @param {string} name One of SHAPES.
+         */
+        setShape: (name) => {
+            if (SHAPES.includes(name)) {
+                shape = name;
+                changed();
+            }
+        },
+
+        /**
+         * Set the letters of the text shape: capitals, digits, space and . - ! ? ' (others are dropped).
+         *
+         * @param {string} value Letters.
+         * @returns {string} What will be written ('' when nothing is left).
+         */
+        setText: (value) => {
+            const clean = Array.from(String(value || '').toUpperCase())
+                .filter((c) => TEXT_CHARACTERS.includes(c)).join('').slice(0, MAX_TEXT);
+            if (clean.trim() !== '') {
+                text = clean;
+                changed();
+            }
+            return clean;
         },
 
         /** @returns {number} The strength, 0 to 1. */
@@ -631,14 +841,19 @@ export const createTools = (options) => {
          * Start a stroke.
          *
          * @param {number[]|Object} p Tool position, sculpture-local.
-         * @param {Object} [opts] {axis} for twist; {pressure} 0..1 scales the strength.
-         * @returns {boolean} Whether the stroke started (false: refused or not a point).
+         * @param {Object} [opts] {axis} for twist; {normal} the surface normal for flatten and the shapes;
+         *     {pressure} 0..1 scales the strength.
+         * @returns {boolean} Whether the stroke started, or for a shape tool whether the shape was placed
+         *     (false: refused or not a point).
          */
         begin: (p, opts = {}) => {
             finish();
             const point = toPoint(p);
             if (!point) {
                 return false;
+            }
+            if (SHAPE_TOOLS.includes(tool)) {
+                return placeShape(point, normalOf(opts, point));
             }
             const radius = size;
             const locking = LOCKING.includes(tool);
@@ -670,7 +885,15 @@ export const createTools = (options) => {
                 previous: null,
                 target: 0,
                 emitted: 0,
+                mirror: mirror,
+                normal: null,
+                plane: 0,
             };
+            if (tool === 'flatten') {
+                stroke.normal = normalOf(opts, point);
+                const n = stroke.normal;
+                stroke.plane = r5(clamp(n[0] * point[0] + n[1] * point[1] + n[2] * point[2], -1, 1));
+            }
             if (locking) {
                 sendLock(point);
             } else {

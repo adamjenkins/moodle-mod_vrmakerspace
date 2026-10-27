@@ -78,16 +78,30 @@ says so in the studio.
 Open it with **Open the sculpting studio** on the activity page; teachers open any sculpture, and
 anyone any saved version, with **View in 3D** (read only).
 
-Tools: **Grab** (pull the clay with a smooth falloff), **Twist** (around an axis), **Add**, **Carve**,
-**Smooth**, with a brush size and strength. Undo and redo work per person: each person undoes their
-own strokes. While someone grabs or twists, that part of the sculpture is locked for the others.
+Sculpting tools: **Grab** (pull the clay with a smooth falloff), **Twist** (around an axis), **Add**,
+**Carve**, **Smooth**, **Inflate** (swell the surface outwards), **Pinch** (pull the clay together,
+for sharp creases and edges) and **Flatten** (press the surface flat, in the plane where the stroke
+began), with a brush size and strength.
 
-Desktop: 1–5 choose a tool, `[` and `]` change the size, comma and full stop change the strength,
-Ctrl+Z undoes, Ctrl+Shift+Z redoes. Drag with the left button to sculpt, the right button to turn, the
-wheel to zoom.
+Modelling tools: **Add shape** and **Cut shape** place one shape with a click, on the surface (its
+top along the surface) or, beside the sculpture, facing you: a sphere, cube, cylinder, cone, ring, or
+**letters** (up to 16 capitals, digits and `. - ! ? '`, written as clay tubes). The size sets the
+shape's size (letters are twice the size high); the strength sets how softly it blends in. With the
+starting model *Nothing*, students build the whole sculpture from shapes.
+
+**Mirror** (as Blender's X symmetry) repeats every stroke and shape on the other side of the
+sculpture's middle (the plane x = 0, left and right as the studio first shows it).
+
+Undo and redo work per person: each person undoes their own strokes. While someone grabs or twists,
+that part of the sculpture is locked for the others (a mirrored stroke's other side is not locked).
+
+Desktop: 1–9 and 0 choose a tool, M turns mirroring on or off, `[` and `]` change the size, comma and
+full stop change the strength, Ctrl+Z undoes, Ctrl+Shift+Z redoes. Drag with the left button to sculpt
+(a shape tool places its shape with a click), the right button to turn, the wheel to zoom.
 
 VR: the right trigger sculpts, the right stick changes size and strength, A and B change the tool, the
-left grip moves the sculpture, X undoes and Y redoes; a palette on the left wrist shows the tool. With
+left grip moves the sculpture, X undoes and Y redoes; a palette on the left wrist shows the tools and
+the mirror switch. Shapes are placed at the controller tip, their top (and letters' front) towards you. With
 hand tracking, pinch to sculpt. The others are shown with a head, hands and their name.
 
 Saving: the studio saves a new version every minute while the sculpture changes, when you choose

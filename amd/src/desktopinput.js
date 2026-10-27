@@ -18,10 +18,12 @@
  *
  * A left-button drag (or one finger) that starts on the sculpture sculpts with the current tool; one
  * that starts beside it turns the view, as do the right button and the arrow keys. The middle button
- * pans and the wheel (or a pinch) zooms (three.js OrbitControls). Add, carve and smooth follow the
- * surface under the pointer, grab moves the grabbed clay in the plane facing the camera, twist turns
- * it about the view axis by dragging sideways. A see-through sphere of the brush radius shows where
- * the tool works.
+ * pans and the wheel (or a pinch) zooms (three.js OrbitControls). The brushes (add, carve, smooth,
+ * inflate, pinch, flatten) follow the surface under the pointer, grab moves the grabbed clay in the
+ * plane facing the camera, twist turns it about the view axis by dragging sideways. A click with a
+ * shape tool places the shape on the surface (or, beside the sculpture, in the plane through the
+ * view's centre facing the camera). A see-through sphere of the brush radius shows where the tool
+ * works.
  *
  * Keyboard shortcuts (the 'shortcuts' string) work while the focus is anywhere in the studio except
  * in a text field, so typing elsewhere on the page is never taken over.
@@ -31,7 +33,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {TOOLS} from 'mod_vrsculpt/tools';
+import {SHAPE_TOOLS, TOOLS} from 'mod_vrsculpt/tools';
 
 /** Twist angle per pixel of sideways drag (rad). */
 const TWIST_PER_PIXEL = 0.01;
@@ -49,6 +51,11 @@ const CURSOR_COLOURS = {
     add: 0x1a7f37,
     carve: 0xcf222e,
     smooth: 0x9a6700,
+    inflate: 0x1b7c83,
+    pinch: 0xbf3989,
+    flatten: 0x57606a,
+    shape: 0x1a7f37,
+    cutshape: 0xcf222e,
 };
 
 /** Input types that take typed text (keys pressed there are never shortcuts). */
@@ -94,12 +101,16 @@ export const attach = (options) => {
     const direction = new THREE.Vector3();
     const rootquat = new THREE.Quaternion();
     const plane = new THREE.Plane();
+    const normal = new THREE.Vector3();
+    const normalmatrix = new THREE.Matrix3();
     let enabled = true;
     let pointer = null;
     let pointerdirty = false;
     /** @type {Object|null} the stroke the pointer drives */
     let drag = null;
     let cursorvisible = false;
+    /** @type {Object|null} the view controls (OrbitControls), made once the listeners are in place */
+    let controls = null;
 
     // The tool cursor.
     const cursor = new THREE.Mesh(
@@ -148,6 +159,43 @@ export const attach = (options) => {
         world.copy(hits[0].point);
         local.copy(world);
         sculptureRoot.worldToLocal(local);
+        // The face normal, from the chunk mesh's frame to the world's, then to the sculpture's.
+        if (hits[0].face) {
+            normalmatrix.getNormalMatrix(hits[0].object.matrixWorld);
+            normal.copy(hits[0].face.normal).applyMatrix3(normalmatrix);
+            sculptureRoot.getWorldQuaternion(rootquat);
+            normal.applyQuaternion(rootquat.invert()).normalize();
+        } else {
+            normal.set(0, 0, 0);
+        }
+        return true;
+    };
+
+    /**
+     * Where a click beside the sculpture places a shape: the plane through the view's centre facing
+     * the camera.
+     *
+     * @param {number} x Client x.
+     * @param {number} y Client y.
+     * @returns {boolean} Whether the point was found; it is in `world` and `local`, `normal` faces the viewer.
+     */
+    const pickInSpace = (x, y) => {
+        if (!toNdc(x, y)) {
+            return false;
+        }
+        raycaster.setFromCamera(ndc, camera);
+        camera.getWorldDirection(direction);
+        if (!controls) {
+            return false;
+        }
+        plane.setFromNormalAndCoplanarPoint(direction, controls.target);
+        if (!raycaster.ray.intersectPlane(plane, world)) {
+            return false;
+        }
+        local.copy(world);
+        sculptureRoot.worldToLocal(local);
+        const axis = viewAxis();
+        normal.set(axis[0], axis[1], axis[2]).normalize();
         return true;
     };
 
@@ -231,11 +279,15 @@ export const attach = (options) => {
             // Modified left drags pan or turn the view (OrbitControls).
             return;
         }
-        if (!pick(event.clientX, event.clientY)) {
+        const tool = tools.tool;
+        const shapetool = SHAPE_TOOLS.includes(tool);
+        if (!pick(event.clientX, event.clientY) && !(shapetool && pickInSpace(event.clientX, event.clientY))) {
             return;
         }
-        const tool = tools.tool;
         const opts = tool === 'twist' ? {axis: viewAxis()} : {};
+        if (normal.lengthSq() > 0) {
+            opts.normal = [normal.x, normal.y, normal.z];
+        }
         if (!tools.begin([local.x, local.y, local.z], opts)) {
             event.stopImmediatePropagation();
             event.preventDefault();
@@ -328,6 +380,8 @@ export const attach = (options) => {
         ']': () => tools.setSize(tools.size * SIZE_STEP),
         ',': () => tools.setStrength(tools.strength - STRENGTH_STEP),
         '.': () => tools.setStrength(tools.strength + STRENGTH_STEP),
+        'm': () => tools.setMirror(!tools.mirror),
+        'M': () => tools.setMirror(!tools.mirror),
     };
 
     /**
@@ -337,8 +391,9 @@ export const attach = (options) => {
      * @returns {boolean} Whether it was one of ours.
      */
     const plainKey = (key) => {
-        if (key.length === 1 && key >= '1' && key <= String(TOOLS.length)) {
-            tools.setTool(TOOLS[Number(key) - 1]);
+        if (key.length === 1 && key >= '0' && key <= '9' && TOOLS[(Number(key) + 9) % 10]) {
+            // 1–9 are the first nine tools, 0 the tenth.
+            tools.setTool(TOOLS[(Number(key) + 9) % 10]);
         } else if (PLAIN_KEYS[key]) {
             PLAIN_KEYS[key]();
         } else if (key === 'Escape' && drag) {
@@ -376,7 +431,7 @@ export const attach = (options) => {
     canvas.addEventListener('pointerleave', onPointerLeave);
     keyroot.addEventListener('keydown', onKeyDown);
 
-    const controls = new THREE.OrbitControls(camera, canvas);
+    controls = new THREE.OrbitControls(camera, canvas);
     const target = Array.isArray(options.target) ? options.target : [0, 1, 0];
     controls.target.set(target[0], target[1], target[2]);
     controls.enableDamping = true;

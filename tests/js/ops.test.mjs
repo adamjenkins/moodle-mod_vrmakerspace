@@ -42,6 +42,15 @@ const STROKES = [
     Object.assign({k: 'smooth'}, BASE, {st: 1}),
     Object.assign({k: 'grab'}, BASE, {d: [0.012, 0.004, 0]}),
     Object.assign({k: 'twist'}, BASE, {x: [1, 0, 0], g: 0.5, p: [0.09, 0.02, 0.02]}),
+    Object.assign({k: 'inflate'}, BASE),
+    Object.assign({k: 'pinch'}, BASE, {st: 1}),
+    Object.assign({k: 'flatten'}, BASE, {x: [1, 0, 0], g: 0.09}),
+    Object.assign({k: 'shape'}, BASE, {x: [0, 1, 0], g: 0.3, sh: 'cube'}),
+    Object.assign({k: 'cutshape'}, BASE, {x: [0, 0, 1], g: -1.2, sh: 'cone'}),
+    Object.assign({k: 'shape'}, BASE, {r: 0.015, x: [0, 0, 1], g: 0, sh: 'text', tx: 'AB'}),
+    Object.assign({k: 'add'}, BASE, {p: [0.06, 0.06, 0], m: 1}),
+    Object.assign({k: 'grab'}, BASE, {p: [0.07, 0.07, 0], d: [0.01, 0, 0.004], m: 1}),
+    Object.assign({k: 'twist'}, BASE, {x: [1, 1, 0], g: 0.4, p: [0.07, 0.07, 0], m: 1}),
 ];
 
 test('the polynomial sine and cosine match Math.sin/Math.cos closely', () => {

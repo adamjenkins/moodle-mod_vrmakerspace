@@ -25,6 +25,12 @@ Feature: Open the sculpting studio
     And I should see "Clay animals"
     And I should see "Back to the activity"
     And I should not see "View only"
+    And "Inflate" "button" should exist
+    And "Pinch" "button" should exist
+    And "Flatten" "button" should exist
+    And "Add shape" "button" should exist
+    And "Cut shape" "button" should exist
+    And "Mirror" "button" should exist
 
   Scenario: The studio page renders for a group's sculpture
     Given the following "groups" exist:
