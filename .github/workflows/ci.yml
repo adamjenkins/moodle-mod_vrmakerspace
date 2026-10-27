@@ -1,0 +1,194 @@
+# The concurrency block, the development leftover check, the codebase completeness check and the
+# strict Behat check follow ideas from the moodle-workflows collection of Moodle an Hochschulen e.V.
+# (https://github.com/moodle-an-hochschulen/moodle-workflows), re-implemented here.
+name: Moodle Plugin CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the run still going for the older one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        # MOODLE_503_STABLE's minimum (environment.xml 5.3 block: PostgreSQL >= 17). A newer
+        # image would mask minimum-version breakage.
+        image: ${{ matrix.database == 'pgsql' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_USER: 'postgres'
+          POSTGRES_HOST_AUTH_METHOD: 'trust'
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+
+      mariadb:
+        # MOODLE_503_STABLE's minimum (environment.xml 5.3 block: MariaDB >= 11.4).
+        image: ${{ matrix.database == 'mariadb' && 'mariadb:11.4' || '' }}
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+          MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
+          MYSQL_COLLATION_SERVER: "utf8mb4_unicode_ci"
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval 10s --health-timeout 5s --health-retries 3
+
+    strategy:
+      fail-fast: false
+      # Moodle 5.3 only for now, as mod_vrroom (owner, 2026-10-08); 5.2 is tested on the dev site.
+      # Its PHP floor and ceiling (8.3 and 8.4, from MOODLE_503_STABLE's environment.xml and core's
+      # push.yml), with the two database engines alternating so both are exercised.
+      matrix:
+        include:
+          - {moodle-branch: MOODLE_503_STABLE, php: '8.3', database: mariadb}
+          - {moodle-branch: MOODLE_503_STABLE, php: '8.4', database: pgsql}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          path: plugin
+          persist-credentials: false
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ${{ matrix.extensions }}
+          ini-values: max_input_vars=5000, opcache.enable_cli=1
+          coverage: none
+
+      - name: Initialise moodle-plugin-ci
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo $(cd ci/bin; pwd) >> $GITHUB_PATH
+          echo $(cd ci/vendor/bin; pwd) >> $GITHUB_PATH
+          sudo locale-gen en_AU.UTF-8
+          echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
+
+      - name: Install moodle-plugin-ci
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: ${{ matrix.database }}
+          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: PHP Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phplint
+
+      - name: PHP Mess Detector
+        continue-on-error: true # This step will show errors but will not fail
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpmd
+
+      - name: Moodle Code Checker
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpcs --max-warnings 0
+
+      - name: Moodle PHPDoc Checker
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpdoc --max-warnings 0
+
+      - name: Development leftover check
+        if: ${{ !cancelled() }}
+        working-directory: plugin
+        run: |
+          # Code files only; generated amd/build is not our code.
+          if grep -rnE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=build \
+              --include='*.php' --include='*.js' --include='*.mjs' --include='*.mustache' --include='*.feature' \
+              --include='*.xml' --include='*.json' --include='*.scss' --include='*.css' \
+              -e '@testme' -e 'TODO' -e '^<<<<<<< ' -e '^>>>>>>> ' .; then
+            echo "::error::Development leftovers found (TODO, @testme or merge conflict markers)."
+            exit 1
+          fi
+          echo "No development leftovers found."
+
+      # The plugin must ship a version.php, its English language file and a privacy provider; the
+      # repository a licence (LICENSE or COPYING.txt) and a README.
+      - name: Codebase completeness check
+        if: ${{ !cancelled() }}
+        working-directory: plugin
+        run: |
+          missing=0
+          need() { if [ ! -f "$1" ]; then echo "::error file=$1::Missing $1"; missing=1; fi; }
+          [ -f LICENSE ] || [ -f COPYING.txt ] || { echo "::error::Missing LICENSE or COPYING.txt"; missing=1; }
+          need README.md
+          for dir in .; do
+            [ -f "$dir/version.php" ] || { [ "$dir" = . ] && need version.php; continue; }
+            component=$(grep -oP "\\\$plugin->component\s*=\s*'\K[a-z0-9_]+" "$dir/version.php")
+            if [ -z "$component" ]; then
+              echo "::error file=$dir/version.php::No \$plugin->component"; missing=1; continue
+            fi
+            # An activity module's language file drops the mod_ prefix.
+            need "$dir/lang/en/${component#mod_}.php"
+            need "$dir/classes/privacy/provider.php"
+            echo "$component: checked"
+          done
+          exit $missing
+
+      - name: Validating
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci validate
+
+      - name: Check upgrade savepoints
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci savepoints
+
+      - name: Mustache Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci mustache
+
+      - name: Grunt
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci grunt --max-lint-warnings 0
+
+      - name: PHPUnit tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit --fail-on-warning
+
+      - name: Behat features
+        id: behat
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          moodle-plugin-ci behat --profile chrome --scss-deprecations --tags="@mod_vrsculpt" \
+            2>&1 | tee "${{ runner.temp }}/behat-output.log"
+
+      # Behat exits 0 when a step is pending (e.g. a generator entity it does not know) or undefined
+      # (no step definition): the scenario is skipped and the run stays green. Fail on those, and on
+      # a run that found no scenarios at all.
+      - name: Check for pending or undefined Behat steps
+        if: ${{ !cancelled() && steps.behat.outcome == 'success' }}
+        run: |
+          log="${{ runner.temp }}/behat-output.log"
+          summary=$(grep -E '^[0-9]+ (scenarios?|steps?) \(' "$log" || true)
+          echo "$summary"
+          if [ -z "$summary" ]; then
+            echo "::error::No Behat summary found: no scenarios ran."
+            exit 1
+          fi
+          if echo "$summary" | grep -qE 'pending|undefined'; then
+            awk '/^--- (Pending|Undefined) steps:/ { p = 1 } /^[0-9]+ scenarios? \(/ { p = 0 } p' "$log"
+            echo "::error::Behat reported pending or undefined steps."
+            exit 1
+          fi
+
+      - name: Upload Behat Faildump
+        if: ${{ failure() && steps.behat.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: Behat Faildump (${{ matrix.moodle-branch }}, PHP ${{ matrix.php }}, ${{ matrix.database }})
+          path: ${{ github.workspace }}/moodledata/behat_dump
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Mark cancelled jobs as failed.
+        if: ${{ cancelled() }}
+        run: exit 1

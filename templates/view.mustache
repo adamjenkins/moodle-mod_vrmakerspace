@@ -1,0 +1,143 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_vrsculpt/view
+
+    The activity page: the user's sculpture with its versions, and every sculpture for teachers.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * data-region="mod_vrsculpt-studio" data-sessionid: where the 3D studio will start
+
+    Context variables required for this template:
+    * startmodel - name of the starting model
+    * workmode - individual or group work
+    * groupselector - rendered group selector HTML, or empty
+    * hassculpture, sculpture - the user's sculpture: sessionid, owner, status, hasversions, versions
+    * nogroup - group work but the user is in no group
+    * canviewall, hasallsculptures, allsculptures - every sculpture (teachers)
+
+    Example context (json):
+    {
+        "startmodel": "Clay lump",
+        "workmode": "Individual",
+        "groupselector": "",
+        "hassculpture": true,
+        "sculpture": {
+            "sessionid": 3,
+            "owner": "Your sculpture",
+            "status": "Open",
+            "hasversions": true,
+            "versions": [
+                {"version": 2, "savedby": "Sam Student", "timesaved": "Tuesday, 27 October 2026, 10:00 AM",
+                 "size": "120.5 KB", "url": "#"}
+            ]
+        },
+        "nogroup": false,
+        "canviewall": true,
+        "hasallsculptures": true,
+        "allsculptures": [
+            {"owner": "Sam Student", "versions": 2, "lastsaved": "Tuesday, 27 October 2026, 10:00 AM",
+             "status": "Open", "url": "#"}
+        ]
+    }
+}}
+<div class="mod_vrsculpt-view">
+    <dl class="row mb-3">
+        <dt class="col-sm-3">{{#str}} startmodel, mod_vrsculpt {{/str}}</dt>
+        <dd class="col-sm-9">{{startmodel}}</dd>
+        <dt class="col-sm-3">{{#str}} workmode, mod_vrsculpt {{/str}}</dt>
+        <dd class="col-sm-9">{{workmode}}</dd>
+    </dl>
+
+    {{{groupselector}}}
+
+    {{#nogroup}}
+        <div class="alert alert-warning">{{#str}} nogroup, mod_vrsculpt {{/str}}</div>
+    {{/nogroup}}
+
+    {{#hassculpture}}
+        {{#sculpture}}
+            <section class="mb-4" aria-labelledby="mod_vrsculpt-mine-{{sessionid}}">
+                <h3 id="mod_vrsculpt-mine-{{sessionid}}">{{owner}}</h3>
+                <p>{{#str}} status, mod_vrsculpt {{/str}}: {{status}}</p>
+                <div class="alert alert-info" data-region="mod_vrsculpt-studio" data-sessionid="{{sessionid}}">
+                    {{#str}} studionotavailable, mod_vrsculpt {{/str}}
+                </div>
+                <h4>{{#str}} versionhistory, mod_vrsculpt {{/str}}</h4>
+                {{#hasversions}}
+                    <table class="table table-sm generaltable">
+                        <thead>
+                            <tr>
+                                <th scope="col">{{#str}} version, mod_vrsculpt {{/str}}</th>
+                                <th scope="col">{{#str}} savedby, mod_vrsculpt {{/str}}</th>
+                                <th scope="col">{{#str}} timesaved, mod_vrsculpt {{/str}}</th>
+                                <th scope="col">{{#str}} size {{/str}}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#versions}}
+                                <tr>
+                                    <td><a href="{{url}}">{{version}}</a></td>
+                                    <td>{{savedby}}</td>
+                                    <td>{{timesaved}}</td>
+                                    <td>{{size}}</td>
+                                </tr>
+                            {{/versions}}
+                        </tbody>
+                    </table>
+                {{/hasversions}}
+                {{^hasversions}}
+                    <p>{{#str}} noversions, mod_vrsculpt {{/str}}</p>
+                {{/hasversions}}
+            </section>
+        {{/sculpture}}
+    {{/hassculpture}}
+
+    {{#canviewall}}
+        <section aria-labelledby="mod_vrsculpt-all">
+            <h3 id="mod_vrsculpt-all">{{#str}} allsculptures, mod_vrsculpt {{/str}}</h3>
+            {{#hasallsculptures}}
+                <table class="table table-sm generaltable">
+                    <thead>
+                        <tr>
+                            <th scope="col">{{#str}} owner, mod_vrsculpt {{/str}}</th>
+                            <th scope="col">{{#str}} versions, mod_vrsculpt {{/str}}</th>
+                            <th scope="col">{{#str}} lastsaved, mod_vrsculpt {{/str}}</th>
+                            <th scope="col">{{#str}} status, mod_vrsculpt {{/str}}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#allsculptures}}
+                            <tr>
+                                <td>{{owner}}</td>
+                                <td>{{#url}}<a href="{{url}}">{{versions}}</a>{{/url}}{{^url}}{{versions}}{{/url}}</td>
+                                <td>{{lastsaved}}</td>
+                                <td>{{status}}</td>
+                            </tr>
+                        {{/allsculptures}}
+                    </tbody>
+                </table>
+            {{/hasallsculptures}}
+            {{^hasallsculptures}}
+                <p>{{#str}} nosculptures, mod_vrsculpt {{/str}}</p>
+            {{/hasallsculptures}}
+        </section>
+    {{/canviewall}}
+</div>
