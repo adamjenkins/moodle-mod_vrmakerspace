@@ -290,7 +290,7 @@ test('undoing one author keeps the other author\'s separate work', async() => {
     assert.ok(changedInA > 0);
 });
 
-test('contributions count confirmed stroke ops and the volume added and removed, per author', async() => {
+test('contributions count confirmed strokes and the volume added and removed, per author', async() => {
     const e = await Engine.create(OPTS);
     e.local({k: 'add', a: 'ua', s: 1, i: 1, p: onSurface(0, 0), r: 0.03, st: 1});
     assert.deepEqual(e.stats().contributions, {}, 'pending ops do not count');
@@ -299,7 +299,7 @@ test('contributions count confirmed stroke ops and the volume added and removed,
     e.confirmed({k: 'end', a: 'ua', s: 1, i: 3}, 3);
     e.confirmed({k: 'carve', a: 'ub', s: 1, i: 1, p: onSurface(Math.PI, 0), r: 0.03, st: 1}, 4);
     const c = e.stats().contributions;
-    assert.equal(c.ua.ops, 2);
+    assert.equal(c.ua.ops, 1, 'two dabs of one stroke are one edit');
     assert.ok(c.ua.added > 0);
     assert.equal(c.ua.removed, 0);
     assert.equal(c.ub.ops, 1);
@@ -390,4 +390,15 @@ test('the default engine is the 128³, 4 mm lump of the build contract', async()
     assert.ok(g.get(64, 64, 64) < 0, 'the centre is inside');
     assert.equal(g.get(0, 0, 0), g.levels[254], 'corners are outside (+band)');
     assert.equal(e.takeDirtyChunks().length, 512);
+});
+
+test('undoing and redoing a stroke is not counted as new work', async() => {
+    const e = await Engine.create(OPTS);
+    e.confirmed({k: 'add', a: 'ua', s: 1, i: 1, p: onSurface(0, 0), r: 0.03, st: 1}, 1);
+    e.confirmed({k: 'end', a: 'ua', s: 1, i: 2}, 2);
+    const before = Object.assign({}, e.stats().contributions.ua);
+    assert.ok(before.added > 0);
+    e.confirmed({k: 'undo', a: 'ua', i: 3, t: 1}, 3);
+    e.confirmed({k: 'redo', a: 'ua', i: 4, t: 1}, 4);
+    assert.deepEqual(e.stats().contributions.ua, before);
 });

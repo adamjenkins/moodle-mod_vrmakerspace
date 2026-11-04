@@ -51,7 +51,8 @@ Nothing else: individual work and pair work need no server besides Moodle.
   service)*. The second choice is offered only when the companion plugin is installed, with a note while
   it is not set up.
 - **People working at once** (companion service): 2 to 8. Working with one partner is always two.
-- **Track each person's contribution** (group work).
+- **Track each person's contribution** (group work, on by default). A share is the mean of a member's part of all
+  the edits and of all the clay added and removed; turning a mesh into clay and undoing are not counted as new work.
 - **Grade**: points only.
 
 ## Working together
@@ -89,6 +90,9 @@ Every piece has two layers, shown together in the same space: the **clay** you s
 you model, in a cool blue-grey so the two are told apart. The method switch (**Sculpt** or **Model**)
 chooses which tools you use. It is per person, so two students can use different ways at once; with one
 way of making in the activity, the switch is hidden.
+
+Your piece is saved every minute, with Save now, and when you follow a link away from the studio. Closing the tab
+or reloading with unsaved work makes the browser ask first.
 
 Undo and redo work per person: each person undoes their own strokes and edits, in time order across both
 ways of making. When someone joins or rejoins a piece,

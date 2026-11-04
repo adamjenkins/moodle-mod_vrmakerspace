@@ -211,6 +211,45 @@ final class provider_test extends provider_testcase {
     }
 
     /**
+     * Deleting alice takes her mesh selection out of the group's saved version, and leaves bob's.
+     */
+    public function test_delete_removes_selection_from_group_versions(): void {
+        $team = \context_module::instance($this->team->cmid);
+        $maker = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $alice = 'u' . $this->alice->id;
+        $bob = 'u' . $this->bob->id;
+        $data = $maker->snapshot_data('selections', 9);
+        $selections = '"s":[["' . $alice . '","f",[1]],["' . $bob . '","f",[2]]]';
+        $data = str_replace('"s":[]', $selections, $data);
+        $data = substr_replace($data, pack('V', strlen($data) - 48), 44, 4);
+        $snapshot = session_manager::save_snapshot($this->groupsession, $team, (int)$this->bob->id, $data);
+
+        provider::delete_data_for_user(new approved_contextlist($this->alice, 'mod_vrmakerspace', [$team->id]));
+
+        $content = session_manager::get_snapshot_file($snapshot, $team)->get_content();
+        $this->assertStringNotContainsString($alice, $content);
+        $this->assertStringContainsString($bob, $content);
+        session_manager::validate_snapshot($content);
+    }
+
+    /**
+     * A compressed mesh section is rewritten compressed.
+     */
+    public function test_snapshot_without_author_compressed(): void {
+        $grid = str_repeat("\x7f", 512);
+        $mesh = gzdeflate('{"v":[],"f":[],"s":[["u5","f",[1]],["u6","v",[2]]]}', 9);
+        $payload = pack('V', strlen($grid)) . $grid . $mesh;
+        $data = session_manager::SNAPSHOT_MAGIC . pack('vvvvvv', 2, 1, 8, 8, 8, 0) . pack('g', 0.004) . pack('g', 0.012)
+            . pack('V', 1) . str_repeat("\0", 16) . pack('V', strlen($payload)) . $payload;
+
+        $this->assertNull(session_manager::snapshot_without_author($data, 'u7'));
+        $result = session_manager::snapshot_without_author($data, 'u5');
+        $this->assertSame(strlen($result) - 48, unpack('V', $result, 44)[1]);
+        $this->assertSame($grid, substr($result, 52, 512));
+        $this->assertSame('{"v":[],"f":[],"s":[["u6","v",[2]]]}', gzinflate(substr($result, 564)));
+    }
+
+    /**
      * Deleting alice: her own piece and grade go, her group versions are anonymised, bob's stay.
      */
     public function test_delete_data_for_user(): void {

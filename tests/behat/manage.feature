@@ -32,7 +32,7 @@ Feature: Close and reopen a piece
     And I log out
     And I am on the "Clay animals" "vrmakerspace activity" page logged in as "student1"
     And I should see "This piece is closed: you can look at it, but not change it."
-    And I follow "Open the makerspace"
+    And I follow "Look at the piece"
     And I should see "View only"
     And I log out
     And I am on the "Clay animals" "vrmakerspace activity" page logged in as "teacher1"

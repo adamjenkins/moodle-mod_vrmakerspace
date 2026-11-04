@@ -97,6 +97,9 @@ const MAX_CANDIDATES_PER_SIGNAL = 30;
 /** A new link that has not connected after this long is re-created (ms). */
 const CONNECT_TIMEOUT = 20000;
 
+/** After the ops channel closed, wait this long before making a new link (ms). */
+const CHANNEL_LOST_WAIT = 1000;
+
 /** After a failure (and an ICE restart), or a disconnect, wait this long for 'connected' (ms). */
 const RESTART_GRACE = 15000;
 
@@ -358,6 +361,10 @@ class Link {
             this.open = open;
             this.transport.onLinkOpen(this, open);
         }
+        if (this.channels.ops.readyState === 'closed') {
+            // The connection may look fine, but nothing can travel on it: make a new link soon.
+            this.arm(CHANNEL_LOST_WAIT);
+        }
     }
 
     /**
@@ -366,17 +373,31 @@ class Link {
      * @param {boolean} restart Whether this is an ICE restart.
      */
     offer(restart) {
-        this.queue = this.queue.then(() => {
-            if (this.closed) {
-                return undefined;
-            }
-            return Promise.resolve(this.pc.createOffer(restart ? {iceRestart: true} : {}))
-                .then((description) => this.pc.setLocalDescription(description))
-                .then(() => {
-                    this.sendDescription();
-                    return undefined;
-                });
-        }).catch((error) => Log.debug(error));
+        this.queue = this.queue.then(() => (this.closed ? undefined : this.makeOffer(restart)))
+            .catch((error) => Log.debug(error));
+    }
+
+    /**
+     * Make an offer and send it.
+     *
+     * @param {boolean} restart Whether this is an ICE restart.
+     * @returns {Promise<void>}
+     */
+    async makeOffer(restart) {
+        const description = await this.pc.createOffer(restart ? {iceRestart: true} : {});
+        await this.pc.setLocalDescription(description);
+        this.sendDescription();
+    }
+
+    /**
+     * Make an answer and send it.
+     *
+     * @returns {Promise<void>}
+     */
+    async makeAnswer() {
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        this.sendDescription();
     }
 
     /**
@@ -428,15 +449,7 @@ class Link {
             this.pendingremote = [];
             return this.onCandidates(pending);
         }).then(() => {
-            if (payload.type !== 'offer' || this.closed) {
-                return undefined;
-            }
-            return Promise.resolve(this.pc.createAnswer())
-                .then((answer) => this.pc.setLocalDescription(answer))
-                .then(() => {
-                    this.sendDescription();
-                    return undefined;
-                });
+            return payload.type !== 'offer' || this.closed ? undefined : this.makeAnswer();
         });
     }
 
@@ -879,14 +892,18 @@ export class PairTransport extends Emitter {
          * @param {number} attempt Calls made so far.
          * @returns {Promise<Object>} The pair_join result.
          */
-        const attemptJoin = (attempt) => this.call('mod_vrmakerspace_pair_join', {cmid: this.cmid, sessionid: this.sessionid},
-            false).catch((exception) => {
-            const error = toError(exception);
-            if (error.errorcode !== 'pairbusy' || attempt >= JOIN_BUSY_RETRIES || this.stopped) {
-                throw error;
+        const attemptJoin = async(attempt) => {
+            try {
+                return await this.call('mod_vrmakerspace_pair_join', {cmid: this.cmid, sessionid: this.sessionid}, false);
+            } catch (exception) {
+                const error = toError(exception);
+                if (error.errorcode !== 'pairbusy' || attempt >= JOIN_BUSY_RETRIES || this.stopped) {
+                    throw error;
+                }
             }
-            return new Promise((resolve) => setTimeout(resolve, POLL_BACKOFF[0])).then(() => attemptJoin(attempt + 1));
-        });
+            await new Promise((resolve) => setTimeout(resolve, POLL_BACKOFF[0]));
+            return attemptJoin(attempt + 1);
+        };
         return attemptJoin(1).then((result) => {
             if (!result || !isPeerKey(result.peerkey)) {
                 throw toError({errorcode: 'invalidresponse', message: 'Invalid join result'});

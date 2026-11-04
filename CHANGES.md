@@ -19,7 +19,7 @@ modelling a polygon mesh, or both.
   scale, extrude, inset, bevel, loop cut, merge, delete, fill, flip and mirror; Turn into clay bakes the
   whole mesh into the clay layer. While someone has a part selected, the others cannot select or edit it.
 - Per-person undo and redo that cover both ways of making; when someone joins or rejoins, undo starts again from
-  there for everyone, so all copies of the piece stay identical. In a WebXR headset (controllers or hand
+  there for everyone, so all copies of the piece stay identical. A dropped connection does not restart it. In a WebXR headset (controllers or hand
   tracking, with a wrist palette) or on the desktop with mouse and keyboard. Export to STL, 3MF and glTF
   binary, clay and mesh together, with a watertightness report.
 - Working together with one partner, built in: two members of a group, browser to browser, with no

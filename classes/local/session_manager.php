@@ -79,7 +79,7 @@ class session_manager {
     public const SNAPSHOT_MAGIC = 'VRSC';
 
     /** @var int Default largest snapshot, in bytes, when the admin setting is not set. */
-    public const DEFAULT_MAX_SNAPSHOT_SIZE = 16777216;
+    public const DEFAULT_MAX_SNAPSHOT_SIZE = 33554432;
 
     /** @var string The file area holding snapshot data. */
     public const FILEAREA = 'snapshots';
@@ -98,6 +98,9 @@ class session_manager {
 
     /** @var int The snapshot format version the studio writes: clay and mesh. */
     public const SNAPSHOT_VERSION = 2;
+
+    /** @var int The largest mesh section read back from a snapshot, in bytes (polymesh.js MAX_DOC_BYTES). */
+    public const MAX_MESH_JSON = 67108864;
 
     /** @var int The older snapshot format version, clay only. */
     public const SNAPSHOT_VERSION_CLAY = 1;
@@ -477,6 +480,68 @@ class session_manager {
         $DB->set_field('vrmakerspace_sessions', 'timemodified', $now, ['id' => $session->id]);
         $transaction->allow_commit();
         return $snapshot;
+    }
+
+    /**
+     * A snapshot without one person's mesh selection.
+     *
+     * @param string $data the snapshot
+     * @param string $author the author id of the selection
+     * @return string|null the new snapshot, or null when it holds no such selection
+     */
+    public static function snapshot_without_author(string $data, string $author): ?string {
+        if (strlen($data) < 52 || unpack('v', $data, 4)[1] !== self::SNAPSHOT_VERSION) {
+            return null;
+        }
+        $compressed = (unpack('v', $data, 6)[1] & 1) === 1;
+        $gridlength = unpack('V', $data, 48)[1];
+        $mesh = substr($data, 52 + $gridlength);
+        if ($compressed) {
+            // A snapshot was checked when it was saved, but this is still not to be inflated without a limit.
+            $mesh = gzinflate($mesh, self::MAX_MESH_JSON);
+        }
+        $doc = $mesh === false ? null : json_decode($mesh);
+        if (!is_object($doc) || !isset($doc->s) || !is_array($doc->s)) {
+            return null;
+        }
+        $kept = array_values(array_filter($doc->s, fn($row) => !is_array($row) || ($row[0] ?? null) !== $author));
+        if (count($kept) === count($doc->s)) {
+            return null;
+        }
+        $doc->s = $kept;
+        $mesh = json_encode($doc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $payload = pack('V', $gridlength) . substr($data, 52, $gridlength) . ($compressed ? gzdeflate($mesh, 9) : $mesh);
+        return substr($data, 0, 44) . pack('V', strlen($payload)) . $payload;
+    }
+
+    /**
+     * Take a person's mesh selection out of every saved version of a piece.
+     *
+     * @param \stdClass $session the session row
+     * @param \context_module $context the activity's context
+     * @param string $author the author id of the selection
+     */
+    public static function remove_author_from_snapshots(\stdClass $session, \context_module $context, string $author): void {
+        global $DB;
+        foreach ($DB->get_records('vrmakerspace_snapshots', ['sessionid' => $session->id]) as $snapshot) {
+            $file = self::get_snapshot_file($snapshot, $context);
+            $data = $file ? self::snapshot_without_author($file->get_content(), $author) : null;
+            if ($data === null) {
+                continue;
+            }
+            $record = [
+                'contextid' => $context->id,
+                'component' => 'mod_vrmakerspace',
+                'filearea' => self::FILEAREA,
+                'itemid' => $snapshot->id,
+                'filepath' => $file->get_filepath(),
+                'filename' => $file->get_filename(),
+                'userid' => $file->get_userid(),
+            ];
+            $file->delete();
+            get_file_storage()->create_file_from_string($record, $data);
+            $DB->set_field('vrmakerspace_snapshots', 'filesize', strlen($data), ['id' => $snapshot->id]);
+        }
     }
 
     /**

@@ -116,6 +116,7 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
 
         $mform->addElement('advcheckbox', 'trackcontributions', get_string('trackcontributions', 'vrmakerspace'));
         $mform->addHelpButton('trackcontributions', 'trackcontributions', 'vrmakerspace');
+        $mform->setDefault('trackcontributions', 1);
         $mform->hideIf('trackcontributions', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
 
         $this->standard_grading_coursemodule_elements();

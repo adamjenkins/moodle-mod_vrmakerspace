@@ -541,7 +541,7 @@ test('baking is deterministic on every client, and voxelises a closed mesh', asy
     assert.ok(count > 0.8 * 26.67 * 26.67 * 26.67 && count < 1.2 * 26.67 * 26.67 * 26.67, 'count ' + count);
     const c = a.stats().contributions.ua;
     assert.equal(c.ops, 1);
-    assert.ok(c.added > 0, 'baking counts as added volume');
+    assert.equal(c.added, 0, 'the mesh was already their work: baking moves no new volume');
 });
 
 test('overlapping parts bake solid: their overlap is not left hollow', async() => {

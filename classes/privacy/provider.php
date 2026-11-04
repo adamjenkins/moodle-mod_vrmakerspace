@@ -346,6 +346,13 @@ class provider implements
         foreach ($userids as $userid) {
             pair_manager::purge_user((int)$userid, $sessionids);
         }
+
+        // What they had selected in the mesh, kept under their id inside the saved versions of the group's piece.
+        foreach ($DB->get_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspaceid]) as $session) {
+            foreach ($userids as $userid) {
+                session_manager::remove_author_from_snapshots($session, $context, 'u' . (int)$userid);
+            }
+        }
     }
 
     /**

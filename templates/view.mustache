@@ -108,7 +108,7 @@
                 {{#isclosed}}
                     <div class="alert alert-info">{{#str}} sculptureclosed, mod_vrmakerspace {{/str}}</div>
                 {{/isclosed}}
-                <p><a class="btn btn-primary" href="{{studiourl}}">{{#str}} openstudio, mod_vrmakerspace {{/str}}</a></p>
+                <p><a class="btn btn-primary" href="{{studiourl}}">{{#isclosed}}{{#str}} viewpiece, mod_vrmakerspace {{/str}}{{/isclosed}}{{^isclosed}}{{#str}} openstudio, mod_vrmakerspace {{/str}}{{/isclosed}}</a></p>
                 {{#hascontribution}}
                     <p>{{contribution}}</p>
                 {{/hascontribution}}

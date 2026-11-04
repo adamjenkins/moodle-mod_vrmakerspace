@@ -85,6 +85,9 @@ export const isTyping = (target) => {
     return tag === 'input' && TEXT_INPUTS.includes(String(target.type || 'text').toLowerCase());
 };
 
+/** Which way a tool's stroke would run away, along the view: nearer (-1) or further (1). */
+const STROKE_DEPTH_WAYS = {add: -1, inflate: -1, carve: 1};
+
 /**
  * Attach desktop input to the studio.
  *
@@ -102,6 +105,8 @@ export const attach = (options) => {
     const world = new THREE.Vector3();
     const local = new THREE.Vector3();
     const direction = new THREE.Vector3();
+    const viewpoint = new THREE.Vector3();
+    const offset = new THREE.Vector3();
     const rootquat = new THREE.Quaternion();
     const plane = new THREE.Plane();
     const normal = new THREE.Vector3();
@@ -177,6 +182,40 @@ export const attach = (options) => {
             normal.set(0, 0, 0);
         }
         return true;
+    };
+
+    /**
+     * How far the last picked point lies from the camera, along the view.
+     *
+     * @returns {number} The depth (m).
+     */
+    const viewDepth = () => {
+        camera.getWorldDirection(direction);
+        camera.getWorldPosition(viewpoint);
+        return offset.copy(world).sub(viewpoint).dot(direction);
+    };
+
+    /**
+     * A stroke picks the surface it has just changed, so a drag of Add climbs towards the viewer and a drag
+     * of Carve digs away. One stroke goes at most its radius from where it started; another stroke goes further.
+     */
+    const keepStrokeDepth = () => {
+        const way = STROKE_DEPTH_WAYS[drag.tool];
+        if (!way) {
+            return;
+        }
+        const limit = drag.depth + way * tools.cursorRadius();
+        if (way * (viewDepth() - limit) <= 0) {
+            return;
+        }
+        const along = raycaster.ray.direction.dot(direction);
+        const start = offset.copy(raycaster.ray.origin).sub(viewpoint).dot(direction);
+        if (along <= 0) {
+            return;
+        }
+        world.copy(raycaster.ray.origin).addScaledVector(raycaster.ray.direction, (limit - start) / along);
+        local.copy(world);
+        sculptureRoot.worldToLocal(local);
     };
 
     /**
@@ -308,6 +347,7 @@ export const attach = (options) => {
         drag = {
             pointerId: event.pointerId,
             tool: tool,
+            depth: viewDepth(),
             startx: event.clientX,
             start: local.clone(),
             axis: opts.axis || null,
@@ -497,6 +537,7 @@ export const attach = (options) => {
                 tools.move([drag.start.x, drag.start.y, drag.start.z], {axis: drag.axis, angle: angle});
                 showCursor(drag.start);
             } else if (pick(drag.x, drag.y)) {
+                keepStrokeDepth();
                 tools.move([local.x, local.y, local.z]);
                 showCursor(local);
             }

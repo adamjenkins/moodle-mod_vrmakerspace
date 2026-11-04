@@ -115,6 +115,19 @@ const HIDDEN_SAVE_INTERVAL = 10000;
 const MAX_REPORT_OPS = 5000;
 const MAX_REPORT_VOLUME = 10000000;
 
+/** Ops that change nothing in the piece: no reason to save, or to warn someone who is leaving. */
+const NOT_EDITS = ['msel', 'lock', 'unlock', 'end', 'save', 'hz'];
+
+/** How long the host waits for a guest's hello before sending its state anyway (ms). */
+const HELLO_WAIT = 1500;
+
+/** Leaving: how many times to look for unconfirmed ops, and how long apart (ms). */
+const LEAVE_OP_CHECKS = 15;
+const LEAVE_OP_CHECK_MS = 200;
+
+/** Leaving: at most this many saves in a row. */
+const LEAVE_SAVES = 3;
+
 /** Retries of a replay that did not reach the announced sequence number before a reload. */
 const MAX_REPLAY_RETRIES = 3;
 
@@ -320,6 +333,61 @@ const overlaps = (a, ra, b, rb) => {
 };
 
 /**
+ * A new name for a run of the host's engine.
+ *
+ * @returns {string}
+ */
+const newRun = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+/**
+ * The mode a session runs in.
+ *
+ * @param {Object} config The session's config.
+ * @returns {string} solo, pair, companion or view.
+ */
+const sessionMode = (config) => {
+    if (config.readonly) {
+        return 'view';
+    }
+    return ['solo', 'pair', 'companion', 'view'].indexOf(config.mode) === -1 ? 'solo' : config.mode;
+};
+
+/**
+ * An author's contribution counters as numbers.
+ *
+ * @param {Object} counters The counters from the engine's stats.
+ * @returns {{ops: number, added: number, removed: number}}
+ */
+const readCounters = (counters) => ({
+    ops: Number(counters.ops) || 0,
+    added: Number(counters.added) || 0,
+    removed: Number(counters.removed) || 0,
+});
+
+/**
+ * Whether the counters are below what was reported, so they must have started again.
+ *
+ * @param {{ops: number, added: number, removed: number}} current The counters now.
+ * @param {{ops: number, added: number, removed: number}} reported What was reported.
+ * @returns {boolean}
+ */
+const countersRestarted = (current, reported) => current.ops < reported.ops || current.added < reported.added
+    || current.removed < reported.removed;
+
+/**
+ * What is new in the contribution counters since the last report.
+ *
+ * @param {{ops: number, added: number, removed: number}} current The counters now.
+ * @param {{ops: number, added: number, removed: number}} reported What was reported.
+ * @returns {{ops: number, added: number, removed: number}} The increments to report.
+ */
+const contributionDelta = (current, reported) => ({
+    ops: Math.min(MAX_REPORT_OPS, Math.round(current.ops - reported.ops)),
+    added: Math.min(MAX_REPORT_VOLUME, Math.round((current.added - reported.added) * 100) / 100),
+    removed: Math.min(MAX_REPORT_VOLUME, Math.round((current.removed - reported.removed) * 100) / 100),
+});
+
+/**
  * The sculpting session.
  */
 class Session extends Emitter {
@@ -340,7 +408,7 @@ class Session extends Emitter {
         this.cmid = Number(c.cmid) || 0;
         this.sessionid = Number(c.sessionid) || 0;
         this.user = {id: Number(c.user && c.user.id) || 0, name: String((c.user && c.user.name) || '')};
-        this.mode = c.readonly ? 'view' : (['solo', 'pair', 'companion', 'view'].indexOf(c.mode) === -1 ? 'solo' : c.mode);
+        this.mode = sessionMode(c);
         this.autosavems = Math.max(5000, Number(c.autosavems) || 60000);
         this.contributionms = Math.max(10000, Number(c.contributionms) || 30000);
         this.trackcontributions = !!c.trackcontributions;
@@ -362,6 +430,10 @@ class Session extends Emitter {
         // the whole room forget its records at one point of the stream, which keeps every undo the same everywhere.
         // Pair: the host sends it before it serializes a state; barrierseq is where it last did.
         this.barrierseq = 0;
+        // Pair: names one run of the host's engine. A guest that still holds this run's state and undo
+        // records after a dropped connection only needs the ops it missed, and nobody loses undo.
+        this.hostrun = null;
+        this.hellotimer = null;
         // Companion: null, or 'need' (state loaded, catching up) or 'sent' (hz not yet back).
         this.barrier = null;
         // Companion: an undo arrived while we were catching up, so our state may not match the room's.
@@ -373,6 +445,7 @@ class Session extends Emitter {
         this.offset = 0;
         this.epoch = '';
         this.lastsavedseq = 0;
+        this.editseq = 0;
         this.version = 0;
         this.closed = false;
         this.stopped = false;
@@ -645,6 +718,36 @@ class Session extends Emitter {
     }
 
     /**
+     * Whether leaving now would lose something: edits not in a saved version (when saving is ours to
+     * do), or ops the sequencer has not confirmed.
+     *
+     * @returns {boolean}
+     */
+    hasUnsaved() {
+        if (this.role === 'view' || this.closed || this.stopped) {
+            return false;
+        }
+        return this.outbox.length > 0 || (this.isLeader() && this.editseq > this.lastsavedseq);
+    }
+
+    /**
+     * Get everything safe before the page goes: ops confirmed, a version saved, contributions reported.
+     * A save takes longer than a page's unload lasts, so whoever leaves on purpose waits for this first.
+     *
+     * @returns {Promise<void>} Rejects when the save fails.
+     */
+    async finishBeforeLeaving() {
+        for (let n = 0; n < LEAVE_OP_CHECKS && this.outbox.length > 0; n++) {
+            await new Promise((resolve) => setTimeout(resolve, LEAVE_OP_CHECK_MS));
+        }
+        // An edit can land while a save is running, so look again after it.
+        for (let n = 0; n < LEAVE_SAVES && this.isLeader() && this.editseq > this.lastsavedseq; n++) {
+            await this.save();
+        }
+        await this.reportContribution();
+    }
+
+    /**
      * Stop: the leader's final save, the last contribution report, then leave.
      *
      * @returns {Promise<void>}
@@ -662,7 +765,7 @@ class Session extends Emitter {
         if (typeof document !== 'undefined') {
             document.removeEventListener('visibilitychange', this.onVisibility);
         }
-        if (leader && this.seq !== this.lastsavedseq) {
+        if (leader && this.editseq > this.lastsavedseq) {
             try {
                 await this.save();
             } catch (error) {
@@ -858,6 +961,7 @@ class Session extends Emitter {
         this.offset = engineseq - this.seq;
         this.epoch = cleanEpoch((result && result.epoch) || (header && header.epoch));
         this.lastsavedseq = this.seq;
+        this.editseq = this.seq;
     }
 
     /**
@@ -881,8 +985,10 @@ class Session extends Emitter {
         }
         this.seq = roomseq;
         this.lastsavedseq = roomseq;
+        this.editseq = roomseq;
         if (bytes) {
             this.barrierseq = roomseq;
+            this.hostrun = this.role === 'sequencer' ? newRun() : null;
             this.barrier = this.companion ? 'need' : null;
             this.barrierstale = false;
             this.emit('historyreset', {});
@@ -929,6 +1035,9 @@ class Session extends Emitter {
      */
     afterConfirmed(op, n) {
         this.seq = n;
+        if (NOT_EDITS.indexOf(op.k) === -1) {
+            this.editseq = n;
+        }
         this.activity.set(op.a, Date.now());
         const last = this.lastindex.get(op.a) || 0;
         if (op.i > last) {
@@ -1155,7 +1264,8 @@ class Session extends Emitter {
             return;
         }
         const now = Date.now();
-        if (this.isLeader() && this.seq !== this.lastsavedseq && (unloading || now - this.lasthiddensave >= HIDDEN_SAVE_INTERVAL)) {
+        const due = unloading || now - this.lasthiddensave >= HIDDEN_SAVE_INTERVAL;
+        if (this.isLeader() && this.editseq > this.lastsavedseq && due) {
             this.lasthiddensave = now;
             this.save().catch((error) => Log.debug(error));
         }
@@ -1173,7 +1283,7 @@ class Session extends Emitter {
             return;
         }
         this.timers.push(setInterval(() => {
-            if (this.isLeader() && this.seq !== this.lastsavedseq) {
+            if (this.isLeader() && this.editseq > this.lastsavedseq) {
                 this.save().catch((error) => Log.debug(error));
             }
         }, this.autosavems));
@@ -1222,21 +1332,12 @@ class Session extends Emitter {
             if (!mine) {
                 return;
             }
-            const current = {
-                ops: Number(mine.ops) || 0,
-                added: Number(mine.added) || 0,
-                removed: Number(mine.removed) || 0,
-            };
-            if (current.ops < this.reported.ops || current.added < this.reported.added
-                    || current.removed < this.reported.removed) {
+            const current = readCounters(mine);
+            if (countersRestarted(current, this.reported)) {
                 // The engine started counting again (a state was loaded).
                 this.reported = {ops: 0, added: 0, removed: 0};
             }
-            const delta = {
-                ops: Math.min(MAX_REPORT_OPS, Math.round(current.ops - this.reported.ops)),
-                added: Math.min(MAX_REPORT_VOLUME, Math.round((current.added - this.reported.added) * 100) / 100),
-                removed: Math.min(MAX_REPORT_VOLUME, Math.round((current.removed - this.reported.removed) * 100) / 100),
-            };
+            const delta = contributionDelta(current, this.reported);
             if (delta.ops <= 0 && delta.added <= 0 && delta.removed <= 0) {
                 return;
             }
@@ -1415,6 +1516,7 @@ class Session extends Emitter {
                 this.offset += this.seq;
                 this.seq = 0;
                 this.lastsavedseq = 0;
+                this.editseq = 0;
             }
             this.requestReplay(this.seq);
             return;
@@ -1797,6 +1899,7 @@ class Session extends Emitter {
         this.synced = true;
         this.guestsynced = false;
         this.hostlog = [];
+        this.hostrun = newRun();
         if (pending.length) {
             this.engine.promote();
             pending.forEach((op) => this.afterConfirmed(op, this.seq + 1));
@@ -1843,10 +1946,62 @@ class Session extends Emitter {
         }
         this.emitPeers();
         if (this.role === 'sequencer') {
-            this.sendHostState().catch((error) => Log.debug(error));
+            this.waitForHello();
         } else if (this.role === 'client') {
             this.synced = false;
+            this.pair.sendMessage({t: 'hello', run: this.hostrun, seq: this.seq});
         }
+        this.updateStatus();
+    }
+
+    /**
+     * The host gives the guest a moment to say which state it holds; without an answer it sends its own.
+     */
+    waitForHello() {
+        this.stopWaitingForHello();
+        this.hellotimer = setTimeout(() => {
+            this.hellotimer = null;
+            if (this.role === 'sequencer' && this.linkopen) {
+                this.sendHostState().catch((error) => Log.debug(error));
+            }
+        }, HELLO_WAIT);
+    }
+
+    /**
+     * Stop waiting for a guest's hello.
+     */
+    stopWaitingForHello() {
+        if (this.hellotimer) {
+            clearTimeout(this.hellotimer);
+            this.hellotimer = null;
+        }
+    }
+
+    /**
+     * A guest said which state it holds: it gets the ops it missed if it holds this run's state, else our state.
+     *
+     * @param {Object} message {t, run, seq}.
+     */
+    onGuestHello(message) {
+        if (!this.hellotimer) {
+            return;
+        }
+        this.stopWaitingForHello();
+        const following = this.hostlog.filter((entry) => entry.n > message.seq);
+        const reachable = Number.isInteger(message.seq) && message.seq >= 0 && message.seq <= this.seq
+            && (message.seq === this.seq || (following.length > 0 && following[0].n === message.seq + 1));
+        if (message.run !== this.hostrun || !reachable) {
+            this.sendHostState().catch((error) => Log.debug(error));
+            return;
+        }
+        this.transfer++;
+        const guest = 'u' + this.remote.userid;
+        this.pair.sendMessage({t: 'rs', li: this.lastindex.get(guest) || 0});
+        following.forEach((entry) => this.pair.sendMessage({t: 'o', n: entry.n, d: entry.text}));
+        const locks = [];
+        this.locks.forEach((lock, author) => locks.push([author, lock.p, lock.r]));
+        this.pair.sendMessage({t: 'lk', l: locks.slice(0, 16)});
+        this.guestsynced = true;
         this.updateStatus();
     }
 
@@ -1858,6 +2013,7 @@ class Session extends Emitter {
         this.linkopen = false;
         this.guestsynced = false;
         this.transfer++;
+        this.stopWaitingForHello();
         if (this.role === 'client') {
             this.synced = false;
         }
@@ -1896,6 +2052,7 @@ class Session extends Emitter {
         if (!ok || transfer !== this.transfer || this.role !== 'sequencer' || !this.linkopen) {
             return;
         }
+        this.pair.sendMessage({t: 'run', run: this.hostrun});
         const following = this.hostlog.filter((entry) => entry.n > roomseq);
         if (roomseq < this.seq && (!following.length || following[0].n !== roomseq + 1)) {
             // The log no longer reaches back to the state: send a newer state.
@@ -1930,6 +2087,8 @@ class Session extends Emitter {
                 this.sequence(op);
             } else if (message.t === 'sync') {
                 this.sendHostState().catch((error) => Log.debug(error));
+            } else if (message.t === 'hello') {
+                this.onGuestHello(message);
             }
             return;
         }
@@ -1950,7 +2109,17 @@ class Session extends Emitter {
      * @param {string} hostauthor The host's author id.
      */
     guestMessage(message, hostauthor) {
-        if (message.t === 'o') {
+        if (message.t === 'run') {
+            this.hostrun = typeof message.run === 'string' ? message.run : null;
+        } else if (message.t === 'rs') {
+            // We still hold the host's state: only the ops we missed follow.
+            const li = Number(message.li) || 0;
+            this.outbox = this.outbox.filter((entry) => entry.op.i > li);
+            this.synced = true;
+            this.sendgen++;
+            this.updateStatus();
+            this.flushOutbox();
+        } else if (message.t === 'o') {
             if (!this.synced || !Number.isInteger(message.n) || message.n <= this.seq) {
                 return;
             }

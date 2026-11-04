@@ -74,22 +74,9 @@ jobs:
           echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
 
       # mod_vrmakerspace depends on vrroomruntime_builtin, which mod_vrroom bundles (its three.js, WebXR
-      # and presence modules): install mod_vrroom first. The mod_vrroom repository is private for now:
-      # set the repository secret MOD_VRROOM_TOKEN to a fine-grained token that can read it (Contents:
-      # read-only). Without the secret the public URL is used, which works once mod_vrroom is public.
-      # The token goes into an HTTP header for git (as actions/checkout does), never into a clone URL:
-      # moodle-plugin-ci prints a failed command wrapped across lines, which defeats the log masking.
+      # and presence modules): install mod_vrroom first.
       - name: Add mod_vrroom
-        run: |
-          if [ -n "$MOD_VRROOM_TOKEN" ]; then
-            auth=$(printf 'x-access-token:%s' "$MOD_VRROOM_TOKEN" | base64 -w0)
-            echo "::add-mask::$auth"
-            git config --global http.https://github.com/adamjenkins/moodle-mod_vrroom.git/.extraheader "AUTHORIZATION: basic $auth"
-          fi
-          moodle-plugin-ci add-plugin adamjenkins/moodle-mod_vrroom
-          git config --global --unset-all http.https://github.com/adamjenkins/moodle-mod_vrroom.git/.extraheader || true
-        env:
-          MOD_VRROOM_TOKEN: ${{ secrets.MOD_VRROOM_TOKEN }}
+        run: moodle-plugin-ci add-plugin adamjenkins/moodle-mod_vrroom
 
       - name: Install moodle-plugin-ci
         run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1

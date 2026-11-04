@@ -110,8 +110,8 @@ final class contribution_manager {
     /**
      * The members' shares of a piece, largest first.
      *
-     * A share is the user's part of all the clay added and removed; while no clay has moved, of all
-     * the operations.
+     * A share is the mean of the user's part of all the edits (clay strokes and mesh edits alike) and of
+     * all the clay added and removed. While no clay has moved it is the part of the edits alone.
      *
      * @param int $sessionid the session id
      * @return array list of ['userid' => int, 'ops' => int, 'added' => float, 'removed' => float,
@@ -129,10 +129,9 @@ final class contribution_manager {
         $summary = [];
         foreach ($rows as $row) {
             $volume = (float)$row->added + (float)$row->removed;
+            $share = $totalops > 0 ? 100 * (int)$row->ops / $totalops : 0.0;
             if ($totalvolume > 0) {
-                $share = 100 * $volume / $totalvolume;
-            } else {
-                $share = $totalops > 0 ? 100 * (int)$row->ops / $totalops : 0.0;
+                $share = ($share + 100 * $volume / $totalvolume) / 2;
             }
             $summary[] = [
                 'userid' => (int)$row->userid,

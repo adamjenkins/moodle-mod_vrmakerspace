@@ -43,7 +43,7 @@ const OWN_COLOUR = 0xff8c1a;
 
 /** Width (m) of a vertex dot, and of a selected one. */
 const POINT_SIZE = 0.004;
-const SELECTED_POINT_SIZE = 0.008;
+const SELECTED_POINT_SIZE = 0.014;
 
 /** Opacity of a selected face's tint. */
 const FACE_TINT = 0.35;
@@ -57,6 +57,16 @@ const MIN_CAPACITY = 64;
 /** Hues (degrees) other people's colours are chosen from: leaves out the reds and oranges, which mean something else. */
 const FIRST_HUE = 70;
 const HUE_RANGE = 260;
+
+/**
+ * Pull a selection mark slightly towards the viewer, so that it never fights with the edge under it.
+ *
+ * @param {Object} shader The material's shader.
+ */
+const drawInFront = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>',
+        '#include <project_vertex>\n\tgl_Position.z -= 0.0004 * gl_Position.w;');
+};
 
 /**
  * A number from an author id, so everyone sees a person in the same colour.
@@ -234,7 +244,9 @@ export const createPolyView = (THREE, parent) => {
         polygonOffsetUnits: -1,
     });
     const selLineMaterial = new THREE.LineBasicMaterial({vertexColors: true});
+    selLineMaterial.onBeforeCompile = drawInFront;
     const selPointMaterial = new THREE.PointsMaterial({vertexColors: true, size: SELECTED_POINT_SIZE, sizeAttenuation: true});
+    selPointMaterial.onBeforeCompile = drawInFront;
     const selFaces = new THREE.Mesh(selFaceGeometry, selFaceMaterial);
     const selLines = new THREE.LineSegments(selLineGeometry, selLineMaterial);
     const selPoints = new THREE.Points(selPointGeometry, selPointMaterial);

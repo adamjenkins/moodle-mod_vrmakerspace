@@ -104,6 +104,20 @@ final class contribution_manager_test extends \advanced_testcase {
         contribution_manager::report($session, (int)$one->id, 1, 50.0, 50.0, 1800000100);
         $summary = contribution_manager::summary((int)$session->id);
         $this->assertSame([(int)$two->id, (int)$one->id], array_column($summary, 'userid'));
-        $this->assertEquals([75.0, 25.0], array_column($summary, 'share'));
+        // Edits 2 of 6 and 4 of 6; clay 300 of 400 and 100 of 400.
+        $this->assertEquals([54.2, 45.8], array_column($summary, 'share'));
+    }
+
+    /**
+     * Someone who only models still has a share when a partner has moved clay.
+     */
+    public function test_summary_counts_modelling(): void {
+        $this->resetAfterTest();
+        [$session, $one, $two] = $this->make_session();
+        contribution_manager::report($session, (int)$one->id, 3, 0.0, 0.0, 1800000000);
+        contribution_manager::report($session, (int)$two->id, 1, 500.0, 0.0, 1800000000);
+        $summary = contribution_manager::summary((int)$session->id);
+        $this->assertSame([(int)$two->id, (int)$one->id], array_column($summary, 'userid'));
+        $this->assertEquals([62.5, 37.5], array_column($summary, 'share'));
     }
 }

@@ -61,7 +61,7 @@ const STRING_KEYS = [
     'mshape_cylinder', 'mshape_sphere', 'mshape_cone', 'mshape_torus', 'segments', 'axislock', 'axis_free', 'axis_x',
     'axis_y', 'axis_z', 'meshrefused_empty', 'meshrefused_needfaces', 'meshrefused_neededges',
     'meshrefused_nonmanifold', 'meshrefused_badselection', 'meshrefused_limit', 'meshrefused_conflict',
-    'meshrefused_nosolid', 'undoreset',
+    'meshrefused_nosolid', 'undoreset', 'leavesavefailed',
     'modelopenedges', 'modelshortcuts', 'vrmodelhelp', 'vrmodelselecthelp', 'meshlayer',
 ];
 
@@ -85,6 +85,9 @@ const MAX_PIXEL_RATIO = 1.5;
 
 /** Presence poses are sent at most this often (ms): 15 a second. */
 const POSE_INTERVAL = 67;
+
+/** How long leaving waits for the save (ms). */
+const LEAVE_SAVE_WAIT = 10000;
 
 /** How long passing messages (someone joined, a region is locked) stay (ms). */
 const MESSAGE_TIME = 5000;
@@ -229,6 +232,26 @@ const watchVr = (xr, toolbar, isStopped) => {
         toolbar.setVr(!!available && !isStopped(), false);
         return available;
     }).catch((error) => Log.debug(error));
+};
+
+/**
+ * Whether a click on a link takes this tab away from this page.
+ *
+ * @param {HTMLAnchorElement} link The link.
+ * @param {MouseEvent} event The click.
+ * @returns {boolean}
+ */
+const leavesPage = (link, event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+        return false;
+    }
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download') || link.hasAttribute('data-bs-toggle')) {
+        return false;
+    }
+    if (link.protocol !== 'http:' && link.protocol !== 'https:') {
+        return false;
+    }
+    return link.href.split('#')[0] !== window.location.href.split('#')[0];
 };
 
 /**
@@ -842,6 +865,8 @@ const run = (root, config, strings, extra) => {
             return Promise.resolve(null);
         }
         stopped = true;
+        document.removeEventListener('click', onLinkClick, true);
+        window.removeEventListener('beforeunload', onBeforeUnload);
         const ending = Promise.resolve().then(() => session.stop()).catch((error) => Log.debug(error));
         return ending.then(() => {
             if (xr) {
@@ -878,6 +903,59 @@ const run = (root, config, strings, extra) => {
         stop();
     };
 
+    // Whether the page may go now: the piece is safe, or a save could not be made and the person was told.
+    let mayleave = false;
+    let waitingtoleave = false;
+    let savedforleaving = false;
+
+    /**
+     * Following a link on this page: first save, because a save does not outlast the page.
+     *
+     * @param {MouseEvent} event The click.
+     */
+    const onLinkClick = (event) => {
+        const link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+        if (!link || mayleave || readonly || !leavesPage(link, event)) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        if (waitingtoleave) {
+            return;
+        }
+        waitingtoleave = true;
+        toolbar.message(strings.saving);
+        const timeout = new Promise((resolve, reject) => {
+            window.setTimeout(() => reject(new Error('timeout')), LEAVE_SAVE_WAIT);
+        });
+        Promise.race([session.finishBeforeLeaving(), timeout]).then(() => {
+            mayleave = true;
+            savedforleaving = true;
+            window.location.href = link.href;
+            return null;
+        }).catch((error) => {
+            Log.debug(error);
+            // Leave the choice to the person: the next click goes, and the browser asks first.
+            waitingtoleave = false;
+            mayleave = true;
+            toolbar.message(strings.leavesavefailed);
+        });
+    };
+
+    /**
+     * Closing the tab or reloading: nothing can be saved in time any more, so have the browser ask.
+     *
+     * @param {BeforeUnloadEvent} event The event.
+     */
+    const onBeforeUnload = (event) => {
+        if (session.hasUnsaved() && !(mayleave && savedforleaving)) {
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    };
+    document.addEventListener('click', onLinkClick, true);
+    window.addEventListener('beforeunload', onBeforeUnload);
+
     /**
      * A page restored from the back/forward cache starts afresh.
      *
@@ -890,6 +968,12 @@ const run = (root, config, strings, extra) => {
     };
     window.addEventListener('pagehide', onPageHide);
     window.addEventListener('pageshow', onPageShow);
+
+    // Below the page heading, the tools and the 3D view may not fit the window: start with them in view.
+    const toolrow = root.querySelector('[data-region="toolbar"]');
+    if (toolrow && window.scrollY === 0) {
+        toolrow.scrollIntoView({block: 'start'});
+    }
 
     return Promise.resolve(session.start()).then(() => {
         if (stopped) {

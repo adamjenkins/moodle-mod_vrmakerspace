@@ -153,6 +153,8 @@ export class Engine {
     constructor(grid, seq, epoch, mesh) {
         /** Contributions per author, counted on C: {ops, added, removed} (mm³). @type {Map<string, object>} */
         this.contributions = new Map();
+        /** The stroke last counted as an edit, per author. @type {Map<string, number>} */
+        this.countedStroke = new Map();
         this.reset(grid, seq, epoch, mesh);
     }
 
@@ -588,6 +590,20 @@ export class Engine {
     }
 
     /**
+     * Counts an edit for its author: one per stroke, however many ops a drag sends, so that clay and mesh
+     * edits compare.
+     *
+     * @param {object} c Clean op with a stroke id.
+     * @returns {void}
+     */
+    countEdit(c) {
+        if (this.countedStroke.get(c.a) !== c.s) {
+            this.countedStroke.set(c.a, c.s);
+            this.contributionOf(c.a).ops++;
+        }
+    }
+
+    /**
      * The contribution counters of an author, created on first use.
      *
      * @param {string} author Author id.
@@ -620,7 +636,7 @@ export class Engine {
             return null;
         }
         if (isStrokeKind(c.k)) {
-            this.contributionOf(c.a).ops++;
+            this.countEdit(c);
             const box = footprint(c, C);
             if (!box) {
                 return null;
@@ -663,7 +679,8 @@ export class Engine {
             } else {
                 this.history.undo(c.a, c.t, C);
             }
-            this.account(box, c.a, null);
+            // Taking back or repeating a stroke is not new work.
+            this.account(box, c.a, null, false);
             return box;
         }
         return null;
@@ -689,7 +706,7 @@ export class Engine {
         if (!r.ok) {
             this.refusal = r.reason;
         } else if (edit) {
-            this.contributionOf(c.a).ops++;
+            this.countEdit(c);
         }
     }
 
@@ -779,7 +796,7 @@ export class Engine {
             this.refusal = 'nosolid';
             return null;
         }
-        this.contributionOf(c.a).ops++;
+        this.countEdit(c);
         const capture = this.history.stroke(c.a, c.s, C);
         copyBox(C, box, this.workC);
         const {nx, ny, data} = C;
@@ -794,7 +811,8 @@ export class Engine {
                 }
             }
         }
-        this.account(box, c.a, capture);
+        // The mesh was already the student's work: turning it into clay moves no new volume.
+        this.account(box, c.a, capture, false);
         MC.rec = this.meshHistory.stroke(c.a, c.s, MC);
         try {
             Array.from(MC.faces.keys()).forEach((id) => MC.delFace(id));
@@ -813,9 +831,10 @@ export class Engine {
      * @param {{min: number[], max: number[]}} box The box written.
      * @param {string} author Author id.
      * @param {import('./history.js').StrokeCapture|null} capture The open stroke's capture, or null.
+     * @param {boolean} [counts] Whether the voxels count for the author's contribution (default true).
      * @returns {void}
      */
-    account(box, author, capture) {
+    account(box, author, capture, counts = true) {
         const C = this.C;
         const {nx, ny, data} = C;
         const [ncx, ncy] = C.chunks;
@@ -868,7 +887,7 @@ export class Engine {
                 }
             }
         }
-        if (added || removed) {
+        if (counts && (added || removed)) {
             const mm = C.voxel * 1000;
             const volume = mm * mm * mm;
             const counters = this.contributionOf(author);

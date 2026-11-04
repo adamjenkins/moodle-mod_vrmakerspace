@@ -176,6 +176,19 @@ const normaliseResult = (result) => {
 };
 
 /**
+ * The reason a join failed, from its error.
+ *
+ * @param {Object} error The error.
+ * @returns {string} The reason.
+ */
+const joinFailureReason = (error) => {
+    if (error && error.reason) {
+        return error.reason;
+    }
+    return error && typeof error.errorcode === 'string' ? error.errorcode : 'error';
+};
+
+/**
  * Transport over the companion service.
  */
 export class CompanionTransport extends Emitter {
@@ -394,8 +407,7 @@ export class CompanionTransport extends Emitter {
             return welcome;
         }).catch((error) => {
             this.joining = null;
-            const reason = error && error.reason ? error.reason
-                : (error && typeof error.errorcode === 'string' ? error.errorcode : 'error');
+            const reason = joinFailureReason(error);
             if (this.state === 'joining') {
                 this.stopEverything();
                 this.setState('failed', reason);
@@ -413,36 +425,43 @@ export class CompanionTransport extends Emitter {
      * @param {boolean} refreshed Whether a refresh was already made.
      * @returns {Promise<Object>} The welcome frame; rejects with a join error.
      */
-    connectWhileJoining(retried, refreshed) {
-        return this.connectOnce().catch((failure) => {
-            if (this.state !== 'joining') {
-                throw joinError('closed');
+    async connectWhileJoining(retried, refreshed) {
+        let failure;
+        try {
+            return await this.connectOnce();
+        } catch (error) {
+            failure = error;
+        }
+        if (this.state !== 'joining') {
+            throw joinError('closed');
+        }
+        const code = failure && failure.code ? failure.code : 1006;
+        Log.debug(LOGPREFIX + 'socket closed while joining (' + code + ')');
+        const action = Frames.closeAction(code, false);
+        if (action.action === 'retry') {
+            if (retried) {
+                throw joinError('network');
             }
-            const code = failure && failure.code ? failure.code : 1006;
-            Log.debug(LOGPREFIX + 'socket closed while joining (' + code + ')');
-            const action = Frames.closeAction(code, false);
-            if (action.action === 'retry') {
-                if (retried) {
-                    throw joinError('network');
-                }
-                return this.wait(Frames.backoff(0)).then(() => this.connectWhileJoining(true, refreshed));
-            }
-            if (action.action === 'refresh') {
-                if (refreshed) {
-                    throw joinError(action.reason);
-                }
-                return this.fetchJoin(true).then((result) => {
-                    if (this.state !== 'joining') {
-                        throw joinError('closed');
-                    }
-                    this.applyResult(result);
-                    return this.connectWhileJoining(retried, true);
-                }, (error) => {
-                    throw joinError(isNetworkError(error) ? 'network' : 'notallowed', error);
-                });
-            }
+            await this.wait(Frames.backoff(0));
+            return this.connectWhileJoining(true, refreshed);
+        }
+        if (action.action !== 'refresh') {
             throw joinError(action.reason || 'error');
-        });
+        }
+        if (refreshed) {
+            throw joinError(action.reason);
+        }
+        let result;
+        try {
+            result = await this.fetchJoin(true);
+        } catch (error) {
+            throw joinError(isNetworkError(error) ? 'network' : 'notallowed', error);
+        }
+        if (this.state !== 'joining') {
+            throw joinError('closed');
+        }
+        this.applyResult(result);
+        return this.connectWhileJoining(retried, true);
     }
 
     /**
