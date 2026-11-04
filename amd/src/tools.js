@@ -33,6 +33,10 @@
  * from a time-based value (8 per second since 2026) or past the last value this browser reserved,
  * whichever is higher.
  *
+ * The undo and redo stacks are shared with the mesh tools (modeltools.js), which take their stroke ids
+ * from allocStroke() and put them on the stack with recordStroke(), so Undo and Redo go through both
+ * ways of making in the order things were done.
+ *
  * @module     mod_vrmakerspace/tools
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -239,7 +243,8 @@ const makeCounter = (name) => {
  *
  * @param {Object} options {session, lockOwner(p, r) → name|null, onChange(), onRefused(name)}
  * @returns {Object} Tools {tool, size, strength, mirror, shape, text, active, setTool, setSize, setStrength,
- *     setMirror, setShape, setText, begin, move, end, undo, redo, canUndo, canRedo, cursorRadius}
+ *     setMirror, setShape, setText, begin, move, end, undo, redo, canUndo, canRedo, cursorRadius, author,
+ *     allocStroke, recordStroke, forgetStroke}
  */
 export const createTools = (options) => {
     const session = options.session;
@@ -279,6 +284,19 @@ export const createTools = (options) => {
      * @returns {string}
      */
     const author = () => String(session.author());
+
+    /**
+     * Put a finished stroke on the undo stack: it is the last thing done, so nothing is left to redo.
+     *
+     * @param {number} s The stroke id.
+     */
+    const pushUndo = (s) => {
+        undostack.push(s);
+        if (undostack.length > MAX_UNDO) {
+            undostack.shift();
+        }
+        redostack.length = 0;
+    };
 
     /**
      * Take one op from the rate budget.
@@ -376,11 +394,7 @@ export const createTools = (options) => {
         stroke = null;
         if (current.ops > 0) {
             send({k: 'end', a: author(), s: current.s, i: nextIndex(author())});
-            undostack.push(current.s);
-            if (undostack.length > MAX_UNDO) {
-                undostack.shift();
-            }
-            redostack.length = 0;
+            pushUndo(current.s);
         }
         if (current.locked) {
             send({k: 'unlock', a: author(), i: nextIndex(author())});
@@ -699,11 +713,7 @@ export const createTools = (options) => {
         }
         send(op);
         send({k: 'end', a: author(), s: s, i: nextIndex(author())});
-        undostack.push(s);
-        if (undostack.length > MAX_UNDO) {
-            undostack.shift();
-        }
-        redostack.length = 0;
+        pushUndo(s);
         changed();
         return true;
     };
@@ -965,5 +975,49 @@ export const createTools = (options) => {
 
         /** @returns {number} The radius of the tool cursor (m, sculpture-local). */
         cursorRadius: () => (stroke ? stroke.r : size),
+
+        /** @returns {string} The author id of this user. */
+        author: () => author(),
+
+        /** @returns {number} The next stroke id of this user, for a stroke made outside these tools. */
+        allocStroke: () => nextStroke(author()),
+
+        /**
+         * Put a stroke made outside these tools on the shared undo stack.
+         *
+         * @param {number} s Its stroke id, from allocStroke().
+         */
+        recordStroke: (s) => {
+            pushUndo(s);
+            changed();
+        },
+
+        /**
+         * Forget what can be undone and redone: the room's undo records started again.
+         *
+         * @returns {boolean} Whether there was anything to forget.
+         */
+        clearHistory: () => {
+            const had = undostack.length > 0 || redostack.length > 0;
+            undostack.length = 0;
+            redostack.length = 0;
+            if (had) {
+                changed();
+            }
+            return had;
+        },
+
+        /**
+         * Take a stroke off the undo stack again, because it turned out to have done nothing.
+         *
+         * @param {number} s Its stroke id.
+         */
+        forgetStroke: (s) => {
+            const at = undostack.lastIndexOf(s);
+            if (at !== -1) {
+                undostack.splice(at, 1);
+                changed();
+            }
+        },
     };
 };

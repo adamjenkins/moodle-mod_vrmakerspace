@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Module Web Worker that runs the sculpting engine off the main thread.
+ * Module Web Worker that runs the engine (the clay and mesh layers) off the main thread.
  *
  * Start it with new Worker(url, {type: 'module'}); url may carry a cache-busting query (?v=…),
  * which is passed on to the sibling modules it imports.
@@ -22,6 +22,7 @@
  * main → worker:
  *   {type: 'init', dims, voxel, model, upload: {bytes: ArrayBuffer, format}|null, snapshot: ArrayBuffer|null}
  *       → {type: 'ready', seq, epoch, dims, voxel}, then {type: 'chunks'} with every non-empty chunk
+ *       and {type: 'polymesh'} (also when the mesh is empty)
  *   {type: 'local', op}             apply to the display state as a pending op
  *   {type: 'confirmed', op, seq}    apply to the confirmed state in seq order
  *   {type: 'promote'}               every pending op becomes confirmed
@@ -29,9 +30,13 @@
  *   {type: 'serialize', id, epoch}  → {type: 'serialized', id, bytes: ArrayBuffer, seq}
  *   {type: 'export', id, format}    → {type: 'exported', id, bytes: ArrayBuffer, report} (stl|glb|3mf)
  *   {type: 'stats', id}             → {type: 'stats', id, seq, pending, contributions}
+ *   {type: 'preview', op}           show an adjustable mesh tool's result (never sent); op null clears it
  * worker → main, unsolicited:
  *   {type: 'chunks', chunks: [{key: 'cx,cy,cz', positions, normals, indices}]} (buffers transferred,
  *       empty arrays remove the chunk), at most every 33 ms;
+ *   {type: 'polymesh', data: polymesh.renderData(display mesh)} (buffers transferred), same throttle;
+ *   {type: 'meshrefused', op, reason} an own local or confirmed mesh op changed nothing, reason as
+ *       polyops.applyMeshOp gives it (each op told once);
  *   {type: 'rejected', op, reason};  {type: 'error', id?, message}.
  *
  * Messages are handled strictly in arrival order. serialize and export capture the state at the
@@ -48,7 +53,11 @@ const REMESH_MS = 33;
 /** Cache-busting query of this worker's URL, passed on to its imports. */
 const QUERY = self.location.search || '';
 
-/** Lazily imported modules. @type {{engine: object, mesher: object, exporter: object, validate: object}|null} */
+/**
+ * Lazily imported modules.
+ *
+ * @type {{engine: object, mesher: object, tetmesh: object, exporter: object, validate: object, polymesh: object}|null}
+ */
 let modules = null;
 
 /** The engine, once initialised. @type {object|null} */
@@ -60,7 +69,7 @@ const shown = new Set();
 /** Pending remesh timer. @type {number|null} */
 let timer = null;
 
-/** Time of the last chunks message (performance.now()). */
+/** Time of the last chunks or polymesh message (performance.now()). */
 let lastSent = -Infinity;
 
 /** Tail of the message queue. @type {Promise<void>} */
@@ -73,14 +82,15 @@ let queue = Promise.resolve();
  */
 async function loadModules() {
     if (!modules) {
-        const [engineModule, mesher, tetmesh, exporter, validate] = await Promise.all([
+        const [engineModule, mesher, tetmesh, exporter, validate, polymesh] = await Promise.all([
             import('./engine.js' + QUERY),
             import('./mesher.js' + QUERY),
             import('./tetmesh.js' + QUERY),
             import('./export.js' + QUERY),
             import('./validate.js' + QUERY),
+            import('./polymesh.js' + QUERY),
         ]);
-        modules = {engine: engineModule, mesher, tetmesh, exporter, validate};
+        modules = {engine: engineModule, mesher, tetmesh, exporter, validate, polymesh};
     }
     return modules;
 }
@@ -134,16 +144,12 @@ function ownArray(arr) {
 /**
  * Meshes the dirty chunks and posts them (with every chunk that became empty).
  *
- * @returns {void}
+ * @returns {boolean} Whether any chunk was dirty.
  */
-function flushChunks() {
-    timer = null;
-    if (!engine) {
-        return;
-    }
+function postChunks() {
     const dirty = engine.takeDirtyChunks();
     if (!dirty.length) {
-        return;
+        return false;
     }
     const grid = engine.display;
     const out = [];
@@ -167,9 +173,51 @@ function flushChunks() {
         out.push({key, positions, normals, indices});
         transfer.push(positions.buffer, normals.buffer, indices.buffer);
     }
-    lastSent = performance.now();
     if (out.length) {
         self.postMessage({type: 'chunks', chunks: out}, transfer);
+    }
+    return true;
+}
+
+/**
+ * Posts the display mesh when it changed since it was last posted.
+ *
+ * @returns {boolean} Whether a message was posted.
+ */
+function postPolymesh() {
+    if (!engine.takePolyDirty()) {
+        return false;
+    }
+    const data = modules.polymesh.renderData(engine.polyDisplay);
+    const transfer = [];
+    Object.keys(data).forEach((key) => {
+        if (!ArrayBuffer.isView(data[key])) {
+            return;
+        }
+        data[key] = ownArray(data[key]);
+        const buffer = data[key].buffer;
+        if (buffer.byteLength > 0 && transfer.indexOf(buffer) === -1) {
+            transfer.push(buffer);
+        }
+    });
+    self.postMessage({type: 'polymesh', data}, transfer);
+    return true;
+}
+
+/**
+ * Posts what changed on display since the last time: clay chunks and the mesh.
+ *
+ * @returns {void}
+ */
+function flushChunks() {
+    timer = null;
+    if (!engine) {
+        return;
+    }
+    const chunks = postChunks();
+    const poly = postPolymesh();
+    if (chunks || poly) {
+        lastSent = performance.now();
     }
 }
 
@@ -217,6 +265,17 @@ function postRejected(op, reason) {
 }
 
 /**
+ * Posts the own mesh ops the engine refused since the last time.
+ *
+ * @returns {void}
+ */
+function postRefusals() {
+    engine.takeRefusals().forEach((r) => {
+        self.postMessage({type: 'meshrefused', op: r.op, reason: r.reason});
+    });
+}
+
+/**
  * Throws unless the engine is initialised.
  *
  * @returns {object} The engine.
@@ -230,15 +289,18 @@ function needEngine() {
 }
 
 /**
- * Builds the export of the display state: one closed, manifold mesh (marching tetrahedra; the display's
- * surface nets can be non-manifold where two surfaces share a cell), the file and its printability report.
+ * Builds the export of the display state: the clay as one closed, manifold mesh (marching tetrahedra; the
+ * display's surface nets can be non-manifold where two surfaces share a cell) merged with the mesh layer,
+ * the file and its printability report. An empty clay layer gives only the mesh and an empty mesh layer
+ * only the clay.
  *
  * @param {object} grid The display grid.
+ * @param {object} doc The display mesh document (without a tool's preview).
  * @param {string} format 'stl', 'glb' or '3mf'.
  * @returns {Promise<{bytes: ArrayBuffer, report: object}>} The file and report.
  */
-async function buildExport(grid, format) {
-    const mesh = modules.tetmesh.meshManifold(grid);
+async function buildExport(grid, doc, format) {
+    const mesh = modules.polymesh.mergeMeshes(modules.tetmesh.meshManifold(grid), modules.polymesh.exportMesh(doc));
     let bytes;
     if (format === 'stl') {
         bytes = await modules.exporter.toSTL(mesh);
@@ -281,6 +343,7 @@ async function handle(msg) {
             if (!r.ok && r.reason !== 'duplicate') {
                 postRejected(msg.op, r.reason);
             }
+            postRefusals();
             scheduleRemesh();
             return;
         }
@@ -289,11 +352,17 @@ async function handle(msg) {
             if (!r.ok && (r.reason === 'invalid' || r.reason === 'noauthor')) {
                 postRejected(msg.op, r.reason);
             }
+            postRefusals();
             scheduleRemesh();
             return;
         }
         case 'promote':
             needEngine().promote();
+            postRefusals();
+            scheduleRemesh();
+            return;
+        case 'preview':
+            needEngine().setPreview(msg.op || null);
             scheduleRemesh();
             return;
         case 'load': {
@@ -321,7 +390,7 @@ async function handle(msg) {
         }
         case 'export': {
             const e = needEngine();
-            buildExport(e.display, msg.format).then(({bytes, report}) => {
+            buildExport(e.display, e.MD, msg.format).then(({bytes, report}) => {
                 self.postMessage({type: 'exported', id: msg.id, bytes, report}, [bytes]);
                 return null;
             }).catch((err) => postError(err, msg.id));

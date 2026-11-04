@@ -14,9 +14,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The main-thread side of the sculpting engine: owns the module Web Worker that holds the signed
- * distance field, turns its chunk meshes into three.js meshes under the sculpture group, and gives
- * the session and the studio a promise-based API over the worker protocol.
+ * The main-thread side of the engine: owns the module Web Worker that holds the signed distance field
+ * and the mesh document, turns its chunk meshes into three.js meshes under the piece's group, draws the
+ * mesh layer through a PolyView there, and gives the session and the studio a promise-based API over
+ * the worker protocol.
  *
  * Every chunk is one Mesh whose geometry is updated in place: the vertex and index buffers grow
  * (by half again) only when a chunk needs more room than it has, so steady sculpting allocates
@@ -29,6 +30,7 @@
  */
 
 import Log from 'core/log';
+import {createPolyView} from 'mod_vrmakerspace/polyview';
 
 /** Cells per chunk edge (contract §2). */
 const CHUNK = 16;
@@ -66,7 +68,7 @@ const toBuffer = (bytes) => {
  * @param {Object} parent THREE.Group the chunk meshes are added to (the sculpture-local frame).
  * @param {Object} material Material every chunk mesh uses.
  * @returns {Object} EngineClient {init, local, confirmed, promote, load, serialize, exportModel, stats,
- *     meshes, on, dispose}
+ *     meshes, polydata, poly, preview, on, dispose}
  */
 export const createEngineClient = (workerurl, THREE, parent, material) => {
     const worker = new Worker(workerurl, {type: 'module'});
@@ -76,6 +78,10 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
     const chunks = new Map();
     /** @type {Object[]} the chunk meshes, for raycasting */
     let meshlist = [];
+    /** The view of the mesh layer. */
+    const poly = createPolyView(THREE, parent);
+    /** @type {Object|null} the latest polymesh.renderData the worker posted */
+    let polydata = null;
     /** @type {Map<string, Set<Function>>} */
     const listeners = new Map();
     let nextid = 1;
@@ -275,6 +281,17 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
         emit('chunks', {count: Array.isArray(list) ? list.length : 0});
     };
 
+    /**
+     * Show the mesh layer's new drawing data.
+     *
+     * @param {Object} data polymesh.renderData.
+     */
+    const applyPolymesh = (data) => {
+        polydata = data || null;
+        poly.setData(polydata);
+        emit('polymesh', polydata);
+    };
+
     /** Remove every chunk mesh. */
     const clearChunks = () => {
         Array.from(chunks.keys()).forEach(removeChunk);
@@ -352,6 +369,10 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
             onReady(data);
         } else if (data.type === 'chunks') {
             applyChunks(data.chunks);
+        } else if (data.type === 'polymesh') {
+            applyPolymesh(data.data);
+        } else if (data.type === 'meshrefused') {
+            emit('meshrefused', {op: data.op, reason: data.reason});
         } else if (data.type === 'rejected') {
             emit('rejected', {op: data.op, reason: data.reason});
         } else if (data.type === 'error') {
@@ -387,6 +408,8 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
                 initwait.reject(new Error('The sculpting engine was started again'));
             }
             clearChunks();
+            polydata = null;
+            poly.setData(null);
             const snapshot = toBuffer(options.snapshot || null);
             // A copy of the uploaded model each time: the caller keeps its bytes for a restart.
             const upload = options.upload ? {bytes: toBuffer(options.upload.bytes), format: options.upload.format} : null;
@@ -473,7 +496,26 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
         meshes: () => meshlist,
 
         /**
-         * Listen to an engine event: chunks, rejected, error.
+         * The latest drawing data of the mesh layer, for picking and the mesh tools. It is replaced, never changed.
+         *
+         * @returns {Object|null} polymesh.renderData, or null before the engine has posted any.
+         */
+        polydata: () => polydata,
+
+        /** The view of the mesh layer: {setData, setShowEditing, setOwnAuthor, setPresent, meshes, dispose}. */
+        poly: poly,
+
+        /**
+         * Show the result of an adjustable mesh tool while it is dragged. It is never sent to anyone.
+         *
+         * @param {Object|null} op The op with its author `a`, or null to stop showing it.
+         */
+        preview: (op) => {
+            post({type: 'preview', op: op || null});
+        },
+
+        /**
+         * Listen to an engine event: chunks, polymesh (the drawing data), meshrefused ({op, reason}), rejected, error.
          *
          * @param {string} type Event type.
          * @param {Function} fn Listener.
@@ -501,6 +543,8 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
             failAll(new Error('The sculpting engine has stopped'));
             worker.terminate();
             clearChunks();
+            polydata = null;
+            poly.dispose();
             listeners.clear();
         },
     };

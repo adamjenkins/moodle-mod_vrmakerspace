@@ -14,11 +14,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The grading page's quick view: a popup with one saved version of a sculpture that the teacher turns
+ * The grading page's quick view: a popup with one saved version of a piece that the teacher turns
  * (drag), zooms (wheel, pinch or buttons) and moves (right-drag, Shift+drag or the arrow keys).
  *
- * The version is meshed by the sculpting engine's worker, as in the studio; the renderer and lights
- * follow the studio's view (mod_vrmakerspace/studio), the camera is three.js's OrbitControls.
+ * The version's clay is meshed by the engine's worker and its polygon mesh drawn by the engine client,
+ * as in the studio; the renderer and lights follow the studio's view (mod_vrmakerspace/studio), the
+ * camera is three.js's OrbitControls.
  *
  * @module     mod_vrmakerspace/quickview
  * @copyright  2026 Boban Blagojevic
@@ -136,7 +137,7 @@ const show = (body, workerurl, url) => {
     const box = new THREE.Box3();
     const centre = new THREE.Vector3();
     const sphere = new THREE.Sphere();
-    // Look at the whole sculpture from the front, a little above.
+    // Look at the whole piece from the front, a little above.
     const frame = () => {
         // Precise: the chunk meshes' own bounds are whole chunks, much bigger than the clay in them.
         box.setFromObject(sculpture, true);
@@ -152,13 +153,16 @@ const show = (body, workerurl, url) => {
     };
 
     const engine = createEngineClient(workerurl, THREE, sculpture, material);
-    engine.on('chunks', () => {
+    // A piece may be all clay or all mesh, and either comes first: show and frame on both.
+    const onShape = () => {
         loading.classList.add('d-none');
         // Chunks come in batches: keep framing until the teacher moves the view.
         if (!touched) {
             frame();
         }
-    });
+    };
+    engine.on('chunks', onShape);
+    engine.on('polymesh', onShape);
     engine.on('error', (detail) => fail('quickview_failed', new Error(detail && detail.message)));
 
     const resize = () => {

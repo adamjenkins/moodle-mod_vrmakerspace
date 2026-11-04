@@ -23,7 +23,7 @@ use core_external\external_value;
 use mod_vrmakerspace\local\session_manager;
 
 /**
- * Close or reopen a sculpture.
+ * Close or reopen a piece.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

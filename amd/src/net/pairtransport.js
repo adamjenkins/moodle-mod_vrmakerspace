@@ -76,8 +76,11 @@ const REPLACED_WINDOW = 15000;
 /** Largest JSON message on the ops channel (characters) and largest binary piece (bytes). */
 export const MAX_MESSAGE = 16384;
 
-/** Largest state transfer in bytes. */
-export const MAX_STATE = 8388608;
+/**
+ * Largest state transfer in bytes: what the session fetches as a snapshot at most. The state is a whole snapshot, clay
+ * and mesh, and where the browser cannot compress, a full mesh alone is about 25 MB of JSON.
+ */
+export const MAX_STATE = 33554432;
 
 /** Largest pose message (characters). */
 const MAX_POSE = 1024;

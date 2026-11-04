@@ -1,20 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/vrmakerspace/db" VERSION="20261027" COMMENT="XMLDB file for Moodle mod/vrmakerspace"
+<XMLDB PATH="mod/vrmakerspace/db" VERSION="20261104" COMMENT="XMLDB file for Moodle mod/vrmakerspace"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="vrmakerspace" COMMENT="One VR sculpting activity">
+    <TABLE NAME="vrmakerspace" COMMENT="One VR Makerspace activity">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="course" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="intro" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="introformat" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-        <FIELD NAME="startmodel" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="lump" SEQUENCE="false" COMMENT="Starting model: sphere, cube, lump or upload (the file in the startmodel file area)"/>
-        <FIELD NAME="workmode" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 = one sculpture per user, 1 = one shared sculpture per group"/>
+        <FIELD NAME="methods" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="both" SEQUENCE="false" COMMENT="Ways of making: both, sculpt or model"/>
+        <FIELD NAME="startmodel" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="lump" SEQUENCE="false" COMMENT="Starting model: lump, sphere, cube, meshcube, empty or upload (the file in the startmodel file area)"/>
+        <FIELD NAME="workmode" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 = one piece per user, 1 = one shared piece per group"/>
         <FIELD NAME="connectmode" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="pair" SEQUENCE="false" COMMENT="Group work: pair (built in, two people) or companion (the companion service)"/>
-        <FIELD NAME="maxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="8" SEQUENCE="false" COMMENT="Most people sculpting one group sculpture at once"/>
+        <FIELD NAME="maxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="8" SEQUENCE="false" COMMENT="Most people working on one group piece at once"/>
         <FIELD NAME="trackcontributions" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Record each user's share of the edits"/>
         <FIELD NAME="grade" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="100" SEQUENCE="false" COMMENT="Maximum grade, 0 = not graded"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
@@ -27,7 +28,7 @@
         <INDEX NAME="course" UNIQUE="false" FIELDS="course"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrmakerspace_sessions" COMMENT="One sculpture: a user's own (groupid 0) or a group's (userid 0)">
+    <TABLE NAME="vrmakerspace_sessions" COMMENT="One piece: a user's own (groupid 0) or a group's (userid 0)">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="vrmakerspaceid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -47,13 +48,13 @@
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrmakerspace_snapshots" COMMENT="Saved versions of a sculpture; the data is in the snapshots file area, item id = this id">
+    <TABLE NAME="vrmakerspace_snapshots" COMMENT="Saved versions of a piece; the data is in the snapshots file area, item id = this id">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="version" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="1, 2, 3... per session"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Who saved it; 0 once anonymised"/>
-        <FIELD NAME="opcount" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Sculpting operations applied since the session started"/>
+        <FIELD NAME="opcount" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Operations applied since the session started"/>
         <FIELD NAME="filesize" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
@@ -84,7 +85,7 @@
         <INDEX NAME="vrmakerspaceuser" UNIQUE="true" FIELDS="vrmakerspaceid, userid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrmakerspace_peers" COMMENT="People connected to a group sculpture in pair work, refreshed while their studio polls">
+    <TABLE NAME="vrmakerspace_peers" COMMENT="People connected to a group piece in pair work, refreshed while their studio polls">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -124,12 +125,12 @@
         <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrmakerspace_contrib" COMMENT="How much of a group sculpture each member made, when the activity tracks contributions">
+    <TABLE NAME="vrmakerspace_contrib" COMMENT="How much of a group piece each member made, when the activity tracks contributions">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
-        <FIELD NAME="ops" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Sculpting operations made"/>
+        <FIELD NAME="ops" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Operations made"/>
         <FIELD NAME="added" TYPE="number" LENGTH="12" NOTNULL="true" DEFAULT="0" SEQUENCE="false" DECIMALS="2" COMMENT="Clay added, cubic millimetres"/>
         <FIELD NAME="removed" TYPE="number" LENGTH="12" NOTNULL="true" DEFAULT="0" SEQUENCE="false" DECIMALS="2" COMMENT="Clay removed, cubic millimetres"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>

@@ -17,7 +17,7 @@
 {{!
     @template mod_vrmakerspace/view
 
-    The activity page: the user's sculpture with its versions and the studio link, and every sculpture
+    The activity page: the user's piece with its versions and the studio link, and every piece
     for teachers, with their management links.
 
     Classes required for JS:
@@ -27,19 +27,21 @@
     * none
 
     Context variables required for this template:
+    * methods - the ways of making
     * startmodel - name of the starting model
     * workmode - individual or group work
-    * hasconnection, connection - group work: how the members sculpt together
+    * hasconnection, connection - group work: how the members work together
     * groupselector - rendered group selector HTML, or empty
     * cangrade, gradeurl - the grading page link
-    * hassculpture, sculpture - the user's sculpture: sessionid, owner, status, isclosed, studiourl,
+    * hassculpture, sculpture - the user's piece: sessionid, owner, status, isclosed, studiourl,
       hasversions, versions (version, savedby, timesaved, size, url, viewurl), hascontribution, contribution
     * nogroup - group work but the user is in no group
-    * canviewall, canmanage, tracked, hasallsculptures, allsculptures - every sculpture (teachers):
+    * canviewall, canmanage, tracked, hasallsculptures, allsculptures - every piece (teachers):
       owner, versions, lastsaved, status, url, viewurl, contributions, managelinks (action, label, url)
 
     Example context (json):
     {
+        "methods": "Sculpting and modelling",
         "startmodel": "Clay lump",
         "workmode": "Individual",
         "hasconnection": false,
@@ -50,7 +52,7 @@
         "hassculpture": true,
         "sculpture": {
             "sessionid": 3,
-            "owner": "Your sculpture",
+            "owner": "Your piece",
             "status": "Open",
             "isclosed": false,
             "studiourl": "#",
@@ -76,6 +78,8 @@
 }}
 <div class="mod_vrmakerspace-view">
     <dl class="row mb-3">
+        <dt class="col-sm-3">{{#str}} methods, mod_vrmakerspace {{/str}}</dt>
+        <dd class="col-sm-9">{{methods}}</dd>
         <dt class="col-sm-3">{{#str}} startmodel, mod_vrmakerspace {{/str}}</dt>
         <dd class="col-sm-9">{{startmodel}}</dd>
         <dt class="col-sm-3">{{#str}} workmode, mod_vrmakerspace {{/str}}</dt>

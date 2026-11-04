@@ -26,7 +26,7 @@ namespace mod_vrmakerspace\local;
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\contribution_manager::class)]
 final class contribution_manager_test extends \advanced_testcase {
     /**
-     * A group sculpture and two members.
+     * A group piece and two members.
      *
      * @return array [\stdClass $session, \stdClass $one, \stdClass $two]
      */

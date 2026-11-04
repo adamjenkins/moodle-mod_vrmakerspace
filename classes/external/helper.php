@@ -50,7 +50,7 @@ class helper {
     }
 
     /**
-     * Refuse a user who may not sculpt a session: the capability, an open session, one of its owners.
+     * Refuse a user who may not work on a session: the capability, an open session, one of its owners.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
@@ -99,7 +99,7 @@ class helper {
         return new external_single_structure([
             'sessionid' => new external_value(PARAM_INT, 'Session id'),
             'connection' => new external_value(PARAM_ALPHA, 'Group work: pair or companion; empty for individual work'),
-            'startmodel' => new external_value(PARAM_ALPHA, 'Starting model: lump, sphere, cube or upload'),
+            'startmodel' => new external_value(PARAM_ALPHA, 'Starting model: lump, sphere, cube, meshcube, empty or upload'),
             'status' => new external_value(PARAM_INT, '0 = open, 1 = closed'),
             'cansculpt' => new external_value(PARAM_BOOL, 'Whether the user may save versions'),
             'version' => new external_value(PARAM_INT, 'Latest saved version, 0 when none'),
@@ -110,7 +110,7 @@ class helper {
     }
 
     /**
-     * Refuse a pair-work call for an activity whose sculptures are not sculpted in pairs.
+     * Refuse a pair-work call for an activity whose pieces are not worked on in pairs.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return void
@@ -123,7 +123,7 @@ class helper {
     }
 
     /**
-     * Structure of the other people connected to a pair-work sculpture.
+     * Structure of the other people connected to a pair-work piece.
      *
      * @return external_multiple_structure
      */

@@ -14,9 +14,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The studio toolbar (templates/studio.mustache): tool buttons (aria-pressed), the mirror switch,
- * the shape tools' shape and letters (shown while a shape tool is chosen), brush size and strength
- * sliders, undo and redo, save now, the export menu, Enter VR, full screen, and the status
+ * The studio toolbar (templates/studio.mustache): the method switch, the Sculpt panel (tool buttons
+ * with aria-pressed, the mirror switch, the shape tools' shape and letters, shown while a shape tool is
+ * chosen, brush size and strength sliders), the Model panel (select modes and commands, the shapes menu,
+ * tools, axis lock, segments, one-shot commands, the confirmation of Turn into clay), undo and redo, save
+ * now, the export menu, Enter VR, full screen, the keyboard help of the method in use, and the status
  * region (a polite live region) with the connection state and the latest message.
  *
  * The toolbar only binds to the markup the template rendered; every label comes from the template
@@ -51,17 +53,37 @@ const show = (element, visible) => {
 };
 
 /**
+ * Show which of a set of buttons is the chosen one.
+ *
+ * @param {HTMLElement} root Studio root.
+ * @param {string} action The buttons' data-action.
+ * @param {Function} isChosen Takes a button, returns whether it is the chosen one.
+ */
+const press = (root, action, isChosen) => {
+    root.querySelectorAll(`[data-action="${action}"]`).forEach((button) => {
+        const pressed = !!isChosen(button);
+        button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+        button.classList.toggle('active', pressed);
+    });
+};
+
+/**
  * Bind the toolbar.
  *
  * @param {HTMLElement} root Studio root element.
  * @param {Object} options {strings, tools (null when read-only), handlers: {save(), exportModel(format), vr(),
- *     fullscreen()}}
- * @returns {Object} {refresh(), setTools(tools), setStatus(text), message(text, timeout), setVr(available, active),
- *     setFullscreen(active), setSaving(saving), setSaveAllowed(allowed), dispose()}
+ *     fullscreen(), method(name), addShape(shape), selectLoop(), askBake(), confirmBake(), cancelBake()}}
+ * @returns {Object} {refresh(), setTools(tools), setModel(model), setMethods(names), setMethod(name), setOpenEdges(count),
+ *     showBakeConfirm(visible), setStatus(text), message(text, timeout), setVr(available, active), setFullscreen(active),
+ *     setSaving(saving), setSaveAllowed(allowed), dispose()}
  */
 export const createToolbar = (root, options) => {
     const strings = options.strings || {};
     let tools = options.tools || null;
+    /** @type {Object|null} the modelling tools, in an activity that has the Model method */
+    let model = null;
+    let method = 'sculpt';
+    let vravailable = false;
     const handlers = options.handlers || {};
     const toolbar = region(root, 'toolbar');
     const size = region(root, 'size');
@@ -79,6 +101,15 @@ export const createToolbar = (root, options) => {
     const shapeselect = region(root, 'shape');
     const textinput = region(root, 'text');
     const textfield = region(root, 'textfield');
+    const methodswitch = region(root, 'methodswitch');
+    const sculptpanel = region(root, 'sculptpanel');
+    const modelpanel = region(root, 'modelpanel');
+    const sculpthelp = region(root, 'sculpthelp');
+    const modelhelp = region(root, 'modelhelp');
+    const vrmodelhelp = region(root, 'vrmodelhelp');
+    const segments = region(root, 'segments');
+    const openedges = region(root, 'openedges');
+    const bakeconfirm = region(root, 'bakeconfirm');
     let messagetimer = null;
     let saving = false;
     let saveallowed = true;
@@ -103,6 +134,59 @@ export const createToolbar = (root, options) => {
         }
     };
 
+    /** The Select commands of the Model panel: data-select -> what it does. */
+    const SELECT_COMMANDS = {
+        all: () => model.selectAll(),
+        none: () => model.selectNone(),
+        linked: () => model.selectLinked(),
+        loop: () => run('selectLoop'),
+    };
+
+    /** The Model panel's buttons: data-action -> what a click does. */
+    const MODEL_ACTIONS = {
+        selectmode: (button) => model.setSelectMode(button.dataset.mode),
+        select: (button) => {
+            if (SELECT_COMMANDS[button.dataset.select]) {
+                SELECT_COMMANDS[button.dataset.select]();
+            }
+        },
+        modelaction: (button) => model.setAction(button.dataset.tool),
+        axis: (button) => model.setAxis(button.dataset.axis === 'free' ? null : button.dataset.axis),
+        oneshot: (button) => {
+            if (button.dataset.oneshot === 'bake') {
+                run('askBake');
+            } else {
+                model.runOneShot(button.dataset.oneshot);
+            }
+        },
+        addshape: (button) => run('addShape', button.dataset.shape),
+        bakeconfirm: () => run('confirmBake'),
+        bakecancel: () => run('cancelBake'),
+    };
+
+    /**
+     * Whether a tool gesture is going on: nothing changes under it, undo included.
+     *
+     * @returns {boolean}
+     */
+    const busy = () => !!(model && model.active);
+
+    /** The buttons that work the tools: data-action -> what a click does. */
+    const TOOL_ACTIONS = {
+        tool: (button) => tools.setTool(button.dataset.tool),
+        undo: () => {
+            if (!busy()) {
+                tools.undo();
+            }
+        },
+        redo: () => {
+            if (!busy()) {
+                tools.redo();
+            }
+        },
+        mirror: () => tools.setMirror(!tools.mirror),
+    };
+
     /**
      * Clicks anywhere in the toolbar.
      *
@@ -114,26 +198,21 @@ export const createToolbar = (root, options) => {
             return;
         }
         const action = button.dataset.action;
+        if (MODEL_ACTIONS[action]) {
+            if (model && !busy()) {
+                MODEL_ACTIONS[action](button);
+            }
+            return;
+        }
+        if (TOOL_ACTIONS[action]) {
+            if (tools) {
+                TOOL_ACTIONS[action](button);
+            }
+            return;
+        }
         switch (action) {
-            case 'tool':
-                if (tools) {
-                    tools.setTool(button.dataset.tool);
-                }
-                break;
-            case 'undo':
-                if (tools) {
-                    tools.undo();
-                }
-                break;
-            case 'redo':
-                if (tools) {
-                    tools.redo();
-                }
-                break;
-            case 'mirror':
-                if (tools) {
-                    tools.setMirror(!tools.mirror);
-                }
+            case 'method':
+                run('method', button.dataset.method);
                 break;
             case 'save':
                 run('save');
@@ -159,6 +238,13 @@ export const createToolbar = (root, options) => {
      * @param {Event} event The event.
      */
     const onInput = (event) => {
+        if (event.target === segments) {
+            const value = Number(segments.value);
+            if (model && segments.value !== '' && Number.isInteger(value)) {
+                model.setSegments(value);
+            }
+            return;
+        }
         if (!tools) {
             return;
         }
@@ -178,16 +264,32 @@ export const createToolbar = (root, options) => {
         toolbar.addEventListener('input', onInput);
     }
 
+    /** Show the modelling tools' state: select mode, tool, axis lock and segments. */
+    const refreshModel = () => {
+        if (!model) {
+            return;
+        }
+        press(root, 'selectmode', (button) => button.dataset.mode === model.selectMode);
+        press(root, 'modelaction', (button) => button.dataset.tool === model.action);
+        press(root, 'axis', (button) => button.dataset.axis === (model.axis || 'free'));
+        if (segments) {
+            // Bevel, Loop cut and the shapes each have their own range.
+            const range = model.segmentRange();
+            segments.min = String(range.min);
+            segments.max = String(range.max);
+            if (document.activeElement !== segments) {
+                segments.value = String(model.segments);
+            }
+        }
+    };
+
     /** Show the tools' state: pressed tool, sliders, undo and redo. */
     const refresh = () => {
+        refreshModel();
         if (!tools) {
             return;
         }
-        root.querySelectorAll('[data-action="tool"]').forEach((button) => {
-            const pressed = button.dataset.tool === tools.tool;
-            button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-            button.classList.toggle('active', pressed);
-        });
+        press(root, 'tool', (button) => button.dataset.tool === tools.tool);
         if (size && document.activeElement !== size) {
             size.value = String(Math.round(tools.size * 1000));
         }
@@ -215,6 +317,19 @@ export const createToolbar = (root, options) => {
         }
     };
 
+    /** Show the panel and the keyboard help of the method in use. */
+    const refreshMethod = () => {
+        const modelling = method === 'model';
+        press(root, 'method', (button) => button.dataset.method === method);
+        show(sculptpanel, !modelling);
+        show(modelpanel, modelling);
+        show(sculpthelp, !modelling);
+        show(modelhelp, modelling);
+        show(vrhelp, vravailable && !modelling);
+        show(vrmodelhelp, vravailable && modelling);
+        show(openedges, modelling && !!openedges && openedges.textContent !== '');
+    };
+
     /** Enable the save button when saving is allowed and none is running. */
     const refreshSave = () => {
         if (savebutton) {
@@ -224,6 +339,7 @@ export const createToolbar = (root, options) => {
 
     refresh();
     refreshSave();
+    refreshMethod();
 
     return {
         refresh: refresh,
@@ -237,6 +353,75 @@ export const createToolbar = (root, options) => {
             tools = value || null;
             refresh();
         },
+
+        /**
+         * Bind the modelling tools once the session has started.
+         *
+         * @param {Object|null} value Modelling tools, or null when the activity or the viewer has none.
+         */
+        setModel: (value) => {
+            model = value || null;
+            refresh();
+        },
+
+        /**
+         * Say which methods the activity allows: the switch only shows when there is a choice.
+         *
+         * @param {string[]} names 'sculpt', 'model' or both.
+         */
+        setMethods: (names) => {
+            const list = Array.isArray(names) ? names : [];
+            show(methodswitch, list.length > 1);
+        },
+
+        /**
+         * Show a method as the one in use.
+         *
+         * @param {string} name 'sculpt' or 'model'.
+         */
+        setMethod: (name) => {
+            method = name === 'model' ? 'model' : 'sculpt';
+            refreshMethod();
+        },
+
+        /**
+         * Show how many open edges the mesh has (Model method only). Not in the live region: the number
+         * changes while people work.
+         *
+         * @param {number} count Open edges.
+         */
+        setOpenEdges: (count) => {
+            if (!openedges) {
+                return;
+            }
+            const text = count > 0 ? String(strings.modelopenedges || '').split('{$a}').join(String(count)) : '';
+            if (openedges.textContent !== text) {
+                openedges.textContent = text;
+                refreshMethod();
+            }
+        },
+
+        /**
+         * Show or hide the confirmation of Turn into clay, moving the focus into it.
+         *
+         * @param {boolean} visible Whether it shows.
+         */
+        showBakeConfirm: (visible) => {
+            show(bakeconfirm, visible);
+            if (visible && bakeconfirm) {
+                const button = bakeconfirm.querySelector('[data-action="bakeconfirm"]');
+                if (button) {
+                    button.focus();
+                }
+            }
+        },
+
+        /**
+         * Whether the confirmation of Turn into clay shows.
+         *
+         * @returns {boolean}
+         */
+        bakeConfirmShown: () => !!bakeconfirm && !bakeconfirm.classList.contains('d-none'),
 
         /**
          * Show the connection state.
@@ -281,8 +466,9 @@ export const createToolbar = (root, options) => {
          * @param {boolean} active Whether a VR session runs.
          */
         setVr: (available, active) => {
+            vravailable = !!available;
             show(vrbutton, available);
-            show(vrhelp, available);
+            refreshMethod();
             if (vrbutton) {
                 vrbutton.textContent = active ? (strings.exitvr || '') : (strings.entervr || '');
                 vrbutton.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -311,7 +497,7 @@ export const createToolbar = (root, options) => {
         },
 
         /**
-         * Allow or forbid saving (a closed sculpture is not saved).
+         * Allow or forbid saving (a closed piece is not saved).
          *
          * @param {boolean} allowed Whether saving is allowed.
          */

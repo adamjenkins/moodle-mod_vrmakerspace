@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\event;
 
 /**
- * A VR sculpting activity was viewed.
+ * A VR Makerspace activity was viewed.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

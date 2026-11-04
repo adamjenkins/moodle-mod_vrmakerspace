@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Settings form of a VR sculpting activity.
+ * Settings form of a VR Makerspace activity.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -31,7 +31,7 @@ use mod_vrmakerspace\local\companion_manager;
 use mod_vrmakerspace\local\session_manager;
 
 /**
- * Settings form of a VR sculpting activity.
+ * Settings form of a VR Makerspace activity.
  */
 class mod_vrmakerspace_mod_form extends moodleform_mod {
     /**
@@ -49,7 +49,16 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
         $mform->addRule('name', get_string('maximumchars', '', 255), 'maxlength', 255, 'client');
         $this->standard_intro_elements();
 
-        $mform->addElement('header', 'sculptinghdr', get_string('sculptingsettings', 'vrmakerspace'));
+        $mform->addElement('header', 'makinghdr', get_string('sculptingsettings', 'vrmakerspace'));
+        $mform->setExpanded('makinghdr');
+
+        $methods = [];
+        foreach (session_manager::METHODS as $method) {
+            $methods[$method] = get_string('methods_' . $method, 'vrmakerspace');
+        }
+        $mform->addElement('select', 'methods', get_string('methods', 'vrmakerspace'), $methods);
+        $mform->addHelpButton('methods', 'methods', 'vrmakerspace');
+        $mform->setDefault('methods', session_manager::METHODS_BOTH);
 
         $models = [];
         foreach (session_manager::START_MODELS as $model) {
@@ -58,6 +67,7 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
         $mform->addElement('select', 'startmodel', get_string('startmodel', 'vrmakerspace'), $models);
         $mform->addHelpButton('startmodel', 'startmodel', 'vrmakerspace');
         $mform->setDefault('startmodel', 'lump');
+        $this->start_model_follows_methods();
 
         $mform->addElement(
             'filemanager',
@@ -114,6 +124,53 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
     }
 
     /**
+     * When the teacher picks ways of making the chosen starting model does not suit, select one that
+     * does (modelling only: the polygon cube). Without JavaScript, validation() says what to change.
+     *
+     * @return void
+     */
+    protected function start_model_follows_methods(): void {
+        global $PAGE;
+        $allowed = [];
+        $fallback = [];
+        foreach (session_manager::METHODS as $methods) {
+            $allowed[$methods] = array_values(array_filter(
+                session_manager::START_MODELS,
+                fn($model) => session_manager::start_model_allowed($methods, $model)
+            ));
+            $fallback[$methods] = session_manager::start_model_for_methods($methods, '');
+        }
+        $PAGE->requires->js_amd_inline('(function(allowed, fallback) {
+            var methods = document.getElementById("id_methods");
+            var start = document.getElementById("id_startmodel");
+            if (!methods || !start) {
+                return;
+            }
+            methods.addEventListener("change", function() {
+                if (allowed[methods.value].indexOf(start.value) === -1) {
+                    start.value = fallback[methods.value];
+                    start.dispatchEvent(new Event("change", {bubbles: true}));
+                }
+            });
+        })(' . json_encode($allowed) . ', ' . json_encode($fallback) . ');');
+    }
+
+    /**
+     * What is wrong with a starting model for the ways of making.
+     *
+     * @param string $methods the ways of making, as submitted
+     * @param string $model the starting model, as submitted
+     * @return string the lang string key of the error, or '' when the model suits them
+     */
+    public static function start_model_error(string $methods, string $model): string {
+        $methods = session_manager::clean_methods($methods);
+        if (session_manager::start_model_allowed($methods, $model)) {
+            return '';
+        }
+        return $methods === session_manager::METHODS_MODEL ? 'startmodel_needsmesh' : 'startmodel_needsclay';
+    }
+
+    /**
      * The starting model's file manager options, limited to the course's upload limit.
      *
      * @return array
@@ -148,8 +205,8 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
     }
 
     /**
-     * Validate the form: grades are points only; the companion service needs its plugin; an uploaded
-     * starting model needs its file.
+     * Validate the form: grades are points only; the companion service needs its plugin; the starting
+     * model must suit the ways of making; an uploaded starting model needs its file.
      *
      * @param array $data submitted data
      * @param array $files submitted files
@@ -167,7 +224,10 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
         ) {
             $errors['connectmode'] = get_string('connection_notinstalled', 'vrmakerspace');
         }
-        if (($data['startmodel'] ?? '') === session_manager::MODEL_UPLOAD) {
+        $modelerror = self::start_model_error((string)($data['methods'] ?? ''), (string)($data['startmodel'] ?? ''));
+        if ($modelerror !== '') {
+            $errors['startmodel'] = get_string($modelerror, 'vrmakerspace');
+        } else if (($data['startmodel'] ?? '') === session_manager::MODEL_UPLOAD) {
             $files = file_get_drafarea_files((int)($data['startmodelfile'] ?? 0))->list;
             $models = array_filter($files, fn($file) => session_manager::start_model_format($file->filename) !== '');
             if (!$models) {

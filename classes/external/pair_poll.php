@@ -24,7 +24,7 @@ use core_external\external_value;
 use mod_vrmakerspace\local\pair_manager;
 
 /**
- * Stay connected to a pair-work sculpture and fetch the partner's connection messages.
+ * Stay connected to a pair-work piece and fetch the partner's connection messages.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

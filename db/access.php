@@ -49,8 +49,8 @@ $capabilities = [
         ],
     ],
 
-    // Sculpting creates the user's own (or their group's) work, so it is separate from viewing:
-    // a teacher looking at the activity must not get a sculpture of their own.
+    // Making creates the user's own (or their group's) work, so it is separate from viewing:
+    // a teacher looking at the activity must not get a piece of their own.
     'mod/vrmakerspace:make' => [
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
@@ -81,7 +81,7 @@ $capabilities = [
         ],
     ],
 
-    // Open, close and reset sculpting sessions.
+    // Open, close and reset sessions.
     'mod/vrmakerspace:managesessions' => [
         'riskbitmask' => RISK_DATALOSS,
         'captype' => 'write',

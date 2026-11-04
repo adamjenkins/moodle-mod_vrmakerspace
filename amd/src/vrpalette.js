@@ -14,9 +14,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The wrist palette of the VR studio: a canvas board shown above the left controller or hand with
- * the ten tools (two rows), the brush size and strength bars, undo, redo, mirror and Exit VR, and a
- * short help text.
+ * The wrist palette of the VR studio: a canvas board shown above the left controller or hand.
+ *
+ * The Sculpt page has the ten tools (two rows), the brush size and strength bars, undo, redo, mirror
+ * and Exit VR, and a short help text. When modelling is allowed the board also has a Model page: the
+ * select modes and commands, the eight actions, axis lock, segments, the basic shapes, the one-shot
+ * tools, undo, redo and Exit VR. With both methods allowed a Sculpt | Model switch heads both pages.
  *
  * Everything is drawn with canvas calls (fillText: plain text, never HTML) into one texture, which
  * is redrawn only when what it shows changes. Hit tests are done in the board's own plane with
@@ -35,6 +38,46 @@
 export const TOOLS = Object.freeze(['grab', 'twist', 'add', 'carve', 'smooth', 'inflate', 'pinch', 'flatten', 'shape',
     'cutshape']);
 
+/** The Model page's actions in palette order (modeltools' action names; A and B step through them). */
+export const ACTIONS = Object.freeze(['select', 'move', 'rotate', 'scale', 'extrude', 'inset', 'bevel', 'loopcut']);
+
+/** The Model page's select modes, in the order of the desktop keys 1, 2 and 3. */
+const SELECT_MODES = Object.freeze(['v', 'e', 'f']);
+
+/** The string of each select mode. */
+const SELECT_MODE_KEYS = Object.freeze({v: 'select_vertex', e: 'select_edge', f: 'select_face'});
+
+/** The Model page's select commands. */
+const SELECT_COMMANDS = Object.freeze(['all', 'none', 'linked', 'loop']);
+
+/** The string of each select command. */
+const SELECT_COMMAND_KEYS = Object.freeze({all: 'selectall', none: 'selectnone', linked: 'selectlinked', loop: 'selectloop'});
+
+/** The axis lock choices ('free' stands for no lock). */
+const AXES = Object.freeze(['free', 'x', 'y', 'z']);
+
+/** The basic shapes, modeltools' shape names. */
+const MESH_SHAPES = Object.freeze(['cube', 'plane', 'cylinder', 'sphere', 'cone', 'torus']);
+
+/** The one-shot tools, modeltools' names. */
+const ONESHOTS = Object.freeze(['merge', 'delete', 'fill', 'flip', 'mirror', 'bake']);
+
+/**
+ * Every string the Model page and the VR messages use, beyond the Sculpt page's: the studio fetches these
+ * and hands them over in options.strings.
+ */
+export const MODEL_STRING_KEYS = Object.freeze([
+    'method_sculpt', 'method_model', 'select_vertex', 'select_edge', 'select_face', 'selectall', 'selectnone',
+    'selectlinked', 'selectloop', 'action_select', 'action_move', 'action_rotate', 'action_scale', 'action_extrude',
+    'action_inset', 'action_bevel', 'action_loopcut', 'oneshot_merge', 'oneshot_delete', 'oneshot_fill', 'oneshot_flip',
+    'oneshot_mirror', 'oneshot_bake', 'bakeconfirm', 'addshape', 'mshape_cube', 'mshape_plane', 'mshape_cylinder',
+    'mshape_sphere', 'mshape_cone', 'mshape_torus', 'segments', 'axislock', 'axis_free', 'axis_x', 'axis_y', 'axis_z',
+    'meshrefused_empty', 'meshrefused_needfaces', 'meshrefused_neededges', 'meshrefused_nonmanifold',
+    'meshrefused_nosolid',
+    'meshrefused_badselection', 'meshrefused_limit', 'meshrefused_conflict', 'lockedbyother', 'vrmodelhelp',
+    'vrmodelselecthelp',
+]);
+
 /** Tool buttons per row. */
 const TOOLS_PER_ROW = 5;
 
@@ -49,6 +92,12 @@ const BOARD_WIDTH = 0.2;
 /** Canvas height of the full palette and of the view-only palette (px). */
 const CANVAS_HEIGHT = 820;
 const CANVAS_HEIGHT_READONLY = 176;
+
+/** Canvas height of the Model page without the method switch (px). */
+const CANVAS_HEIGHT_MODEL = 916;
+
+/** Height the method switch adds to the top of a page (px). */
+const SWITCH_HEIGHT = 108;
 
 /** Outer margin and gap between controls (px). */
 const PAD = 16;
@@ -79,8 +128,9 @@ const noRaycast = () => undefined;
 /**
  * A rectangle of the canvas that reacts to the pointer.
  *
- * @param {string} region 'tool', 'size', 'strength', 'undo', 'redo', 'mirror' or 'exit'.
- * @param {string|null} tool Tool name for a tool button.
+ * @param {string} region 'tool', 'size', 'strength', 'undo', 'redo', 'mirror', 'exit', or on the Model page and
+ *     the switch 'method', 'selmode', 'selcmd', 'action', 'axis', 'segdown', 'segup', 'shape', 'oneshot'.
+ * @param {string|null} tool The name of what the control chooses (a tool, action, shape and so on).
  * @param {number} x Left (px).
  * @param {number} y Top (px).
  * @param {number} w Width (px).
@@ -90,47 +140,186 @@ const noRaycast = () => undefined;
 const area = (region, tool, x, y, w, h) => ({region, tool, key: tool ? region + ':' + tool : region, x, y, w, h});
 
 /**
- * The layout of the board.
+ * Lay out a row of equally wide controls.
+ *
+ * @param {Object[]} areas Where to add them.
+ * @param {string} region Region of the controls.
+ * @param {string[]} names What each control chooses.
+ * @param {number} x Left of the row (px).
+ * @param {number} y Top of the row (px).
+ * @param {number} width Width of the row (px).
+ * @param {number} h Height of the row (px).
+ */
+const addRow = (areas, region, names, x, y, width, h) => {
+    const gap = 10;
+    const w = (width - gap * (names.length - 1)) / names.length;
+    names.forEach((name, i) => areas.push(area(region, name, x + i * (w + gap), y, w, h)));
+};
+
+/**
+ * The layout of the Sculpt page of the board (or of the whole board when there is only that page).
  *
  * @param {boolean} readonly Whether only Exit VR is shown.
- * @returns {Object} {height, areas: Object[], labels: {size: Object, strength: Object}, help: Object|null}
+ * @param {boolean} [methodswitch] Whether the Sculpt | Model switch heads the page.
+ * @param {number} [height] Canvas height (px), for a board shared with the taller Model page.
+ * @returns {Object} {height, areas: Object[], labels: {size: Object, strength: Object}, help: Object|null, model: false}
  */
-const layout = (readonly) => {
+const layout = (readonly, methodswitch, height) => {
     if (readonly) {
         return {
             height: CANVAS_HEIGHT_READONLY,
             areas: [area('exit', null, PAD, PAD, CANVAS_WIDTH - 2 * PAD, CANVAS_HEIGHT_READONLY - 2 * PAD)],
             labels: null,
             help: null,
+            model: false,
         };
     }
     const areas = [];
+    const top = methodswitch ? SWITCH_HEIGHT : 0;
+    const canvasheight = height || CANVAS_HEIGHT;
+    if (methodswitch) {
+        addRow(areas, 'method', ['sculpt', 'model'], PAD, PAD, CANVAS_WIDTH - 2 * PAD, SWITCH_HEIGHT - PAD);
+    }
     const toolwidth = (CANVAS_WIDTH - PAD * (TOOLS_PER_ROW + 1)) / TOOLS_PER_ROW;
     TOOLS.forEach((tool, i) => {
         const column = i % TOOLS_PER_ROW;
         const row = Math.floor(i / TOOLS_PER_ROW);
-        areas.push(area('tool', tool, PAD + column * (toolwidth + PAD), PAD + row * (120 + PAD), toolwidth, 120));
+        areas.push(area('tool', tool, PAD + column * (toolwidth + PAD), top + PAD + row * (120 + PAD), toolwidth, 120));
     });
     const labelwidth = 230;
     const barx = PAD + labelwidth + PAD;
     const barwidth = CANVAS_WIDTH - barx - PAD;
-    areas.push(area('size', null, barx, 302, barwidth, 90));
-    areas.push(area('strength', null, barx, 408, barwidth, 90));
+    areas.push(area('size', null, barx, top + 302, barwidth, 90));
+    areas.push(area('strength', null, barx, top + 408, barwidth, 90));
     const buttonwidth = (CANVAS_WIDTH - 5 * PAD) / 4;
-    areas.push(area('undo', null, PAD, 516, buttonwidth, 100));
-    areas.push(area('redo', null, 2 * PAD + buttonwidth, 516, buttonwidth, 100));
-    areas.push(area('mirror', null, 3 * PAD + 2 * buttonwidth, 516, buttonwidth, 100));
-    areas.push(area('exit', null, 4 * PAD + 3 * buttonwidth, 516, buttonwidth, 100));
+    areas.push(area('undo', null, PAD, top + 516, buttonwidth, 100));
+    areas.push(area('redo', null, 2 * PAD + buttonwidth, top + 516, buttonwidth, 100));
+    areas.push(area('mirror', null, 3 * PAD + 2 * buttonwidth, top + 516, buttonwidth, 100));
+    areas.push(area('exit', null, 4 * PAD + 3 * buttonwidth, top + 516, buttonwidth, 100));
     return {
-        height: CANVAS_HEIGHT,
+        height: canvasheight,
         areas: areas,
         labels: {
-            size: {x: PAD, y: 302, w: labelwidth, h: 90},
-            strength: {x: PAD, y: 408, w: labelwidth, h: 90},
+            size: {x: PAD, y: top + 302, w: labelwidth, h: 90},
+            strength: {x: PAD, y: top + 408, w: labelwidth, h: 90},
         },
-        help: {x: PAD, y: 636, w: CANVAS_WIDTH - 2 * PAD, h: CANVAS_HEIGHT - 636 - PAD},
+        help: {x: PAD, y: top + 636, w: CANVAS_WIDTH - 2 * PAD, h: canvasheight - top - 636 - PAD},
+        model: false,
     };
 };
+
+/**
+ * The layout of the Model page of the board.
+ *
+ * @param {boolean} methodswitch Whether the Sculpt | Model switch heads the page.
+ * @returns {Object} {height, areas: Object[], labels: {axis, segments, value, shapes}, help: Object, model: true}
+ */
+const modelLayout = (methodswitch) => {
+    const areas = [];
+    const top = methodswitch ? SWITCH_HEIGHT : 0;
+    const height = CANVAS_HEIGHT_MODEL + top;
+    const full = CANVAS_WIDTH - 2 * PAD;
+    if (methodswitch) {
+        addRow(areas, 'method', ['sculpt', 'model'], PAD, PAD, full, SWITCH_HEIGHT - PAD);
+    }
+    let y = top + PAD;
+    addRow(areas, 'selmode', SELECT_MODES, PAD, y, full, 84);
+    y += 96;
+    addRow(areas, 'selcmd', SELECT_COMMANDS, PAD, y, full, 68);
+    y += 80;
+    addRow(areas, 'action', ACTIONS.slice(0, 4), PAD, y, full, 84);
+    y += 96;
+    addRow(areas, 'action', ACTIONS.slice(4), PAD, y, full, 84);
+    y += 96;
+    const labels = {
+        axis: {x: PAD, y: y, w: 110, h: 68},
+        segments: {x: 506, y: y, w: 190, h: 68},
+        value: {x: 788, y: y, w: 104, h: 68},
+        shapes: {x: PAD, y: y + 80, w: 150, h: 68},
+    };
+    addRow(areas, 'axis', AXES, 126, y, 368, 68);
+    areas.push(area('segdown', null, 696, y, 92, 68));
+    areas.push(area('segup', null, 892, y, CANVAS_WIDTH - PAD - 892, 68));
+    y += 80;
+    addRow(areas, 'shape', MESH_SHAPES, PAD + 160, y, full - 160, 68);
+    y += 80;
+    addRow(areas, 'oneshot', ONESHOTS, PAD, y, full, 68);
+    y += 80;
+    addRow(areas, 'undo', [null], PAD, y, (full - 20) / 3, 76);
+    addRow(areas, 'redo', [null], PAD + (full - 20) / 3 + 10, y, (full - 20) / 3, 76);
+    addRow(areas, 'exit', [null], PAD + 2 * ((full - 20) / 3 + 10), y, (full - 20) / 3, 76);
+    y += 88;
+    return {
+        height: height,
+        areas: areas,
+        labels: labels,
+        help: {x: PAD, y: y, w: full, h: height - y - PAD},
+        model: true,
+    };
+};
+
+/**
+ * The string key of a choice button of the board.
+ *
+ * @param {Object} a Area of the button.
+ * @returns {string} String key.
+ */
+const choiceKey = (a) => {
+    switch (a.region) {
+        case 'tool':
+            return 'tool_' + a.tool;
+        case 'method':
+            return 'method_' + a.tool;
+        case 'selmode':
+            return SELECT_MODE_KEYS[a.tool];
+        case 'selcmd':
+            return SELECT_COMMAND_KEYS[a.tool];
+        case 'action':
+            return 'action_' + a.tool;
+        case 'axis':
+            return 'axis_' + a.tool;
+        case 'shape':
+            return 'mshape_' + a.tool;
+        default:
+            return 'oneshot_' + a.tool;
+    }
+};
+
+/**
+ * Whether a choice button shows what is chosen now.
+ *
+ * @param {Object} a Area of the button.
+ * @param {Object} state The board state.
+ * @returns {boolean}
+ */
+const choiceSelected = (a, state) => {
+    switch (a.region) {
+        case 'tool':
+            return state.tool === a.tool;
+        case 'method':
+            return state.method === a.tool;
+        case 'selmode':
+            return state.selectmode === a.tool;
+        case 'selcmd':
+            return a.tool === 'loop' && state.looparmed;
+        case 'action':
+            return state.action === a.tool;
+        case 'axis':
+            return state.axis === a.tool;
+        case 'oneshot':
+            return a.tool === 'bake' && state.bakearmed;
+        default:
+            return false;
+    }
+};
+
+/**
+ * Whether an area is a button that chooses something (rather than a bar or a fixed button).
+ *
+ * @param {string} region Region of the area.
+ * @returns {boolean}
+ */
+const isChoice = (region) => ['tool', 'method', 'selmode', 'selcmd', 'action', 'axis', 'shape', 'oneshot'].includes(region);
 
 /**
  * Whether a button of the board can be used now.
@@ -268,20 +457,26 @@ const wrapText = (ctx, text, box, size, colour) => {
  * Create the wrist palette.
  *
  * Options: strings (an object of the mod_vrmakerspace strings by key: tool_grab … tool_cutshape,
- * brushsize, brushstrength, undo, redo, mirror, exitvr, vrhelp), readonly (only Exit VR is shown).
+ * brushsize, brushstrength, undo, redo, mirror, exitvr, vrhelp, and MODEL_STRING_KEYS when modelling
+ * is allowed), readonly (only Exit VR is shown), methods ('both', 'model' or, by default, 'sculpt':
+ * which pages exist), method ('sculpt' or 'model': the page shown first).
  *
  * The board lies in the x/y plane of its object (facing +z), centred on the object's origin. The
  * caller places the object (it sets object.matrix itself; matrixAutoUpdate is off) and keeps
  * object.matrixWorld current before calling hitRay() or hitPoint().
  *
  * A hit is one reused object {region, tool, key, value, distance}: region 'tool' (tool = the tool
- * name), 'size' or 'strength' (value = 0..1 along the bar), 'undo', 'redo' or 'exit'; distance
- * is along the ray (hitRay) or from the board's plane (hitPoint), in metres.
+ * name), 'size' or 'strength' (value = 0..1 along the bar), 'undo', 'redo', 'mirror' or 'exit', or
+ * on the method switch and the Model page 'method' (tool = 'sculpt' or 'model'), 'selmode' ('v', 'e', 'f'),
+ * 'selcmd' ('all', 'none', 'linked', 'loop'), 'action', 'axis' ('free', 'x', 'y', 'z'), 'segdown', 'segup',
+ * 'shape' or 'oneshot' (tool = the name); distance is along the ray (hitRay) or from the board's plane
+ * (hitPoint), in metres.
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object} options Options.
  * @returns {Object} Palette {object, width, height, setState(tool, size, strength, canundo, canredo),
- *     setHover(key|null), hitRay(origin, direction, far), hitPoint(point, depth), dispose()}
+ *     setMethod(name), setModelState(state), setHover(key|null), hitRay(origin, direction, far),
+ *     hitPoint(point, depth), dispose()}
  */
 export const createPalette = (THREE, options = {}) => {
     const strings = options.strings || {};
@@ -293,7 +488,20 @@ export const createPalette = (THREE, options = {}) => {
      * @returns {string}
      */
     const text = (key) => plain(strings[key]);
-    const plan = layout(readonly);
+    /**
+     * A string of the Model page, or its key while it is missing, so a button is never blank.
+     *
+     * @param {string} key String key.
+     * @returns {string}
+     */
+    const modelText = (key) => text(key) || key;
+    const methods = !readonly && (options.methods === 'both' || options.methods === 'model') ? options.methods : 'sculpt';
+    const pages = {
+        sculpt: methods === 'model' ? null :
+            layout(readonly, methods === 'both', methods === 'both' ? CANVAS_HEIGHT_MODEL + SWITCH_HEIGHT : CANVAS_HEIGHT),
+        model: methods === 'sculpt' ? null : modelLayout(methods === 'both'),
+    };
+    let plan = pages.model && (!pages.sculpt || options.method === 'model') ? pages.model : pages.sculpt;
     const boardheight = BOARD_WIDTH * plan.height / CANVAS_WIDTH;
 
     const group = new THREE.Group();
@@ -320,9 +528,24 @@ export const createPalette = (THREE, options = {}) => {
     const localpoint = new THREE.Vector3();
     const hit = {region: '', tool: null, key: '', value: 0, distance: 0};
 
-    const state = {tool: '', size: -1, strength: -1, canundo: false, canredo: false, mirror: false, hover: null};
+    const state = {tool: '', size: -1, strength: -1, canundo: false, canredo: false, mirror: false, hover: null,
+        method: plan.model ? 'model' : 'sculpt', selectmode: '', action: '', axis: 'free', segments: 1,
+        looparmed: false, bakearmed: false};
     let drawn = false;
     let disposed = false;
+
+    /**
+     * Draw what only the Model page has: its labels, the segment count and its help.
+     *
+     * @param {CanvasRenderingContext2D} ctx Context.
+     */
+    const drawModelTexts = (ctx) => {
+        fitText(ctx, modelText('axislock'), plan.labels.axis, 32, COLOURS.text, 'left');
+        fitText(ctx, modelText('segments'), plan.labels.segments, 32, COLOURS.text, 'left');
+        fitText(ctx, String(state.segments), plan.labels.value, 40, COLOURS.text, 'center');
+        fitText(ctx, modelText('addshape'), plan.labels.shapes, 32, COLOURS.text, 'left');
+        wrapText(ctx, text('vrmodelhelp') + ' ' + text('vrmodelselecthelp'), plan.help, 26, COLOURS.help);
+    };
 
     /**
      * Redraw the board from the state.
@@ -340,16 +563,24 @@ export const createPalette = (THREE, options = {}) => {
         ctx.fill();
         plan.areas.forEach((a) => {
             const hovered = state.hover === a.key;
-            if (a.region === 'tool') {
-                const selected = state.tool === a.tool;
+            if (isChoice(a.region)) {
                 let fill = hovered ? COLOURS.hover : COLOURS.button;
-                if (selected) {
-                    fill = COLOURS.selected;
+                if (choiceSelected(a, state)) {
+                    fill = a.region === 'oneshot' ? COLOURS.exit : COLOURS.selected;
                 }
                 ctx.fillStyle = fill;
                 roundRect(ctx, a.x, a.y, a.w, a.h, 18);
                 ctx.fill();
-                fitText(ctx, text('tool_' + a.tool), a, 40, COLOURS.text, 'center');
+                if (a.region === 'tool') {
+                    fitText(ctx, text('tool_' + a.tool), a, 40, COLOURS.text, 'center');
+                } else {
+                    fitText(ctx, modelText(choiceKey(a)), a, 34, COLOURS.text, 'center');
+                }
+            } else if (a.region === 'segdown' || a.region === 'segup') {
+                ctx.fillStyle = hovered ? COLOURS.hover : COLOURS.button;
+                roundRect(ctx, a.x, a.y, a.w, a.h, 18);
+                ctx.fill();
+                fitText(ctx, a.region === 'segdown' ? '\u2212' : '+', a, 44, COLOURS.text, 'center');
             } else if (a.region === 'size' || a.region === 'strength') {
                 const value = a.region === 'size' ?
                     (state.size - SIZE_MIN) / (SIZE_MAX - SIZE_MIN) : state.strength;
@@ -376,12 +607,16 @@ export const createPalette = (THREE, options = {}) => {
                     enabled ? COLOURS.text : COLOURS.muted, 'center');
             }
         });
-        if (plan.labels) {
-            fitText(ctx, text('brushsize'), plan.labels.size, 38, COLOURS.text, 'left');
-            fitText(ctx, text('brushstrength'), plan.labels.strength, 38, COLOURS.text, 'left');
-        }
-        if (plan.help) {
-            wrapText(ctx, text('vrhelp'), plan.help, 30, COLOURS.help);
+        if (plan.model) {
+            drawModelTexts(ctx);
+        } else {
+            if (plan.labels) {
+                fitText(ctx, text('brushsize'), plan.labels.size, 38, COLOURS.text, 'left');
+                fitText(ctx, text('brushstrength'), plan.labels.strength, 38, COLOURS.text, 'left');
+            }
+            if (plan.help) {
+                wrapText(ctx, text('vrhelp'), plan.help, 30, COLOURS.help);
+            }
         }
         texture.needsUpdate = true;
         drawn = true;
@@ -465,6 +700,46 @@ export const createPalette = (THREE, options = {}) => {
             state.strength = qstrength;
             state.canundo = !!canundo;
             state.canredo = !!canredo;
+            draw();
+        },
+
+        /**
+         * Show the page of a method (ignored for a method the board has no page for).
+         *
+         * @param {string} name 'sculpt' or 'model'.
+         */
+        setMethod(name) {
+            const page = name === 'model' ? pages.model : pages.sculpt;
+            if (disposed || !page || page === plan) {
+                return;
+            }
+            plan = page;
+            state.method = name;
+            state.hover = null;
+            draw();
+        },
+
+        /**
+         * Show the Model page's state (redrawn on a change).
+         *
+         * @param {Object} model One reused object {selectmode: 'v'|'e'|'f', action, axis: 'free'|'x'|'y'|'z', segments,
+         *     looparmed: boolean, bakearmed: boolean}.
+         */
+        setModelState(model) {
+            if (disposed || !pages.model) {
+                return;
+            }
+            if (drawn && model.selectmode === state.selectmode && model.action === state.action &&
+                    model.axis === state.axis && model.segments === state.segments &&
+                    model.looparmed === state.looparmed && model.bakearmed === state.bakearmed) {
+                return;
+            }
+            state.selectmode = model.selectmode;
+            state.action = model.action;
+            state.axis = model.axis;
+            state.segments = model.segments;
+            state.looparmed = model.looparmed;
+            state.bakearmed = model.bakearmed;
             draw();
         },
 

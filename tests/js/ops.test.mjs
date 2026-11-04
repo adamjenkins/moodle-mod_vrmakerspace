@@ -25,7 +25,8 @@
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {applyOp, cleanOp, createWork, footprint, READ_MARGIN} from '../../js/engine/ops.js';
+import {KINDS, applyOp, cleanOp, createWork, footprint, isStrokeKind, READ_MARGIN} from '../../js/engine/ops.js';
+import {MESH_EDIT_KINDS, MESH_KINDS, cleanMeshOp} from '../../js/engine/polyops.js';
 import {Grid} from '../../js/engine/grid.js';
 import {fillModel} from '../../js/engine/models.js';
 import {sin, cos, R3, R4, R5} from '../../js/engine/mathx.js';
@@ -82,6 +83,7 @@ test('cleanOp keeps only the keys of each kind, in wire order', () => {
         '{"k":"lock","a":"x","i":12,"p":[0,0.1,0],"r":0.15}');
     assert.equal(JSON.stringify(cleanOp({k: 'unlock', a: 'x', i: 13})), '{"k":"unlock","a":"x","i":13}');
     assert.equal(JSON.stringify(cleanOp({k: 'save', a: 'x', i: 14})), '{"k":"save","a":"x","i":14}');
+    assert.equal(JSON.stringify(cleanOp({k: 'hz', a: 'x', i: 15, s: 3})), '{"k":"hz","a":"x","i":15}');
 });
 
 test('cleanOp rounds (R5 positions, R3 strength, R4 twist) and is idempotent', () => {
@@ -249,4 +251,52 @@ test('add grows and carve shrinks the sculpture', () => {
     const g3 = makeGrid();
     applyOp(g3, cleanOp(Object.assign({}, STROKES[0], {st: 0})), createWork());
     assert.deepEqual(g3.data, makeGrid().data, 'strength 0 changes nothing');
+});
+
+test('the mesh kinds share the op stream: cleanOp hands them over, and they have no footprint', () => {
+    MESH_KINDS.forEach((k) => {
+        assert.ok(KINDS.includes(k), k + ' is a kind');
+        assert.equal(isStrokeKind(k), false, k + ' does not touch the field');
+    });
+    assert.equal(MESH_KINDS.length, 13);
+    assert.deepEqual(KINDS.filter((k) => k[0] === 'm').sort(), Array.from(MESH_KINDS).sort(), 'the two lists agree');
+    assert.equal(MESH_EDIT_KINDS.length, 12);
+    assert.equal(MESH_EDIT_KINDS.includes('msel'), false);
+    const samples = [
+        {k: 'msel', a: 'u1', i: 1, sm: 'all'},
+        {k: 'msel', a: 'u1', i: 2, md: 'v', sm: 'set', ids: [1, 2, 3]},
+        {k: 'mprim', a: 'u1', s: 1, i: 3, p: [0.012344, 0, 0], r: 0.05, sh: 'cube'},
+        {k: 'mxf', a: 'u1', s: 2, i: 4, d: [0.01, 0, 0]},
+        {k: 'mext', a: 'u1', s: 3, i: 5},
+        {k: 'minset', a: 'u1', s: 4, i: 6, r: 0.01},
+        {k: 'mdel', a: 'u1', s: 5, i: 7},
+        {k: 'mbake', a: 'u1', s: 6, i: 8},
+    ];
+    samples.forEach((op) => {
+        const clean = cleanOp(op);
+        assert.ok(clean, op.k);
+        assert.deepEqual(clean, cleanMeshOp(op), op.k + ' is cleaned by polyops');
+        assert.deepEqual(cleanOp(clean), clean, op.k + ' idempotent');
+        assert.equal(footprint(clean), null, op.k + ' has no footprint');
+        const grid = makeGrid();
+        const before = grid.data.slice();
+        assert.equal(applyOp(grid, clean, createWork()), null, op.k + ' writes no voxel');
+        assert.deepEqual(grid.data, before);
+    });
+    assert.equal(cleanOp({k: 'mprim', a: 'u1', s: 1, i: 1, p: [0, 0, 0], r: 0.05, sh: 'teapot'}), null);
+    assert.equal(cleanOp({k: 'mext', a: 'bad author!', s: 1, i: 1}), null);
+    assert.equal(cleanOp({k: 'mext', a: 'u1', i: 1}), null, 'an edit needs its stroke');
+    assert.equal(cleanOp({k: 'mfake', a: 'u1', s: 1, i: 1}), null);
+});
+
+test('a mesh op may be longer than a clay op, up to 1000 bytes', () => {
+    const ids = [];
+    while (JSON.stringify(ids).length < 800) {
+        ids.push(1000000 + ids.length);
+    }
+    assert.ok(cleanOp({k: 'msel', a: 'u1', i: 1, md: 'v', sm: 'add', ids}));
+    while (JSON.stringify(ids).length < 1100) {
+        ids.push(1000000 + ids.length);
+    }
+    assert.equal(cleanOp({k: 'msel', a: 'u1', i: 1, md: 'v', sm: 'add', ids}), null);
 });

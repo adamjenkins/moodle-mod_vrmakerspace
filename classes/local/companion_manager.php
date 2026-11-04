@@ -17,10 +17,10 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Group sculpting over VR room's companion service (vrroom-sync), when it is installed.
+ * Group work over VR room's companion service (vrroom-sync), when it is installed.
  *
  * A soft dependency: the plugin vrroomruntime_companion is optional, so every use of its classes is
- * behind is_installed(). Sculpting peers and rooms get pseudonyms of their own ("vrmakerspace|..."), so they
+ * behind is_installed(). Makerspace peers and rooms get pseudonyms of their own ("vrmakerspace|..."), so they
  * never collide with VR room's.
  *
  * @package    mod_vrmakerspace
@@ -57,7 +57,7 @@ final class companion_manager {
     }
 
     /**
-     * The peer id of a user in a sculpture.
+     * The peer id of a user in a piece.
      *
      * @param int $userid the user
      * @param int $sessionid the session
@@ -69,7 +69,7 @@ final class companion_manager {
     }
 
     /**
-     * The room id of a sculpture.
+     * The room id of a piece.
      *
      * @param int $sessionid the session
      * @return string 'r' and 32 lowercase hex characters
@@ -80,7 +80,7 @@ final class companion_manager {
     }
 
     /**
-     * What the studio needs to join a sculpture's room on the companion service.
+     * What the studio needs to join a piece's room on the companion service.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \stdClass $session the session row

@@ -14,9 +14,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The sculpting studio page (studio.php, templates/studio.mustache): puts together the 3D view, the
- * sculpting engine, the session (on one's own, with a partner or over the companion service), the
- * tools, mouse and keyboard input, VR, the other sculptors' presence and the toolbar.
+ * The studio page (studio.php, templates/studio.mustache): puts together the 3D view, the engine, the
+ * session (on one's own, with a partner or over the companion service), the sculpting and modelling
+ * tools, mouse and keyboard input, VR, the presence of the others and the toolbar.
+ *
+ * The method (Sculpt or Model) is per person: it chooses which tools act, the activity's `methods`
+ * setting limits the choice, and both layers of the piece always show.
  *
  * The WebGL check, the renderer set-up, the resize handling and the THREE.Timer frame loop follow
  * vrroomruntime_builtin/viewer.
@@ -33,7 +36,9 @@ import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
 import {createEngineClient} from 'mod_vrmakerspace/engineclient';
 import {createTools} from 'mod_vrmakerspace/tools';
+import {createModelTools} from 'mod_vrmakerspace/modeltools';
 import {attach as attachDesktop} from 'mod_vrmakerspace/desktopinput';
+import {attach as attachModelInput} from 'mod_vrmakerspace/modelinput';
 import {createToolbar} from 'mod_vrmakerspace/toolbar';
 import {createPresence} from 'mod_vrmakerspace/presence';
 import {createXrStudio} from 'mod_vrmakerspace/xrstudio';
@@ -49,9 +54,24 @@ const STRING_KEYS = [
     'status_connected', 'status_waiting', 'status_reconnecting', 'status_resyncing', 'status_full',
     'status_failed', 'status_companionmissing', 'status_closed', 'lockedbyother', 'peerjoined', 'peerleft',
     'shortcuts', 'vrhelp', 'fullscreen', 'back',
+    'method_sculpt', 'method_model', 'select_vertex', 'select_edge', 'select_face', 'selectall', 'selectnone',
+    'selectlinked', 'selectloop', 'selectloop_hint', 'action_select', 'action_move', 'action_rotate', 'action_scale',
+    'action_extrude', 'action_inset', 'action_bevel', 'action_loopcut', 'oneshot_merge', 'oneshot_delete', 'oneshot_fill',
+    'oneshot_flip', 'oneshot_mirror', 'oneshot_bake', 'bakeconfirm', 'addshape', 'mshape_cube', 'mshape_plane',
+    'mshape_cylinder', 'mshape_sphere', 'mshape_cone', 'mshape_torus', 'segments', 'axislock', 'axis_free', 'axis_x',
+    'axis_y', 'axis_z', 'meshrefused_empty', 'meshrefused_needfaces', 'meshrefused_neededges',
+    'meshrefused_nonmanifold', 'meshrefused_badselection', 'meshrefused_limit', 'meshrefused_conflict',
+    'meshrefused_nosolid', 'undoreset',
+    'modelopenedges', 'modelshortcuts', 'vrmodelhelp', 'vrmodelselecthelp', 'meshlayer',
 ];
 
-/** Height of the sculpture's centre above the floor in the desktop view (m). */
+/** Size of a shape from the Add shape menu (half-extent or radius, m). */
+const NEW_SHAPE_SIZE = 0.06;
+
+/** A new shape stays this close to the middle (m on each axis), so all of it is inside the mesh's reach. */
+const NEW_SHAPE_REACH = 0.3;
+
+/** Height of the piece's centre above the floor in the desktop view (m). */
 const SCULPTURE_HEIGHT = 1.0;
 
 /** Height of the pedestal top (m): just under the lowest the grid reaches. */
@@ -129,7 +149,7 @@ const fileName = (title, extension) => {
     // Control characters and the characters no file system accepts become underscores.
     const safe = Array.from(String(title || '')).map((c) => (c.charCodeAt(0) < 32 || '\\/:*?"<>|'.includes(c) ? '_' : c))
         .join('');
-    const base = safe.replace(/\s+/g, ' ').trim().slice(0, 100) || 'sculpture';
+    const base = safe.replace(/\s+/g, ' ').trim().slice(0, 100) || 'piece';
     return `${base}.${extension}`;
 };
 
@@ -171,6 +191,33 @@ const reportText = (strings, report) => {
 };
 
 /**
+ * The methods an activity allows.
+ *
+ * @param {*} setting config.methods: 'both' (or anything unknown), 'sculpt' or 'model'.
+ * @returns {string[]}
+ */
+export const allowedMethods = (setting) => {
+    if (setting === 'sculpt' || setting === 'model') {
+        return [setting];
+    }
+    return ['sculpt', 'model'];
+};
+
+/**
+ * The method a person starts with.
+ *
+ * @param {string[]} methods The methods allowed.
+ * @param {*} startmodel config.model.
+ * @returns {string} 'sculpt' or 'model'.
+ */
+export const initialMethod = (methods, startmodel) => {
+    if (!methods.includes('sculpt') || (startmodel === 'meshcube' && methods.includes('model'))) {
+        return 'model';
+    }
+    return 'sculpt';
+};
+
+/**
  * Show the Enter VR button once the browser says whether VR is available.
  *
  * @param {Object} xr The XR controller (createXrStudio).
@@ -206,7 +253,7 @@ const showFailure = (root, strings, error) => {
 };
 
 /**
- * Build the 3D view: renderer, camera, lights, floor, pedestal and the sculpture group.
+ * Build the 3D view: renderer, camera, lights, floor, pedestal and the piece's group.
  *
  * @param {HTMLCanvasElement} canvas The canvas.
  * @returns {Object} {renderer, scene, camera, sculptureRoot, material, dispose()}
@@ -319,8 +366,15 @@ const run = (root, config, strings, extra) => {
     const {renderer, scene, camera, sculptureRoot, material} = view;
     const engine = createEngineClient(config.workerurl, THREE, sculptureRoot, material);
     const presence = createPresence(THREE, sculptureRoot);
+    const viewer = new THREE.Vector3();
     const names = new Map();
+    const methods = allowedMethods(config.methods);
+    // Someone who can only look has no method: the piece shows solid, without the Model panel's marks.
+    let method = readonly ? 'sculpt' : initialMethod(methods, config.model);
     let tools = null;
+    /** @type {Object|null} the modelling tools, when this person can edit and the activity has the Model method */
+    let modeltools = null;
+    let modelinput = null;
     let desktop = null;
     let xr = null;
     let stopped = false;
@@ -336,9 +390,17 @@ const run = (root, config, strings, extra) => {
             exportModel: (format) => exportModel(format),
             vr: () => toggleVr(),
             fullscreen: () => toggleFullscreen(),
+            method: (name) => setMethod(name),
+            addShape: (shape) => addShape(shape),
+            selectLoop: () => selectLoop(),
+            askBake: () => askBake(),
+            confirmBake: () => closeBake(true),
+            cancelBake: () => closeBake(false),
         },
     });
     toolbar.setSaveAllowed(!readonly);
+    toolbar.setMethods(readonly ? [] : methods);
+    toolbar.setMethod(method);
 
     const session = createSession(Object.assign({}, config, {
         mode: readonly ? 'view' : config.mode,
@@ -371,7 +433,7 @@ const run = (root, config, strings, extra) => {
     };
 
     /**
-     * Export the sculpture, hand the file to the browser and show the validation report.
+     * Export the piece, hand the file to the browser and show the validation report.
      *
      * @param {string} format stl, glb or 3mf.
      * @returns {Promise}
@@ -405,6 +467,138 @@ const run = (root, config, strings, extra) => {
             Log.debug(error);
             toolbar.message(error && error.message ? error.message : String(error), MESSAGE_TIME);
         });
+    };
+
+    /**
+     * Put the current method into effect: which tools listen, and whether the mesh shows its edit marks.
+     */
+    const applyMethod = () => {
+        const inVr = !!(xr && xr.active);
+        const modelling = method === 'model' && !readonly;
+        if (desktop) {
+            desktop.setToolsEnabled(!modelling);
+        }
+        if (modelinput) {
+            modelinput.setEnabled(modelling && !inVr);
+        }
+        if (engine.poly && !inVr) {
+            engine.poly.setShowEditing(modelling);
+        }
+        toolbar.setMethod(method);
+    };
+
+    /**
+     * Change method (the switch or the Tab key).
+     *
+     * @param {string} name 'sculpt' or 'model'.
+     */
+    const setMethod = (name) => {
+        if (!methods.includes(name) || name === method) {
+            return;
+        }
+        method = name;
+        toolbar.showBakeConfirm(false);
+        applyMethod();
+        if (xr && xr.method !== name) {
+            xr.setMethod(name);
+        }
+    };
+
+    /**
+     * Show a passing message about the tools: on the toolbar, and in VR where the toolbar cannot be seen.
+     *
+     * @param {string} text The message.
+     */
+    const toolMessage = (text) => {
+        toolbar.message(text, MESSAGE_TIME);
+        if (xr && xr.active) {
+            xr.showMessage(text);
+        }
+    };
+
+    /**
+     * Show a passing message by its string key.
+     *
+     * @param {string} key String key.
+     * @param {*} [a] Value for the string.
+     */
+    const messageByKey = (key, a) => {
+        if (strings[key]) {
+            toolMessage(fill(strings[key], a));
+            return;
+        }
+        Promise.resolve(getString(key, 'mod_vrmakerspace', a)).then((text) => {
+            toolMessage(text);
+            return text;
+        }).catch((error) => Log.debug(error));
+    };
+
+    /**
+     * Add a shape from the Add shape menu, in the middle of the view; it comes selected, ready to move.
+     *
+     * @param {string} shape Shape name.
+     */
+    const addShape = (shape) => {
+        if (!modeltools || !desktop) {
+            return;
+        }
+        const at = sculptureRoot.worldToLocal(desktop.controls.target.clone());
+        /**
+         * A coordinate brought within the reach of a new shape.
+         *
+         * @param {number} v Coordinate (m).
+         * @returns {number}
+         */
+        const inReach = (v) => Math.max(-NEW_SHAPE_REACH, Math.min(NEW_SHAPE_REACH, v));
+        modeltools.addShape(shape, [inReach(at.x), inReach(at.y), inReach(at.z)], NEW_SHAPE_SIZE);
+    };
+
+    /**
+     * The toolbar's Select edge loop: from the edge selected last, otherwise the next click chooses the edge.
+     */
+    const selectLoop = () => {
+        if (!modeltools) {
+            return;
+        }
+        const selection = modeltools.selection();
+        const items = selection && selection.md === 'e' && Array.isArray(selection.items) ? selection.items : [];
+        if (items.length >= 2) {
+            modeltools.selectLoop({kind: 'e', a: items[items.length - 2], b: items[items.length - 1]});
+        } else if (modelinput) {
+            modelinput.armLoop();
+            toolbar.message(strings.selectloop_hint, MESSAGE_TIME);
+        }
+    };
+
+    /** Ask before turning the mesh into clay; with no mesh, say so instead. */
+    const askBake = () => {
+        const data = engine.polydata();
+        if (!data || !data.faceIds || !data.faceIds.length) {
+            messageByKey('meshrefused_empty');
+            return;
+        }
+        toolbar.showBakeConfirm(true);
+    };
+
+    /**
+     * Answer the question of Turn into clay.
+     *
+     * @param {boolean} confirmed Whether it goes ahead.
+     */
+    const closeBake = (confirmed) => {
+        toolbar.showBakeConfirm(false);
+        canvas.focus({preventScroll: true});
+        if (confirmed && modeltools) {
+            modeltools.runOneShot('bake');
+        }
+    };
+
+    /** Tell the mesh view who is here: selections of people who left stop being drawn at once. */
+    const refreshPresent = () => {
+        if (engine.poly) {
+            engine.poly.setOwnAuthor(session.author());
+            engine.poly.setPresent(session.peers().map((peer) => String(peer.peerid)));
+        }
     };
 
     /**
@@ -450,13 +644,25 @@ const run = (root, config, strings, extra) => {
     };
 
     /**
-     * Escape leaves the full-window fallback (the browser handles its own full screen).
+     * Escape closes the question of Turn into clay, else leaves the full-window fallback (the browser handles
+     * its own full screen). Tab on the 3D view switches method when there are two; Shift+Tab still leaves it.
      *
      * @param {KeyboardEvent} event The event.
      */
     const onKeyDown = (event) => {
-        if (event.key === 'Escape' && fullwindow) {
+        if (event.defaultPrevented) {
+            return;
+        }
+        if (event.key === 'Escape' && toolbar.bakeConfirmShown()) {
+            closeBake(false);
+        } else if (event.key === 'Escape' && fullwindow) {
             toggleFullscreen();
+        } else if (event.key === 'Tab' && event.target === canvas && !event.shiftKey && !event.ctrlKey && !event.metaKey
+                && !event.altKey && !readonly && tools && methods.length > 1 && !(xr && xr.active)) {
+            event.preventDefault();
+            const next = method === 'model' ? 'sculpt' : 'model';
+            setMethod(next);
+            toolbar.message(strings['method_' + next], MESSAGE_TIME);
         }
     };
 
@@ -498,6 +704,7 @@ const run = (root, config, strings, extra) => {
         });
         names.clear();
         now.forEach((name, peerid) => names.set(peerid, name));
+        refreshPresent();
     });
     listen('pose', (detail) => {
         if (detail && detail.pose) {
@@ -516,6 +723,7 @@ const run = (root, config, strings, extra) => {
         if (name) {
             toolbar.message(fill(strings.peerleft, name), MESSAGE_TIME);
         }
+        refreshPresent();
     });
     listen('saved', (detail) => {
         if (detail && detail.version) {
@@ -525,7 +733,21 @@ const run = (root, config, strings, extra) => {
     listen('savefailed', (detail) => {
         toolbar.message(fill(strings.savefailed, detail && detail.message ? detail.message : ''));
     });
+    listen('historyreset', () => {
+        if (tools && tools.clearHistory()) {
+            messageByKey('undoreset');
+        }
+    });
     unsubscribers.push(engine.on('rejected', (detail) => Log.debug(detail)));
+    unsubscribers.push(engine.on('polymesh', (detail) => {
+        const data = detail && detail.openEdges ? detail : engine.polydata();
+        toolbar.setOpenEdges(data && data.openEdges ? Math.floor(data.openEdges.length / 2) : 0);
+    }));
+    unsubscribers.push(engine.on('meshrefused', (detail) => {
+        if (detail && detail.reason) {
+            messageByKey('meshrefused_' + detail.reason);
+        }
+    }));
     unsubscribers.push(engine.on('error', (detail) => {
         showFailure(root, strings, new Error(detail && detail.message ? detail.message : 'error'));
     }));
@@ -580,7 +802,8 @@ const run = (root, config, strings, extra) => {
             }
         } else {
             cameraPose(camera, sculptureRoot, posework, headpose);
-            desktoppose.r = desktop ? desktop.cursorPose() : null;
+            const pointing = method === 'model' && modelinput ? modelinput : desktop;
+            desktoppose.r = pointing ? pointing.cursorPose() : null;
             pose = desktoppose;
         }
         if (pose) {
@@ -599,8 +822,12 @@ const run = (root, config, strings, extra) => {
             xr.update(dt, frame);
         } else if (desktop) {
             desktop.update(dt);
+            if (modelinput) {
+                modelinput.update(dt);
+            }
         }
-        presence.tick(performance.now());
+        (xr && xr.active ? renderer.xr.getCamera() : camera).getWorldPosition(viewer);
+        presence.tick(performance.now(), sculptureRoot.worldToLocal(viewer));
         sendPose();
         renderer.render(scene, camera);
     });
@@ -623,6 +850,12 @@ const run = (root, config, strings, extra) => {
             renderer.setAnimationLoop(null);
             timer.dispose();
             observer.disconnect();
+            if (modelinput) {
+                modelinput.detach();
+            }
+            if (modeltools) {
+                modeltools.dispose();
+            }
             if (desktop) {
                 desktop.detach();
             }
@@ -674,6 +907,18 @@ const run = (root, config, strings, extra) => {
                 onRefused: (name) => toolbar.message(fill(strings.lockedbyother, name || '…'), MESSAGE_TIME),
             });
             toolbar.setTools(tools);
+            if (methods.includes('model')) {
+                modeltools = createModelTools({
+                    session: session,
+                    tools: tools,
+                    engine: engine,
+                    onChange: () => toolbar.refresh(),
+                    onRefused: (name) => toolMessage(fill(strings.lockedbyother, name || '…')),
+                    onMessage: (key, a) => messageByKey(key, a),
+                    log: (error) => Log.debug(error),
+                });
+                toolbar.setModel(modeltools);
+            }
         }
         desktop = attachDesktop({
             THREE: THREE,
@@ -685,6 +930,17 @@ const run = (root, config, strings, extra) => {
             keyroot: root,
             target: [0, SCULPTURE_HEIGHT, 0],
         });
+        if (modeltools) {
+            modelinput = attachModelInput({
+                THREE: THREE,
+                canvas: canvas,
+                camera: camera,
+                sculptureRoot: sculptureRoot,
+                engine: engine,
+                model: modeltools,
+                keyroot: root,
+            });
+        }
         xr = createXrStudio({
             THREE: THREE,
             renderer: renderer,
@@ -692,18 +948,30 @@ const run = (root, config, strings, extra) => {
             camera: camera,
             sculptureRoot: sculptureRoot,
             tools: tools,
+            model: modeltools,
+            engine: engine,
+            methods: methods.length > 1 ? 'both' : methods[0],
+            method: method,
+            onMethod: (name) => setMethod(name),
             readonly: readonly,
             strings: strings,
             onStart: () => {
                 desktop.setEnabled(false);
+                if (modelinput) {
+                    modelinput.setEnabled(false);
+                }
+                toolbar.showBakeConfirm(false);
                 toolbar.setVr(true, true);
             },
             onEnd: () => {
                 desktop.setEnabled(true);
+                applyMethod();
                 toolbar.setVr(true, false);
                 resize();
             },
         });
+        applyMethod();
+        refreshPresent();
         watchVr(xr, toolbar, () => stopped);
         root.dataset.vrmakerspaceReady = readonly ? 'view' : String(config.mode || 'solo');
         canvas.focus({preventScroll: true});
@@ -718,7 +986,7 @@ const run = (root, config, strings, extra) => {
 /**
  * Start the studio (js_call_amd from studio.php).
  *
- * @param {Object} config {cmid, sessionid, mode, readonly, user: {id, name}, model, modelurl, modelformat, snapshoturl,
+ * @param {Object} config {cmid, sessionid, mode, readonly, user: {id, name}, model, methods, modelurl, modelformat, snapshoturl,
  *     version, workerurl, trackcontributions, maxusers, autosavems, contributionms, backurl}
  * @returns {Promise<Object|null>} {stop()} once running, or null.
  */

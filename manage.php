@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Close, reopen or reset a sculpture: a confirmation page, then the change on a POST with the sesskey.
+ * Close, reopen or reset a piece: a confirmation page, then the change on a POST with the sesskey.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

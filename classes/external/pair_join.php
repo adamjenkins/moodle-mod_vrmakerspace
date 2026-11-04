@@ -24,7 +24,7 @@ use core_external\external_value;
 use mod_vrmakerspace\local\pair_manager;
 
 /**
- * Join a group sculpture to sculpt it with one partner, browser to browser.
+ * Join a group piece to work on it with one partner, browser to browser.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

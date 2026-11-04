@@ -27,7 +27,7 @@ use mod_vrmakerspace\local\session_manager;
 /**
  * Restores vrmakerspace.xml.
  *
- * Restore input is untrusted: the activity's settings are normalised as the form's are, a sculpture
+ * Restore input is untrusted: the activity's settings are normalised as the form's are, a piece
  * whose owner (user or group) was not restored is skipped with its versions and shares, and a grade
  * or share of a user who was not restored is skipped.
  */
@@ -41,7 +41,10 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
         $paths = [new restore_path_element('vrmakerspace', '/activity/vrmakerspace')];
         if ($this->get_setting_value('userinfo')) {
             $paths[] = new restore_path_element('vrmakerspace_session', '/activity/vrmakerspace/sessions/session');
-            $paths[] = new restore_path_element('vrmakerspace_snapshot', '/activity/vrmakerspace/sessions/session/snapshots/snapshot');
+            $paths[] = new restore_path_element(
+                'vrmakerspace_snapshot',
+                '/activity/vrmakerspace/sessions/session/snapshots/snapshot'
+            );
             $paths[] = new restore_path_element(
                 'vrmakerspace_contribution',
                 '/activity/vrmakerspace/sessions/session/contributions/contribution'
@@ -68,7 +71,7 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
     }
 
     /**
-     * One sculpture.
+     * One piece.
      *
      * @param array $data the element's data
      * @return void
@@ -106,7 +109,7 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
     }
 
     /**
-     * One version of a sculpture.
+     * One version of a piece.
      *
      * @param array $data the element's data
      * @return void
@@ -131,7 +134,7 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
     }
 
     /**
-     * One member's share of a sculpture.
+     * One member's share of a piece.
      *
      * @param array $data the element's data
      * @return void

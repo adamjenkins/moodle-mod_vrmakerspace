@@ -17,11 +17,11 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Each member's share of a sculpture, when the activity tracks contributions.
+ * Each member's share of a piece, when the activity tracks contributions.
  *
  * Every studio reports its own user's increments now and then (operations made, clay added and
  * removed in cubic millimetres). A report is a claim by the browser, so it is bounded here: each
- * increment is capped per report, and at most one report per user and sculpture is accepted every
+ * increment is capped per report, and at most one report per user and piece is accepted every
  * MIN_INTERVAL seconds. The shares are a guide for the teacher, not a proof.
  *
  * @package    mod_vrmakerspace
@@ -35,16 +35,16 @@ final class contribution_manager {
     /** @var float Most cubic millimetres one report adds to added or to removed. */
     public const MAX_VOLUME = 1e7;
 
-    /** @var int Seconds between two accepted reports of one user for one sculpture. */
+    /** @var int Seconds between two accepted reports of one user for one piece. */
     public const MIN_INTERVAL = 10;
 
     /** @var float Largest total a counter keeps (the column is NUMBER(12, 2)). */
     private const MAX_TOTAL = 9999999999.99;
 
     /**
-     * Add a user's increments to their record of a sculpture.
+     * Add a user's increments to their record of a piece.
      *
-     * The caller has checked that the user may sculpt the session and that the activity tracks
+     * The caller has checked that the user may work on the session and that the activity tracks
      * contributions. Negative values count as 0; values over the caps count as the cap.
      *
      * @param \stdClass $session the session row
@@ -108,7 +108,7 @@ final class contribution_manager {
     }
 
     /**
-     * The members' shares of a sculpture, largest first.
+     * The members' shares of a piece, largest first.
      *
      * A share is the user's part of all the clay added and removed; while no clay has moved, of all
      * the operations.

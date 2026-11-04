@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Pair work: two members of a group sculpt their group's sculpture together, browser to browser.
+ * Pair work: two members of a group work on their group's piece together, browser to browser.
  *
  * Needs no server of its own: the two browsers find each other through Moodle. Each one is a row of
  * vrmakerspace_peers with a random peer key made here, kept while its studio polls (pair_poll); after
@@ -38,7 +38,7 @@ namespace mod_vrmakerspace\local;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class pair_manager {
-    /** @var int People sculpting one sculpture at once in pair work. */
+    /** @var int People working on one piece at once in pair work. */
     public const MAX_PEERS = 2;
 
     /** @var int A peer that polled within this many seconds is active. */
@@ -97,7 +97,7 @@ final class pair_manager {
     }
 
     /**
-     * Whether an activity's group sculptures can be sculpted in pair work.
+     * Whether an activity's group pieces can be worked on in pair work.
      *
      * Group work with the pair connection; also group work with the companion connection while the
      * companion service is not available, so the studio can fall back to working with one partner.

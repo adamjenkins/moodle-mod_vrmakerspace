@@ -33,5 +33,5 @@ $plugin->requires = 2026042000;
 $plugin->supported = [502, 503];
 // The 3D studio loads three.js, the WebXR helpers and the presence codec from VR room's built-in run
 // mode (vrroomruntime_builtin, bundled with mod_vrroom). The companion service (vrroomruntime_companion)
-// is optional: group sculptures use it only when it is installed and configured.
+// is optional: group work uses it only when it is installed and configured.
 $plugin->dependencies = ['vrroomruntime_builtin' => 2026101100];

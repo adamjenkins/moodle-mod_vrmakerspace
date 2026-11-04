@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Tests of the sculpture and version data layer.
+ * Tests of the piece and version data layer.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -100,7 +100,7 @@ final class session_manager_test extends \advanced_testcase {
     }
 
     /**
-     * Who may view and sculpt: owners sculpt while open, teachers only view, other students neither.
+     * Who may view and make: owners make while open, teachers only view, other students neither.
      */
     public function test_access_rules(): void {
         global $DB;
@@ -172,7 +172,7 @@ final class session_manager_test extends \advanced_testcase {
         $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
 
         try {
-            $bytes = '<html>not a sculpture</html>' . str_repeat(' ', 600);
+            $bytes = '<html>not a piece</html>' . str_repeat(' ', 600);
             session_manager::save_snapshot($session, $context, (int)$user->id, $bytes);
             $this->fail('Foreign data was accepted');
         } catch (\moodle_exception $e) {
@@ -209,7 +209,8 @@ final class session_manager_test extends \advanced_testcase {
     public static function broken_header_provider(): array {
         return [
             'magic' => [0, 'VRSX'],
-            'format version 2' => [4, pack('v', 2)],
+            'format version 0' => [4, pack('v', 0)],
+            'format version 3' => [4, pack('v', 3)],
             'unknown flag' => [6, pack('v', 2)],
             'grid too small' => [8, pack('v', 4)],
             'grid too large' => [10, pack('v', 300)],
@@ -218,7 +219,144 @@ final class session_manager_test extends \advanced_testcase {
             'voxel too large' => [16, pack('g', 0.5)],
             'band not positive' => [20, pack('g', 0.0)],
             'payload length wrong' => [44, pack('V', 511)],
+            'grid length not one byte per voxel' => [48, pack('V', 511)],
+            'grid length past the end' => [48, pack('V', 100000)],
+            'grid length empty' => [48, pack('V', 0)],
         ];
+    }
+
+    /**
+     * A snapshot of a 128-voxel grid with the given format version, flags and payload.
+     *
+     * @param int $version the format version
+     * @param int $flags the header flags
+     * @param string $payload the payload
+     * @return string
+     */
+    private function snapshot_file(int $version, int $flags, string $payload): string {
+        return session_manager::SNAPSHOT_MAGIC . pack('vvvvvv', $version, $flags, 128, 128, 128, 0) . pack('g', 0.004)
+            . pack('g', 0.012) . pack('V', 42) . '0123456789abcdef' . pack('V', strlen($payload)) . $payload;
+    }
+
+    /**
+     * Both format versions pass: version 2 with its mesh section (even an empty one, which the studio
+     * refuses when it parses the file), version 1 with the grid alone.
+     */
+    public function test_validate_snapshot_accepts_both_versions(): void {
+        $this->resetAfterTest();
+        $generator = $this->generator();
+
+        $header = session_manager::validate_snapshot($generator->snapshot_data('x', 9));
+        $this->assertSame(session_manager::SNAPSHOT_VERSION, $header['version']);
+        $this->assertSame(512, $header['gridlength']);
+        $this->assertSame(512 + 4 + strlen('{"v":[],"f":[],"s":[]}'), $header['length']);
+
+        $old = $generator->snapshot_data('x', 9, 8, session_manager::SNAPSHOT_VERSION_CLAY);
+        $header = session_manager::validate_snapshot($old);
+        $this->assertSame(session_manager::SNAPSHOT_VERSION_CLAY, $header['version']);
+        $this->assertSame(512, $header['gridlength']);
+        $this->assertSame(512, $header['length']);
+
+        $sections = pack('V', 4) . 'gridmesh';
+        $header = session_manager::validate_snapshot($this->snapshot_file(2, 1, $sections));
+        $this->assertSame(1, $header['flags']);
+        $this->assertSame(4, $header['gridlength']);
+        $this->assertSame(12, $header['length']);
+
+        $header = session_manager::validate_snapshot($this->snapshot_file(2, 1, pack('V', 4) . 'grid'));
+        $this->assertSame(4, $header['gridlength']);
+    }
+
+    /**
+     * A version 2 payload needs its grid length, and that length must fit in the payload.
+     *
+     * @param int $flags the header flags
+     * @param string $payload the payload
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('broken_sections_provider')]
+    public function test_validate_snapshot_refuses_broken_sections(int $flags, string $payload): void {
+        $this->resetAfterTest();
+        $this->expectException(\moodle_exception::class);
+        $this->expectExceptionMessage(get_string('snapshotinvalid', 'mod_vrmakerspace'));
+        session_manager::validate_snapshot($this->snapshot_file(2, $flags, $payload));
+    }
+
+    /**
+     * Broken version 2 payloads: flags and payload.
+     *
+     * @return array
+     */
+    public static function broken_sections_provider(): array {
+        return [
+            'too short for a grid length' => [1, 'abc'],
+            'only a grid length' => [1, pack('V', 0)],
+            'grid past the end' => [1, pack('V', 5) . 'grid'],
+            'uncompressed grid of the wrong size' => [0, pack('V', 4) . 'gridmesh'],
+        ];
+    }
+
+    /**
+     * Saving a version 2 file keeps it whole, with the header's sequence number as its operation count.
+     */
+    public function test_save_snapshot_keeps_the_mesh(): void {
+        $this->resetAfterTest();
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
+        $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
+        $data = $this->generator()->snapshot_data('mesh', 11);
+
+        $snapshot = session_manager::save_snapshot($session, $context, (int)$user->id, $data);
+
+        $this->assertSame(11, (int)$snapshot->opcount);
+        $this->assertSame($data, session_manager::get_snapshot_file($snapshot, $context)->get_content());
+    }
+
+    /**
+     * Ways of making: unknown values become both; each starting model is allowed as the form says, and
+     * one that does not suit gives way to the polygon cube (modelling only) or the clay lump.
+     */
+    public function test_methods_and_start_models(): void {
+        $this->assertSame('model', session_manager::clean_methods('model'));
+        $this->assertSame('sculpt', session_manager::clean_methods('sculpt'));
+        $this->assertSame('both', session_manager::clean_methods('both'));
+        $this->assertSame('both', session_manager::clean_methods('telepathy'));
+        $this->assertSame('both', session_manager::methods((object)[]));
+        $this->assertSame('sculpt', session_manager::methods((object)['methods' => 'sculpt']));
+        $this->assertSame('meshcube', session_manager::clean_start_model('meshcube'));
+
+        foreach (session_manager::START_MODELS as $model) {
+            $this->assertTrue(session_manager::start_model_allowed('both', $model), $model);
+            $this->assertSame($model !== 'meshcube', session_manager::start_model_allowed('sculpt', $model), $model);
+            $this->assertSame(
+                $model === 'meshcube' || $model === 'empty',
+                session_manager::start_model_allowed('model', $model),
+                $model
+            );
+        }
+        $this->assertFalse(session_manager::start_model_allowed('both', 'teapot'));
+
+        $this->assertSame('meshcube', session_manager::start_model_for_methods('model', 'lump'));
+        $this->assertSame('meshcube', session_manager::start_model_for_methods('model', 'upload'));
+        $this->assertSame('empty', session_manager::start_model_for_methods('model', 'empty'));
+        $this->assertSame('lump', session_manager::start_model_for_methods('sculpt', 'meshcube'));
+        $this->assertSame('upload', session_manager::start_model_for_methods('sculpt', 'upload'));
+        $this->assertSame('meshcube', session_manager::start_model_for_methods('both', 'meshcube'));
+    }
+
+    /**
+     * A new piece takes the activity's polygon cube as its starting model.
+     */
+    public function test_session_starts_from_the_polygon_cube(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', [
+            'course' => $course->id,
+            'methods' => 'model',
+            'startmodel' => 'meshcube',
+        ]);
+        $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
+        $this->assertSame('meshcube', $session->startmodel);
     }
 
     /**
@@ -274,7 +412,8 @@ final class session_manager_test extends \advanced_testcase {
         $status = (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]);
         $this->assertSame(session_manager::STATUS_CLOSED, $status);
         session_manager::set_status($session, session_manager::STATUS_OPEN);
-        $this->assertSame(session_manager::STATUS_OPEN, (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]));
+        $status = (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]);
+        $this->assertSame(session_manager::STATUS_OPEN, $status);
 
         $this->expectException(\moodle_exception::class);
         $this->expectExceptionMessage(get_string('invalidstatus', 'mod_vrmakerspace'));
@@ -283,7 +422,7 @@ final class session_manager_test extends \advanced_testcase {
 
     /**
      * The manage actions: close, reopen, and reset (versions, files, contributions and connections go;
-     * the sculpture and other sculptures stay); an unknown action is refused.
+     * the piece and other pieces stay); an unknown action is refused.
      */
     public function test_manage_actions(): void {
         global $DB;
@@ -302,7 +441,8 @@ final class session_manager_test extends \advanced_testcase {
         $status = (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]);
         $this->assertSame(session_manager::STATUS_CLOSED, $status);
         $this->assertSame('managedone_reopen', session_manager::manage($session, $context, 'reopen'));
-        $this->assertSame(session_manager::STATUS_OPEN, (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]));
+        $status = (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]);
+        $this->assertSame(session_manager::STATUS_OPEN, $status);
 
         $this->assertSame('managedone_reset', session_manager::manage($session, $context, 'reset'));
         $this->assertTrue($DB->record_exists('vrmakerspace_sessions', ['id' => $session->id]));

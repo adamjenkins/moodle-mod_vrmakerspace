@@ -57,7 +57,11 @@ function vrmakerspace_supports(string $feature) {
  * @return stdClass
  */
 function vrmakerspace_clean_instance_data(stdClass $data): stdClass {
-    $data->startmodel = session_manager::clean_start_model((string)($data->startmodel ?? ''));
+    $data->methods = session_manager::clean_methods((string)($data->methods ?? ''));
+    $data->startmodel = session_manager::start_model_for_methods(
+        $data->methods,
+        session_manager::clean_start_model((string)($data->startmodel ?? ''))
+    );
     $data->workmode = (int)($data->workmode ?? 0) === session_manager::MODE_GROUP
         ? session_manager::MODE_GROUP : session_manager::MODE_INDIVIDUAL;
     // Group work only: pair (built in, two people at once) or companion (up to maxusers). Individual
@@ -334,7 +338,7 @@ function vrmakerspace_reset_gradebook(int $courseid, string $type = ''): void {
 }
 
 /**
- * Course reset: delete sculptures with their versions, live connections and contributions, and the
+ * Course reset: delete pieces with their versions, live connections and contributions, and the
  * grades, when asked.
  *
  * @param stdClass $data the reset form data

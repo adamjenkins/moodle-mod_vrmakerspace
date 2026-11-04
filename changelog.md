@@ -23,9 +23,9 @@ All notable changes to this plugin are documented here. The format follows
   `mod_vrmakerspace_set_session_status`; studio and 3D-view links on the activity page.
 - Scheduled task `\mod_vrmakerspace\task\cleanup` (expired pair-work connections).
 - Dependency on `vrroomruntime_builtin` 2026101100.
-- Sculpting and modelling tools: op kinds `inflate`, `pinch`, `flatten`, `shape` and `cutshape`, op keys
-  `m` (mirror), `sh` (shape) and `tx` (letters) (`js/engine/ops.js`, `js/engine/shapes.js`,
-  `js/engine/font.js`); the start model `empty`; the toolbar's modelling group, shape and letters fields
+- More sculpting tools and the shape tools: op kinds `inflate`, `pinch`, `flatten`, `shape` and `cutshape`,
+  op keys `m` (mirror), `sh` (shape) and `tx` (letters) (`js/engine/ops.js`, `js/engine/shapes.js`,
+  `js/engine/font.js`); the start model `empty`; the toolbar's shape group, shape and letters fields
   and Mirror switch; ten tools in two rows on the VR palette, with Mirror. Needs the matching
   `vrroom-sync` for companion work.
 - Grading page quick view: `amd/src/quickview.js` and `templates/quickview.mustache` (a core modal
@@ -34,10 +34,26 @@ All notable changes to this plugin are documented here. The format follows
 - Uploaded starting models: `startmodel` value `upload`, the `startmodel` file area (one STL, OBJ or
   glTF binary file, backed up and restored), served by `vrmakerspace_pluginfile()` to users who may view
   the activity, and read and voxelised in the engine worker by `js/engine/meshimport.js`.
+- Polygon modelling: a mesh layer beside the clay (`js/engine/polymesh.js`, `polyprims.js`, `polyops.js`),
+  with shared per-author selections, op kinds `msel`, `mprim`, `mxf`, `mext`, `minset`, `mbevel`, `mloop`,
+  `mmerge`, `mdel`, `mfill`, `mflip`, `mmirror` and `mbake` (turn the mesh into clay), op keys `md`, `sm`,
+  `ids`, `e`, `n` and `sc`; the studio's method switch, Model panel, keys and VR palette page
+  (`amd/src/modeltools.js`, `modelinput.js`, `polyview.js`, `polypick.js`). Needs the matching
+  `vrroom-sync` for companion work.
+- The `vrmakerspace.methods` field (`both`, `sculpt` or `model`), its form setting and the studio's
+  `methods` configuration; the form and `vrmakerspace_clean_instance_data()` keep the starting model to
+  what suits the ways of making (forms refuse, saving and restoring correct it).
+- The start model `meshcube` (no clay, a polygon cube in the mesh layer).
+- The capability `mod/vrmakerspace:make`.
 
 ### Changed
 
-- Saved snapshots must have a valid "VRSC" version 1 header; a version's operation count is the
-  header's sequence number.
+- Renamed the plugin from `mod_vrsculpt` to `mod_vrmakerspace`, "VR Makerspace", and its words from
+  "sculpture" to "piece" except for the sculpting method itself. Tables, web services, capabilities and
+  file areas follow the new component name. No site has the old component: there is no migration.
+- Saved snapshots must have a valid "VRSC" header, version 1 (clay only, still read) or version 2 (the
+  version the studio writes: `u32 gridLength`, the grid section, the mesh section); a version's operation
+  count is the header's sequence number.
+- Saved versions are stored as `piece-v<n>.vrsc`.
 - `mod_vrmakerspace_get_session_state` and `mod_vrmakerspace_save_snapshot` return the activity's
   `connection`.

@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\event;
 
 /**
- * The list of VR sculpting activities in a course was viewed.
+ * The list of VR Makerspace activities in a course was viewed.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

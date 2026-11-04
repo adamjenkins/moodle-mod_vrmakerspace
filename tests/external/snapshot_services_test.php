@@ -86,7 +86,7 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
     }
 
     /**
-     * Another student cannot save into, or read, someone else's sculpture.
+     * Another student cannot save into, or read, someone else's piece.
      */
     public function test_other_student_refused(): void {
         global $DB;
@@ -96,7 +96,7 @@ final class snapshot_services_test extends \core_external\tests\externallib_test
 
         try {
             save_snapshot::execute((int)$vrmakerspace->cmid, (int)$session->id, base64_encode($this->valid_data()), 1);
-            $this->fail('A student saved into another student\'s sculpture');
+            $this->fail('A student saved into another student\'s piece');
         } catch (\moodle_exception $e) {
             $this->assertSame('cannotsculpt', $e->errorcode);
         }

@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/vrmakerspace/backup/moodle2/backup_vrmakerspace_stepslib.php');
 
 /**
- * Provides the steps to back up one VR sculpting activity.
+ * Provides the steps to back up one VR Makerspace activity.
  */
 class backup_vrmakerspace_activity_task extends backup_activity_task {
     /**
@@ -58,11 +58,11 @@ class backup_vrmakerspace_activity_task extends backup_activity_task {
 
         $base = preg_quote($CFG->wwwroot, '/');
 
-        // Link to the list of VR sculpting activities.
+        // Link to the list of VR Makerspace activities.
         $search = '/(' . $base . '\/mod\/vrmakerspace\/index.php\?id\=)([0-9]+)/';
         $content = preg_replace($search, '$@VRMAKERSPACEINDEX*$2@$', $content);
 
-        // Link to a VR sculpting activity by course module id.
+        // Link to a VR Makerspace activity by course module id.
         $search = '/(' . $base . '\/mod\/vrmakerspace\/view.php\?id\=)([0-9]+)/';
         $content = preg_replace($search, '$@VRMAKERSPACEVIEWBYID*$2@$', $content);
 

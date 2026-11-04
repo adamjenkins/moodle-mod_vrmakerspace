@@ -23,7 +23,7 @@ use core_external\external_value;
 use mod_vrmakerspace\local\session_manager;
 
 /**
- * Save the current sculpture of a session as a new version.
+ * Save the current piece of a session as a new version.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -39,7 +39,7 @@ class save_snapshot extends external_api {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module id'),
             'sessionid' => new external_value(PARAM_INT, 'Session id'),
-            'data' => new external_value(PARAM_RAW, 'The sculpture, base64-encoded'),
+            'data' => new external_value(PARAM_RAW, 'The piece, base64-encoded'),
             'opcount' => new external_value(
                 PARAM_INT,
                 'Operations applied since the session started (informational: the data header\'s sequence number is stored)',
@@ -54,7 +54,7 @@ class save_snapshot extends external_api {
      *
      * @param int $cmid course module id
      * @param int $sessionid session id
-     * @param string $data base64 sculpture data
+     * @param string $data base64 piece data
      * @param int $opcount operations applied (the header's sequence number is what is stored)
      * @return array the session's new state
      */
@@ -71,7 +71,8 @@ class save_snapshot extends external_api {
 
         // Base64 is a third larger than the data: refuse oversize input before decoding it.
         if (strlen($params['data']) > intdiv(session_manager::max_snapshot_size() * 4, 3) + 4) {
-            throw new \moodle_exception('snapshottoolarge', 'mod_vrmakerspace', '', display_size(session_manager::max_snapshot_size()));
+            $limit = display_size(session_manager::max_snapshot_size());
+            throw new \moodle_exception('snapshottoolarge', 'mod_vrmakerspace', '', $limit);
         }
         $bytes = base64_decode($params['data'], true);
         if ($bytes === false) {

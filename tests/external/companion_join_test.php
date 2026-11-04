@@ -33,7 +33,7 @@ use mod_vrmakerspace\local\session_manager;
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\companion_manager::class)]
 final class companion_join_test extends \core_external\tests\externallib_testcase {
     /**
-     * A group-work activity over the companion service with one group and its sculpture.
+     * A group-work activity over the companion service with one group and its piece.
      *
      * @param string $connection the activity's connection
      * @return array [\stdClass $vrmakerspace, \stdClass $session, \stdClass $member, \stdClass $outsider]
@@ -78,8 +78,8 @@ final class companion_join_test extends \core_external\tests\externallib_testcas
     }
 
     /**
-     * Configured: a token for the sculpture's room, with the peer id and room made from pseudonyms, and
-     * the activity's maximum; the same user and sculpture always get the same peer id.
+     * Configured: a token for the piece's room, with the peer id and room made from pseudonyms, and
+     * the activity's maximum; the same user and piece always get the same peer id.
      */
     public function test_configured(): void {
         $this->resetAfterTest();

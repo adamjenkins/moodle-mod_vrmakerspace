@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/vrmakerspace/backup/moodle2/restore_vrmakerspace_stepslib.php');
 
 /**
- * Provides the steps to restore one VR sculpting activity.
+ * Provides the steps to restore one VR Makerspace activity.
  */
 class restore_vrmakerspace_activity_task extends restore_activity_task {
     /**

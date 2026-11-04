@@ -42,10 +42,10 @@ final class provider_test extends provider_testcase {
     /** @var \stdClass group-work activity */
     private \stdClass $team;
 
-    /** @var \stdClass student with an own sculpture and a version of the group's */
+    /** @var \stdClass student with an own piece and a version of the group's */
     private \stdClass $alice;
 
-    /** @var \stdClass student with an own sculpture */
+    /** @var \stdClass student with an own piece */
     private \stdClass $bob;
 
     /** @var \stdClass teacher who grades */
@@ -58,7 +58,7 @@ final class provider_test extends provider_testcase {
     private \stdClass $groupsession;
 
     /**
-     * Two activities with sculptures, versions and grades.
+     * Two activities with pieces, versions and grades.
      */
     protected function setUp(): void {
         parent::setUp();
@@ -75,19 +75,19 @@ final class provider_test extends provider_testcase {
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $this->alice->id]);
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $this->bob->id]);
 
-        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
-        $this->alicesession = $sculpt->create_session(['vrmakerspaceid' => $this->solo->id, 'userid' => $this->alice->id]);
-        $sculpt->create_snapshot($this->alicesession, (int)$this->alice->id, 'alice');
-        $bobsession = $sculpt->create_session(['vrmakerspaceid' => $this->solo->id, 'userid' => $this->bob->id]);
-        $sculpt->create_snapshot($bobsession, (int)$this->bob->id, 'bob');
-        $this->groupsession = $sculpt->create_session(['vrmakerspaceid' => $this->team->id, 'groupid' => $group->id]);
-        $sculpt->create_snapshot($this->groupsession, (int)$this->alice->id, 'team1');
-        $sculpt->create_snapshot($this->groupsession, (int)$this->bob->id, 'team2');
+        $maker = $gen->get_plugin_generator('mod_vrmakerspace');
+        $this->alicesession = $maker->create_session(['vrmakerspaceid' => $this->solo->id, 'userid' => $this->alice->id]);
+        $maker->create_snapshot($this->alicesession, (int)$this->alice->id, 'alice');
+        $bobsession = $maker->create_session(['vrmakerspaceid' => $this->solo->id, 'userid' => $this->bob->id]);
+        $maker->create_snapshot($bobsession, (int)$this->bob->id, 'bob');
+        $this->groupsession = $maker->create_session(['vrmakerspaceid' => $this->team->id, 'groupid' => $group->id]);
+        $maker->create_snapshot($this->groupsession, (int)$this->alice->id, 'team1');
+        $maker->create_snapshot($this->groupsession, (int)$this->bob->id, 'team2');
         grader::save_grade($this->solo, (int)$this->alice->id, 60.0, (int)$this->teacher->id);
 
-        // Shares of the group's sculpture, and alice's live connection with a message to bob's.
-        $sculpt->create_contribution($this->groupsession, (int)$this->alice->id, 12, 400.0, 100.0);
-        $sculpt->create_contribution($this->groupsession, (int)$this->bob->id, 3, 50.0, 0.0);
+        // Shares of the group's piece, and alice's live connection with a message to bob's.
+        $maker->create_contribution($this->groupsession, (int)$this->alice->id, 12, 400.0, 100.0);
+        $maker->create_contribution($this->groupsession, (int)$this->bob->id, 3, 50.0, 0.0);
         $this->add_peer($this->alice, 'a', 'host');
         $this->add_peer($this->bob, 'b', 'guest');
         global $DB;
@@ -100,7 +100,7 @@ final class provider_test extends provider_testcase {
     }
 
     /**
-     * A live connection to the group's sculpture.
+     * A live connection to the group's piece.
      *
      * @param \stdClass $user the user
      * @param string $char the character the peer key repeats
@@ -161,7 +161,7 @@ final class provider_test extends provider_testcase {
     }
 
     /**
-     * Export: alice's own sculpture with its file, only her version of the group's, and her grade.
+     * Export: alice's own piece with its file, only her version of the group's, and her grade.
      */
     public function test_export_user_data(): void {
         $solo = \context_module::instance($this->solo->cmid);
@@ -170,21 +170,21 @@ final class provider_test extends provider_testcase {
         $this->export_context_data_for_user((int)$this->alice->id, $team, 'mod_vrmakerspace');
 
         $data = writer::with_context($solo)->get_data();
-        $this->assertCount(1, $data->sculptures);
-        $this->assertSame((int)$this->alicesession->id, $data->sculptures[0]->sculpture);
+        $this->assertCount(1, $data->pieces);
+        $this->assertSame((int)$this->alicesession->id, $data->pieces[0]->piece);
         $this->assertEquals('60.00', $data->grade);
         $path = [get_string('privacy:path:sculpture', 'mod_vrmakerspace', (int)$this->alicesession->id)];
         $this->assertNotEmpty(writer::with_context($solo)->get_files($path));
 
         $data = writer::with_context($team)->get_data();
-        $this->assertCount(1, $data->sculptures);
-        $this->assertCount(1, $data->sculptures[0]->versions);
-        $this->assertSame(1, $data->sculptures[0]->versions[0]->version);
-        $this->assertSame(12, $data->sculptures[0]->contribution->operations);
-        $this->assertCount(1, $data->sculptures[0]->connections);
-        $this->assertSame('host', $data->sculptures[0]->connections[0]->role);
-        $this->assertCount(1, $data->sculptures[0]->connectionmessages);
-        $this->assertSame('{"type":"description"}', $data->sculptures[0]->connectionmessages[0]->message);
+        $this->assertCount(1, $data->pieces);
+        $this->assertCount(1, $data->pieces[0]->versions);
+        $this->assertSame(1, $data->pieces[0]->versions[0]->version);
+        $this->assertSame(12, $data->pieces[0]->contribution->operations);
+        $this->assertCount(1, $data->pieces[0]->connections);
+        $this->assertSame('host', $data->pieces[0]->connections[0]->role);
+        $this->assertCount(1, $data->pieces[0]->connectionmessages);
+        $this->assertSame('{"type":"description"}', $data->pieces[0]->connectionmessages[0]->message);
     }
 
     /**
@@ -204,14 +204,14 @@ final class provider_test extends provider_testcase {
 
         $this->export_context_data_for_user((int)$carol->id, $team, 'mod_vrmakerspace');
         $data = writer::with_context($team)->get_data();
-        $this->assertSame([], $data->sculptures[0]->versions);
-        $this->assertSame(1, $data->sculptures[0]->contribution->operations);
+        $this->assertSame([], $data->pieces[0]->versions);
+        $this->assertSame(1, $data->pieces[0]->contribution->operations);
         $DB->delete_records('vrmakerspace_contrib', ['userid' => $carol->id]);
         $this->assertSame([], provider::get_contexts_for_userid((int)$carol->id)->get_contextids());
     }
 
     /**
-     * Deleting alice: her own sculpture and grade go, her group versions are anonymised, bob's stay.
+     * Deleting alice: her own piece and grade go, her group versions are anonymised, bob's stay.
      */
     public function test_delete_data_for_user(): void {
         global $DB;
@@ -223,7 +223,8 @@ final class provider_test extends provider_testcase {
         $this->assertFalse($DB->record_exists('vrmakerspace_grades', ['userid' => $this->alice->id]));
         $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots', ['userid' => $this->alice->id]));
         $this->assertSame(2, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $this->groupsession->id]));
-        $this->assertTrue($DB->record_exists('vrmakerspace_sessions', ['vrmakerspaceid' => $this->solo->id, 'userid' => $this->bob->id]));
+        $bobs = ['vrmakerspaceid' => $this->solo->id, 'userid' => $this->bob->id];
+        $this->assertTrue($DB->record_exists('vrmakerspace_sessions', $bobs));
         $this->assertFalse($DB->record_exists('vrmakerspace_contrib', ['userid' => $this->alice->id]));
         $this->assertFalse($DB->record_exists('vrmakerspace_peers', ['userid' => $this->alice->id]));
         $this->assertFalse($DB->record_exists('vrmakerspace_signals', ['fromuserid' => $this->alice->id]));

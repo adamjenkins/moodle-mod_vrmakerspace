@@ -77,7 +77,7 @@ final class start_model_test extends \advanced_testcase {
 
     /**
      * An activity saved with an uploaded model keeps the file and gives the studio its URL and format;
-     * switching to a primitive removes the file, and sculptures that started from it get the clay lump.
+     * switching to a primitive removes the file, and pieces that started from it get the clay lump.
      */
     public function test_upload_saved_served_and_removed(): void {
         $this->resetAfterTest();
@@ -104,7 +104,7 @@ final class start_model_test extends \advanced_testcase {
         $expected = '/pluginfile.php/' . $context->id . '/mod_vrmakerspace/startmodel/0/owl.stl';
         $this->assertStringContainsString($expected, $config['modelurl']);
 
-        // The teacher switches to the sphere: the file goes; the student's sculpture keeps 'upload'
+        // The teacher switches to the sphere: the file goes; the student's piece keeps 'upload'
         // and falls back to the lump.
         $this->setAdminUser();
         vrmakerspace_save_start_model((object)['startmodel' => 'sphere', 'startmodelfile' => file_get_unused_draft_itemid(),

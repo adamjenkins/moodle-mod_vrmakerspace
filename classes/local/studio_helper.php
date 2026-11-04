@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Which sculpture the studio page opens, and how: the configuration of the studio's JavaScript.
+ * Which piece the studio page opens, and how: the configuration of the studio's JavaScript.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -43,23 +43,23 @@ final class studio_helper {
     public const MODE_VIEW = 'view';
 
     /**
-     * The sculpture a request asks for, checked against what the user may do.
+     * The piece a request asks for, checked against what the user may do.
      *
-     * Without $sessionid, the user's own sculpture (or their group's), created on first use as on the
-     * activity page; with it, any sculpture of this activity the user may see. With $version, that
-     * saved version. The studio is read-only for users who may not sculpt the sculpture, for a closed
-     * sculpture, and for any version but the latest.
+     * Without $sessionid, the user's own piece (or their group's), created on first use as on the
+     * activity page; with it, any piece of this activity the user may see. With $version, that
+     * saved version. The studio is read-only for users who may not change the piece, for a closed
+     * piece, and for any version but the latest.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \cm_info|\stdClass $cm the course module
      * @param \context_module $context the activity context
      * @param int $userid the user (never from the client)
-     * @param int $sessionid a sculpture, or 0 for the user's own
+     * @param int $sessionid a piece, or 0 for the user's own
      * @param int $version a saved version, or 0 for the latest
-     * @param int $groupid group work, own sculpture: which of the user's groups (0 for the first)
+     * @param int $groupid group work, own piece: which of the user's groups (0 for the first)
      * @return array{session: \stdClass, snapshot: ?\stdClass, latest: ?\stdClass, readonly: bool}
      * @throws \moodle_exception invalidsession, nogroup, invalidversion
-     * @throws \required_capability_exception when the user may not see the sculpture
+     * @throws \required_capability_exception when the user may not see the piece
      */
     public static function resolve(
         \stdClass $vrmakerspace,
@@ -97,10 +97,10 @@ final class studio_helper {
     }
 
     /**
-     * The studio mode of a sculpture.
+     * The studio mode of a piece.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
-     * @param bool $readonly whether the studio only shows the sculpture
+     * @param bool $readonly whether the studio only shows the piece
      * @return string one of the MODE_* constants
      */
     public static function mode(\stdClass $vrmakerspace, bool $readonly): string {
@@ -134,12 +134,17 @@ final class studio_helper {
             $maxusers = session_manager::connection($vrmakerspace) === session_manager::CONNECTION_COMPANION
                 ? min(8, max(2, (int)$vrmakerspace->maxusers)) : pair_manager::MAX_PEERS;
         }
-        // An uploaded starting model that has gone (the activity now starts from a primitive) falls back
-        // to the clay lump, as an unknown model does.
-        $model = session_manager::clean_start_model((string)$session->startmodel);
+        // A piece keeps the starting model it was created with, but the teacher may have changed the ways
+        // of making since: a model that no longer suits them gives way, as an unknown model does. So does
+        // an uploaded starting model that has gone (the activity now starts from a primitive).
+        $methods = session_manager::methods($vrmakerspace);
+        $model = session_manager::start_model_for_methods(
+            $methods,
+            session_manager::clean_start_model((string)$session->startmodel)
+        );
         $modelfile = $model === session_manager::MODEL_UPLOAD ? session_manager::start_model_file($context) : null;
         if ($model === session_manager::MODEL_UPLOAD && !$modelfile) {
-            $model = session_manager::START_MODELS[0];
+            $model = session_manager::start_model_for_methods($methods, session_manager::START_MODELS[0]);
         }
         $modelurl = $modelfile ? \moodle_url::make_pluginfile_url(
             $context->id,
@@ -159,10 +164,11 @@ final class studio_helper {
             'mode' => $mode,
             'readonly' => $readonly,
             'user' => ['id' => (int)$user->id, 'name' => pair_manager::display_name(fullname($user))],
+            'methods' => $methods,
             'model' => $model,
             'modelurl' => $modelurl,
             'modelformat' => $modelfile ? session_manager::start_model_format($modelfile->get_filename()) : '',
-            // Looking only: the version shown, fetched directly. Sculpting: the session fetches its state.
+            // Looking only: the version shown, fetched directly. Working: the session fetches its state.
             'snapshoturl' => $readonly && $snapshot ? session_manager::snapshot_url($snapshot, $context)->out(false) : '',
             'version' => $snapshot ? (int)$snapshot->version : 0,
             'workerurl' => $workerurl->out(false),
@@ -176,7 +182,27 @@ final class studio_helper {
     }
 
     /**
-     * The URL of the sculpting engine's worker, for the studio and the grading page's quick view.
+     * Which controls the studio template shows for the ways of making.
+     *
+     * @param string $methods one of session_manager::METHODS
+     * @param string $model the starting model the studio opens with
+     * @return array{methods: string, cansculpt: bool, canmodel: bool, showmethodswitch: bool, modelfirst: bool}
+     */
+    public static function methods_context(string $methods, string $model): array {
+        $methods = session_manager::clean_methods($methods);
+        $canmodel = $methods !== session_manager::METHODS_SCULPT;
+        return [
+            'methods' => $methods,
+            'cansculpt' => $methods !== session_manager::METHODS_MODEL,
+            'canmodel' => $canmodel,
+            'showmethodswitch' => $methods === session_manager::METHODS_BOTH,
+            'modelfirst' => $methods === session_manager::METHODS_MODEL
+                || ($canmodel && $model === session_manager::MODEL_MESHCUBE),
+        ];
+    }
+
+    /**
+     * The URL of the engine's worker, for the studio and the grading page's quick view.
      *
      * Served by engine.php under a versioned path, so the worker's relative imports are versioned too.
      *
@@ -187,7 +213,7 @@ final class studio_helper {
     }
 
     /**
-     * The studio page's heading: whose sculpture, and which version when an older one is shown.
+     * The studio page's heading: whose piece, and which version when an older one is shown.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context

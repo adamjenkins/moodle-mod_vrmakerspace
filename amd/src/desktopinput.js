@@ -28,6 +28,9 @@
  * Keyboard shortcuts (the 'shortcuts' string) work while the focus is anywhere in the studio except
  * in a text field, so typing elsewhere on the page is never taken over.
  *
+ * In the Model method (setToolsEnabled(false), mod_vrmakerspace/modelinput takes over the tools) this
+ * module keeps the view controls and Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z, which cover both methods.
+ *
  * @module     mod_vrmakerspace/desktopinput
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -68,7 +71,7 @@ const TEXT_INPUTS = ['text', 'search', 'email', 'url', 'tel', 'password', 'numbe
  * @param {EventTarget} target The event target.
  * @returns {boolean}
  */
-const isTyping = (target) => {
+export const isTyping = (target) => {
     if (!target || !target.tagName) {
         return false;
     }
@@ -87,7 +90,7 @@ const isTyping = (target) => {
  *
  * @param {Object} options {THREE, canvas, camera, sculptureRoot, engine, tools (null when read-only),
  *     keyroot: the element whose keys are shortcuts, target: [x, y, z] the view turns around}
- * @returns {Object} {controls, update(dt), setEnabled(enabled), cursorPose(), detach()}
+ * @returns {Object} {controls, update(dt), setEnabled(enabled), setToolsEnabled(on), cursorPose(), detach()}
  */
 export const attach = (options) => {
     const {THREE, canvas, camera, sculptureRoot, engine} = options;
@@ -104,6 +107,7 @@ export const attach = (options) => {
     const normal = new THREE.Vector3();
     const normalmatrix = new THREE.Matrix3();
     let enabled = true;
+    let toolsenabled = true;
     let pointer = null;
     let pointerdirty = false;
     /** @type {Object|null} the stroke the pointer drives */
@@ -153,6 +157,10 @@ export const attach = (options) => {
         raycaster.setFromCamera(ndc, camera);
         hits.length = 0;
         raycaster.intersectObjects(engine.meshes(), false, hits);
+        // Clay can start on the polygon mesh too; each call sorts the hits, nearest first.
+        if (engine.poly) {
+            raycaster.intersectObjects(engine.poly.meshes(), false, hits);
+        }
         if (hits.length === 0) {
             return false;
         }
@@ -264,7 +272,7 @@ export const attach = (options) => {
      */
     const onPointerDown = (event) => {
         canvas.focus({preventScroll: true});
-        if (!enabled || !tools) {
+        if (!enabled || !tools || !toolsenabled) {
             return;
         }
         if (drag) {
@@ -413,7 +421,11 @@ export const attach = (options) => {
         if (!enabled || !tools || event.defaultPrevented || event.altKey || isTyping(event.target)) {
             return;
         }
-        const handled = (event.ctrlKey || event.metaKey) ? commandKey(event) : plainKey(event.key);
+        const command = event.ctrlKey || event.metaKey;
+        if (!command && !toolsenabled) {
+            return;
+        }
+        const handled = command ? commandKey(event) : plainKey(event.key);
         if (handled) {
             event.preventDefault();
             if (cursorvisible) {
@@ -457,7 +469,7 @@ export const attach = (options) => {
                 return;
             }
             controls.update(dt);
-            if (!tools || !pointer || !pointerdirty) {
+            if (!tools || !toolsenabled || !pointer || !pointerdirty) {
                 return;
             }
             pointerdirty = false;
@@ -506,6 +518,23 @@ export const attach = (options) => {
             }
             enabled = value;
             controls.enabled = value;
+            if (!value) {
+                endDrag();
+                hideCursor();
+            }
+        },
+
+        /**
+         * Turn the sculpting tools on or off (off in the Model method); the view controls stay.
+         *
+         * @param {boolean} on Whether they are on.
+         */
+        setToolsEnabled: (on) => {
+            const value = !!on;
+            if (value === toolsenabled) {
+                return;
+            }
+            toolsenabled = value;
             if (!value) {
                 endDrag();
                 hideCursor();

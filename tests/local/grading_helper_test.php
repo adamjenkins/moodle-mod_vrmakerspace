@@ -42,7 +42,7 @@ final class grading_helper_test extends \advanced_testcase {
     }
 
     /**
-     * Individual work: each sculpture grades its owner; saving changes only what changed.
+     * Individual work: each piece grades its owner; saving changes only what changed.
      */
     public function test_individual_grading(): void {
         global $DB;
@@ -55,17 +55,18 @@ final class grading_helper_test extends \advanced_testcase {
         $one = $gen->create_and_enrol($course, 'student');
         $two = $gen->create_and_enrol($course, 'student');
         $teacher = $gen->create_and_enrol($course, 'editingteacher');
-        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
-        $s1 = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $one->id]);
-        $s2 = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $two->id]);
-        $sculpt->create_snapshot($s1, (int)$one->id);
+        $maker = $gen->get_plugin_generator('mod_vrmakerspace');
+        $s1 = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $one->id]);
+        $s2 = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $two->id]);
+        $maker->create_snapshot($s1, (int)$one->id);
         $this->setUser($teacher);
 
         $gradable = grading_helper::gradable($vrmakerspace, $cm, $context);
         $this->assertSame([(int)$one->id], $gradable[(int)$s1->id]['userids']);
         $this->assertSame([(int)$two->id], $gradable[(int)$s2->id]['userids']);
 
-        $result = grading_helper::save($vrmakerspace, $gradable, [(int)$one->id => '15.5', (int)$two->id => ''], [], (int)$teacher->id);
+        $grades = [(int)$one->id => '15.5', (int)$two->id => ''];
+        $result = grading_helper::save($vrmakerspace, $gradable, $grades, [], (int)$teacher->id);
         $this->assertSame(['saved' => 1, 'errors' => []], $result);
         $this->assertEquals(15.5, $this->gradebook_grade($vrmakerspace, (int)$one->id));
         $this->assertFalse($DB->record_exists('vrmakerspace_grades', ['userid' => $two->id]));
@@ -107,7 +108,7 @@ final class grading_helper_test extends \advanced_testcase {
     }
 
     /**
-     * Group work: every member who may sculpt is graded; the group field gives all of them the same
+     * Group work: every member who may make is graded; the group field gives all of them the same
      * grade, overriding their own fields; contributions show when tracked.
      */
     public function test_group_grading(): void {
@@ -125,12 +126,12 @@ final class grading_helper_test extends \advanced_testcase {
             $members[$n] = $gen->create_and_enrol($course, 'student');
             $gen->create_group_member(['groupid' => $group->id, 'userid' => $members[$n]->id]);
         }
-        // The teacher is in the group too, but cannot sculpt: not graded.
+        // The teacher is in the group too, but cannot make: not graded.
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $teacher->id]);
-        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
-        $session = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $group->id]);
-        $sculpt->create_contribution($session, (int)$members[1]->id, 30, 300.0, 0.0);
-        $sculpt->create_contribution($session, (int)$members[2]->id, 10, 100.0, 0.0);
+        $maker = $gen->get_plugin_generator('mod_vrmakerspace');
+        $session = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $group->id]);
+        $maker->create_contribution($session, (int)$members[1]->id, 30, 300.0, 0.0);
+        $maker->create_contribution($session, (int)$members[2]->id, 10, 100.0, 0.0);
         $this->setUser($teacher);
 
         $gradable = grading_helper::gradable($vrmakerspace, $cm, $context);
@@ -146,7 +147,8 @@ final class grading_helper_test extends \advanced_testcase {
         }
 
         // Without the group field, each member's own field.
-        grading_helper::save($vrmakerspace, $gradable, [(int)$members[2]->id => '61'], [(int)$session->id => ''], (int)$teacher->id);
+        $grades = [(int)$members[2]->id => '61'];
+        grading_helper::save($vrmakerspace, $gradable, $grades, [(int)$session->id => ''], (int)$teacher->id);
         $this->assertEquals(61.0, $this->gradebook_grade($vrmakerspace, (int)$members[2]->id));
         $this->assertEquals(80.0, $this->gradebook_grade($vrmakerspace, (int)$members[1]->id));
 
@@ -162,7 +164,7 @@ final class grading_helper_test extends \advanced_testcase {
     }
 
     /**
-     * Separate groups: a teacher without access to all groups sees only their groups' sculptures.
+     * Separate groups: a teacher without access to all groups sees only their groups' pieces.
      */
     public function test_separate_groups(): void {
         global $DB;
@@ -183,9 +185,9 @@ final class grading_helper_test extends \advanced_testcase {
         $role = $DB->get_field('role', 'id', ['shortname' => 'teacher']);
         assign_capability('moodle/site:accessallgroups', CAP_PROHIBIT, $role, $context->id, true);
         accesslib_clear_all_caches_for_unit_testing();
-        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
-        $visible = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $mine->id]);
-        $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $theirs->id]);
+        $maker = $gen->get_plugin_generator('mod_vrmakerspace');
+        $visible = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $mine->id]);
+        $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $theirs->id]);
         $this->setUser($teacher);
         $this->assertFalse(has_capability('moodle/site:accessallgroups', $context));
 

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Activity page: the user's sculpture and its versions, and for teachers every sculpture.
+ * Activity page: the user's piece and its versions, and for teachers every piece.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -47,6 +47,7 @@ $PAGE->set_heading(format_string($course->fullname, true, ['context' => context_
 $isgroupwork = session_manager::is_group_work($vrmakerspace);
 $tracked = $isgroupwork && !empty($vrmakerspace->trackcontributions);
 $templatecontext = [
+    'methods' => view_helper::methods_text($vrmakerspace),
     'startmodel' => get_string('startmodel_' . session_manager::clean_start_model($vrmakerspace->startmodel), 'vrmakerspace'),
     'workmode' => get_string($isgroupwork ? 'workmode_group' : 'workmode_individual', 'vrmakerspace'),
     'hasconnection' => $isgroupwork,
@@ -68,7 +69,7 @@ if ($isgroupwork) {
 $names = [];
 $canmanage = has_capability('mod/vrmakerspace:managesessions', $context);
 
-// The user's own sculpture (or their group's).
+// The user's own piece (or their group's).
 if (has_capability('mod/vrmakerspace:make', $context)) {
     if ($isgroupwork) {
         $groups = session_manager::get_user_groups($cm, (int)$USER->id);
@@ -119,7 +120,7 @@ if (has_capability('mod/vrmakerspace:make', $context)) {
     }
 }
 
-// Every sculpture, for teachers.
+// Every piece, for teachers.
 if (has_capability('mod/vrmakerspace:viewallsubmissions', $context)) {
     $rows = [];
     foreach (view_helper::visible_sessions($vrmakerspace, $cm, $context) as $session) {

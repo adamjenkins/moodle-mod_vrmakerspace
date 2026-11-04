@@ -23,10 +23,10 @@ use core_external\external_value;
 use mod_vrmakerspace\local\pair_manager;
 
 /**
- * Leave a pair-work sculpture.
+ * Leave a pair-work piece.
  *
  * Only the caller's own row can be removed (it must carry the peer key sent); leaving needs no open
- * sculpture, so a studio can always let go of its connection.
+ * piece, so a studio can always let go of its connection.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

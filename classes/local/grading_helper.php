@@ -17,11 +17,11 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * The grading page: every sculpture a teacher may see, who is graded for it, and saving the grades.
+ * The grading page: every piece a teacher may see, who is graded for it, and saving the grades.
  *
- * An individual sculpture grades its owner. A group sculpture grades each member of the group who may
- * sculpt, one by one, or all of them at once with the group's "give every member this grade" field.
- * A user listed under two sculptures (a member of two groups) gets one grade field, under the first.
+ * An individual piece grades its owner. A group piece grades each member of the group who may
+ * work on it, one by one, or all of them at once with the group's "give every member this grade" field.
+ * A user listed under two pieces (a member of two groups) gets one grade field, under the first.
  * Only the users the page lists can be graded: posted ids are checked against the same list.
  *
  * @package    mod_vrmakerspace
@@ -30,12 +30,12 @@ namespace mod_vrmakerspace\local;
  */
 final class grading_helper {
     /**
-     * Who is graded for each sculpture a teacher may see.
+     * Who is graded for each piece a teacher may see.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \cm_info|\stdClass $cm the course module
      * @param \context_module $context the activity context
-     * @return array sessionid => ['session' => \stdClass, 'userids' => int[]] (a user under one sculpture only)
+     * @return array sessionid => ['session' => \stdClass, 'userids' => int[]] (a user under one piece only)
      */
     public static function gradable(\stdClass $vrmakerspace, $cm, \context_module $context): array {
         $seen = [];

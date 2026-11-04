@@ -173,8 +173,8 @@ jobs:
         with:
           node-version: '22'
 
-      # The sculpting engine, mesher, exporters and sync frames are plain ES modules (js/engine/,
-      # amd/src/net/syncframes.js) tested with Node's own test runner.
+      # The clay and mesh engine, mesher, exporters, sync frames and mesh picking are plain ES modules
+      # (js/engine/, amd/src/net/syncframes.js, amd/src/polypick.js) tested with Node's own test runner.
       - name: JavaScript tests
         if: ${{ !cancelled() }}
         run: node --test plugin/tests/js/*.mjs

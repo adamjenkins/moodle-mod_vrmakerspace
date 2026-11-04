@@ -15,8 +15,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The 3D sculpting studio: sculpt the user's own (or their group's) sculpture, or look at any sculpture
- * or saved version the user may see.
+ * The 3D studio: sculpt or model the user's own (or their group's) piece, or look at any piece or saved
+ * version the user may see.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -61,12 +61,12 @@ $config = studio_helper::config($vrmakerspace, $context, $USER, $resolved);
 $PAGE->requires->js_call_amd('mod_vrmakerspace/studio', 'init', [$config]);
 
 echo $OUTPUT->header();
-// Whose sculpture this is (and which version): plain text, escaped here because heading() does not.
+// Whose piece this is (and which version): plain text, escaped here because heading() does not.
 echo $OUTPUT->heading(s($title), 3);
 echo $OUTPUT->render_from_template('mod_vrmakerspace/studio', [
     'readonly' => $config['readonly'],
     // The activity name (the canvas label and the export file name), escaped once by the template.
     'title' => format_string($vrmakerspace->name, true, ['context' => $context, 'escape' => false]),
     'backurl' => $config['backurl'],
-]);
+] + studio_helper::methods_context($config['methods'], $config['model']));
 echo $OUTPUT->footer();

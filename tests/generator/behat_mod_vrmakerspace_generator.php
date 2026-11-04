@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Behat data generator for mod_vrmakerspace: saved versions of a student's sculpture.
+ * Behat data generator for mod_vrmakerspace: saved versions of a student's piece.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

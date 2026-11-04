@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * The sculpting engine: confirmed state, display state and the rebase rule.
+ * The engine of a piece, its clay and mesh layers: confirmed state, display state and the rebase rule.
  *
  * The engine keeps the confirmed grid C (every op the sequencer has ordered, applied in sequence
  * order) and the display grid D = C ⊕ pending, where pending is the ordered list of this client's
@@ -27,6 +27,15 @@
  * Undo records (history.js) and per-author contributions are kept on C only, so every client agrees
  * on them. Duplicates are dropped by (author, op index).
  *
+ * The mesh layer follows the same idea, more simply: MC is the confirmed PolyDoc and MD = MC ⊕ the pending
+ * mesh ops, in pending order. A mesh op applies to MD when local; when the sequencer confirms it, it applies
+ * to MC with a capture for MeshHistory. If it was the oldest pending op with identical JSON, MD already holds
+ * it; otherwise, with mesh ops still pending, MD is rebuilt from MC. Own ops that the document refuses are
+ * kept in pending all the same (they are sent, and the confirmed state decides), have no effect while they
+ * are refused, and are told to the main thread once. mbake (the whole mesh into the clay) is never applied
+ * optimistically: it runs when confirmed, and changes both layers under one stroke. A preview is a local-only
+ * op shown on a throw-away copy of MD; it is never sent and never reaches MC.
+ *
  * Dependency-free ES module: it runs in a module Web Worker and in Node (node --test).
  *
  * @module     mod_vrmakerspace/engine/engine
@@ -34,11 +43,13 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {Grid, CHUNK} from './grid.js';
-import {fillModel, isModel} from './models.js';
-import {fillUpload, FORMATS} from './meshimport.js';
-import {READ_MARGIN, applyOp, cleanOp, copyBox, createWork, footprint, isStrokeKind} from './ops.js';
+import {BORDER, Grid, CHUNK} from './grid.js';
+import {fillMeshModel, fillModel, isModel} from './models.js';
+import {fillMesh, fillUpload, FORMATS} from './meshimport.js';
+import {MAX_ID, READ_MARGIN, applyOp, cleanOp, copyBox, createWork, footprint, isStrokeKind} from './ops.js';
 import {History} from './history.js';
+import {MeshHistory, PolyDoc, bakeGroups} from './polymesh.js';
+import {MESH_EDIT_KINDS, MESH_KINDS, applyMeshOp} from './polyops.js';
 import {isEpoch, readSnapshot, writeSnapshot, MIN_DIM, MAX_DIM, MIN_VOXEL, MAX_VOXEL} from './snapshot.js';
 
 /** Voxels a mesh chunk depends on below its first cell and above its last (surface nets + normals). */
@@ -48,6 +59,12 @@ const MESH_MARGIN = 3;
 export const DEFAULT_DIMS = 128;
 export const DEFAULT_VOXEL = 0.004;
 export const BAND_VOXELS = 3;
+
+/** Voxels added around the band when baking the mesh into the clay. */
+const BAKE_MARGIN = 2;
+
+/** Refused own ops kept for the main thread until it collects them. */
+const MAX_REFUSALS = 64;
 
 /**
  * A fresh random epoch: 16 lower-case hex characters.
@@ -112,7 +129,17 @@ function snapshotBytes(snapshot) {
 }
 
 /**
- * The sculpting engine.
+ * Whether a kind acts on the mesh layer.
+ *
+ * @param {string} k Kind.
+ * @returns {boolean} True for the m* kinds.
+ */
+function isMeshKind(k) {
+    return MESH_KINDS.indexOf(k) !== -1;
+}
+
+/**
+ * The engine of a piece.
  */
 export class Engine {
     /**
@@ -121,11 +148,12 @@ export class Engine {
      * @param {Grid} grid Confirmed grid (taken).
      * @param {number} seq Confirmed sequence number.
      * @param {string} epoch Epoch (16 hex characters).
+     * @param {PolyDoc} [mesh] Confirmed mesh document (taken); default: an empty one.
      */
-    constructor(grid, seq, epoch) {
+    constructor(grid, seq, epoch, mesh) {
         /** Contributions per author, counted on C: {ops, added, removed} (mm³). @type {Map<string, object>} */
         this.contributions = new Map();
-        this.reset(grid, seq, epoch);
+        this.reset(grid, seq, epoch, mesh);
     }
 
     /**
@@ -135,8 +163,9 @@ export class Engine {
      *     upload: ({bytes: (ArrayBuffer|ArrayBufferView), format: string}|null|undefined),
      *     snapshot: (ArrayBuffer|ArrayBufferView|null|undefined)}} [options] dims (8..256, default 128)
      *     and voxel (metres, default 0.004) for a new grid; model 'lump' (default), 'sphere', 'cube',
-     *     'empty' or 'upload' (the uploaded model in upload: an STL, OBJ or glTF binary file, see meshimport.js);
-     *     snapshot a VRSC file, whose dimensions, voxel, seq and epoch then win.
+     *     'empty', 'meshcube' (no clay, a polygon cube) or 'upload' (the uploaded model in upload: an STL, OBJ
+     *     or glTF binary file, see meshimport.js); snapshot a VRSC file, whose dimensions, voxel, mesh, seq and
+     *     epoch then win.
      * @returns {Promise<Engine>} The engine. Its epoch is the snapshot's, else a new random one.
      * @throws {Error} For a bad snapshot, model or grid shape.
      */
@@ -144,7 +173,7 @@ export class Engine {
         const bytes = snapshotBytes(options.snapshot);
         if (bytes) {
             const r = await readSnapshot(bytes);
-            return new Engine(r.grid, r.seq, r.epoch || randomEpoch());
+            return new Engine(r.grid, r.seq, r.epoch || randomEpoch(), r.mesh);
         }
         const dims = options.dims === undefined || options.dims === null ? DEFAULT_DIMS : options.dims;
         const voxel = options.voxel === undefined || options.voxel === null ? DEFAULT_VOXEL : options.voxel;
@@ -169,24 +198,43 @@ export class Engine {
         } else {
             fillModel(grid, model);
         }
-        return new Engine(grid, 0, randomEpoch());
+        return new Engine(grid, 0, randomEpoch(), fillMeshModel(new PolyDoc(), model));
     }
 
     /**
-     * Replaces both states with a confirmed grid (pending ops, undo records and dedupe state are
-     * dropped; contributions are kept) and marks every mesh chunk dirty.
+     * Replaces both states with a confirmed grid and mesh (pending ops, undo records, a preview and dedupe
+     * state are dropped; contributions are kept) and marks every mesh chunk and the mesh layer dirty.
      *
      * @param {Grid} grid Confirmed grid (taken).
      * @param {number} seq Confirmed sequence number.
      * @param {string} epoch Epoch.
+     * @param {PolyDoc} [mesh] Confirmed mesh document (taken); default: an empty one.
      * @returns {void}
      */
-    reset(grid, seq, epoch) {
+    reset(grid, seq, epoch, mesh) {
+        /** Confirmed mesh document. @type {PolyDoc} */
+        this.MC = mesh || new PolyDoc();
+        /** Display mesh document, MC ⊕ the pending mesh ops. @type {PolyDoc} */
+        this.MD = this.MC.copy();
+        /** Undo records of the mesh layer, kept on MC only. @type {MeshHistory} */
+        this.meshHistory = new MeshHistory();
+        /** Whether the shown mesh changed since takePolyDirty(). @type {boolean} */
+        this.meshDirty = true;
+        /** The clean local-only op being previewed. @type {object|null} */
+        this.previewOp = null;
+        /** MD with the preview applied, made when first asked for. @type {PolyDoc|null} */
+        this.previewDoc = null;
+        /** Own mesh ops refused and not yet collected: {op, reason}. @type {object[]} */
+        this.refusals = [];
+        /** Why the confirmed mesh op being applied was refused. @type {string|null} */
+        this.refusal = null;
+        /** Whether applying a confirmed op changed MC so that MD must be rebuilt. @type {boolean} */
+        this.polyStale = false;
         /** @type {Grid} */
         this.C = grid;
         /** @type {Grid} */
         this.D = grid.copy();
-        /** Pending own ops: {op, json, box}. @type {object[]} */
+        /** Pending own ops: {op, json, box, mesh, told}. @type {object[]} */
         this.pending = [];
         /** Highest confirmed op index per author. @type {Map<string, number>} */
         this.lastIndex = new Map();
@@ -228,6 +276,32 @@ export class Engine {
     }
 
     /**
+     * The confirmed mesh document.
+     *
+     * @returns {PolyDoc} The document (do not modify).
+     */
+    get polyConfirmed() {
+        return this.MC;
+    }
+
+    /**
+     * The mesh to show: MD, or a throw-away copy of MD with the preview applied. A preview the document
+     * refuses shows MD as it is.
+     *
+     * @returns {PolyDoc} The document (do not modify).
+     */
+    get polyDisplay() {
+        if (!this.previewOp) {
+            return this.MD;
+        }
+        if (!this.previewDoc) {
+            const doc = this.MD.copy();
+            this.previewDoc = applyMeshOp(doc, this.previewOp).ok ? doc : this.MD;
+        }
+        return this.previewDoc;
+    }
+
+    /**
      * The confirmed sequence number.
      *
      * @returns {number} seq.
@@ -257,9 +331,12 @@ export class Engine {
     /**
      * Applies an own op to the display state as a pending op.
      *
+     * A mesh op the document refuses stays pending: it is on its way to the sequencer, and the confirmed
+     * state decides. The result then carries the document's reason as `refused`, and takeRefusals() has it.
+     *
      * @param {object} op The op (must carry its author `a`).
-     * @returns {{ok: boolean, op: (object|undefined), reason: (string|undefined)}} ok with the clean op,
-     *     or a reason: 'invalid', 'noauthor' or 'duplicate'.
+     * @returns {{ok: boolean, op: (object|undefined), reason: (string|undefined), refused: (string|undefined)}}
+     *     ok with the clean op, or a reason: 'invalid', 'noauthor' or 'duplicate'.
      */
     local(op) {
         const c = cleanOp(op);
@@ -279,14 +356,24 @@ export class Engine {
             }
         }
         let box = null;
+        let refused = null;
+        const mesh = isMeshKind(c.k);
         if (isStrokeKind(c.k)) {
             box = applyOp(this.D, c, this.workD);
             if (box) {
                 this.markDirtyBox(box);
             }
+        } else if (mesh && c.k !== 'mbake') {
+            const r = applyMeshOp(this.MD, c);
+            if (r.ok) {
+                this.polyChanged();
+            } else {
+                refused = r.reason;
+                this.refuse(c, refused);
+            }
         }
-        this.pending.push({op: c, json: JSON.stringify(c), box});
-        return {ok: true, op: c};
+        this.pending.push({op: c, json: JSON.stringify(c), box, mesh, told: refused !== null});
+        return refused === null ? {ok: true, op: c} : {ok: true, op: c, refused};
     }
 
     /**
@@ -294,11 +381,14 @@ export class Engine {
      *
      * The sequence number advances even for an invalid op (every client rejects it the same way).
      * Pending ops of the same author with an index up to the op's are dropped (confirmed, or lost).
+     * A mesh op the document refuses is still ok here (it took its seq and changed nothing, on every
+     * client alike); the result carries the reason as `refused`, and when it is this client's own op that
+     * it has not been told about yet, takeRefusals() has it.
      *
      * @param {object} op The op, author stamped by the sequencer.
      * @param {number} seq Its sequence number (must be greater than the current one).
-     * @returns {{ok: boolean, op: (object|undefined), reason: (string|undefined)}} ok with the clean op,
-     *     or a reason: 'stale' (old seq, ignored), 'invalid', 'noauthor' or 'duplicate'.
+     * @returns {{ok: boolean, op: (object|undefined), reason: (string|undefined), refused: (string|undefined)}}
+     *     ok with the clean op, or a reason: 'stale' (old seq, ignored), 'invalid', 'noauthor' or 'duplicate'.
      */
     confirmed(op, seq) {
         if (!Number.isInteger(seq) || seq < 1 || seq <= this.seqValue) {
@@ -320,14 +410,25 @@ export class Engine {
         const pending = this.pending;
         const first = pending.length ? pending[0] : null;
         const fast = first !== null && first.op.a === c.a && first.op.i === c.i &&
-            first.json === JSON.stringify(c) && c.k !== 'undo' && c.k !== 'redo';
+            first.json === JSON.stringify(c) && c.k !== 'undo' && c.k !== 'redo' && c.k !== 'mbake';
         const changed = [];
         let w = 0;
+        let droppedMesh = false;
+        let own = false;
+        let told = false;
         for (let n = 0; n < pending.length; n++) {
             const p = pending[n];
             if (p.op.a === c.a && p.op.i <= c.i) {
-                if (!(fast && n === 0) && p.box) {
-                    changed.push(p.box);
+                if (!(fast && n === 0)) {
+                    if (p.box) {
+                        changed.push(p.box);
+                    }
+                    // A dropped mbake never showed; any other mesh op left its mark on MD.
+                    droppedMesh = droppedMesh || (p.mesh && p.op.k !== 'mbake');
+                }
+                if (p.op.i === c.i) {
+                    own = true;
+                    told = p.told;
                 }
                 continue;
             }
@@ -335,6 +436,8 @@ export class Engine {
         }
         pending.length = w;
 
+        this.refusal = null;
+        this.polyStale = false;
         const box = this.applyConfirmed(c);
         if (!fast && box) {
             changed.push(box);
@@ -342,7 +445,132 @@ export class Engine {
         if (changed.length) {
             this.rebase(changed);
         }
-        return {ok: true, op: c};
+        const refused = this.refusal;
+        this.rebasePoly(c, fast, droppedMesh, refused);
+        if (refused === null) {
+            return {ok: true, op: c};
+        }
+        if (own && !told) {
+            this.refuse(c, refused);
+        }
+        return {ok: true, op: c, refused};
+    }
+
+    /**
+     * Brings MD back to MC ⊕ the pending mesh ops after a confirmed op.
+     *
+     * @param {object} c The clean confirmed op, already applied to MC and removed from pending.
+     * @param {boolean} fast Whether it was the oldest pending op with identical JSON, so MD holds it.
+     * @param {boolean} droppedMesh Whether a pending mesh op that MD holds was dropped without being that op.
+     * @param {string|null} refused Why MC refused it, if it did: MC then did not change.
+     * @returns {void}
+     */
+    rebasePoly(c, fast, droppedMesh, refused) {
+        if (droppedMesh || this.polyStale) {
+            this.rebuildPoly();
+            return;
+        }
+        if (fast || refused !== null || !isMeshKind(c.k)) {
+            return;
+        }
+        if (this.pending.some((p) => p.mesh && p.op.k !== 'mbake')) {
+            this.rebuildPoly();
+            return;
+        }
+        applyMeshOp(this.MD, c);
+        this.polyChanged();
+    }
+
+    /**
+     * Rebuilds MD: a copy of MC with every pending mesh op applied again in order (a pending mbake never shows).
+     *
+     * @returns {void}
+     */
+    rebuildPoly() {
+        const doc = this.MC.copy();
+        this.pending.forEach((p) => {
+            if (p.mesh && p.op.k !== 'mbake') {
+                applyMeshOp(doc, p.op);
+            }
+        });
+        this.MD = doc;
+        this.polyChanged();
+    }
+
+    /**
+     * Notes that the mesh on display changed: a preview is worked out again, and the worker posts it.
+     *
+     * @returns {void}
+     */
+    polyChanged() {
+        this.previewDoc = null;
+        this.meshDirty = true;
+    }
+
+    /**
+     * Keeps an own mesh op's refusal until the main thread collects it.
+     *
+     * @param {object} op The clean op.
+     * @param {string} reason The document's reason.
+     * @returns {void}
+     */
+    refuse(op, reason) {
+        if (this.refusals.length < MAX_REFUSALS) {
+            this.refusals.push({op, reason});
+        }
+    }
+
+    /**
+     * The own mesh ops refused since the last call, oldest first, and clears the list. Each op appears
+     * at most once: when local refused it, its confirmation adds nothing.
+     *
+     * @returns {Array<{op: object, reason: string}>} The refusals.
+     */
+    takeRefusals() {
+        const out = this.refusals;
+        this.refusals = [];
+        return out;
+    }
+
+    /**
+     * Whether the mesh to show changed since the last call, and clears the flag.
+     *
+     * @returns {boolean} True when polyDisplay has something new.
+     */
+    takePolyDirty() {
+        const dirty = this.meshDirty;
+        this.meshDirty = false;
+        return dirty;
+    }
+
+    /**
+     * Shows the result of an adjustable mesh tool while it is dragged. The op is local only: it is never sent,
+     * never pending, and only ever applied to a copy of MD. It is applied again after every change of MD.
+     *
+     * @param {object|null} op The op (with its author; `i` is replaced by the largest op index, and `s` is
+     *     optional), or null to clear. Not `msel` or `mbake`.
+     * @returns {{ok: boolean, reason: (string|undefined)}} ok, or 'invalid' or 'noauthor' (the preview is
+     *     then cleared).
+     */
+    setPreview(op) {
+        const had = this.previewOp !== null;
+        this.previewOp = null;
+        this.previewDoc = null;
+        let result = {ok: true};
+        if (op) {
+            const c = cleanOp(Object.assign({}, op, {i: MAX_ID, s: op.s === undefined ? MAX_ID : op.s}));
+            if (!c || MESH_EDIT_KINDS.indexOf(c.k) === -1 || c.k === 'mbake') {
+                result = {ok: false, reason: 'invalid'};
+            } else if (!c.a) {
+                result = {ok: false, reason: 'noauthor'};
+            } else {
+                this.previewOp = c;
+            }
+        }
+        if (had || this.previewOp) {
+            this.meshDirty = true;
+        }
+        return result;
     }
 
     /**
@@ -375,13 +603,22 @@ export class Engine {
     }
 
     /**
-     * Applies a clean op to C with undo capture and contribution counting.
+     * Applies a clean op to the confirmed state with undo capture and contribution counting.
+     *
+     * Sets this.refusal when the mesh document refused the op and this.polyStale when MD must be rebuilt.
      *
      * @param {object} c Clean op with an author.
-     * @returns {{min: number[], max: number[]}|null} The voxel box written, or null.
+     * @returns {{min: number[], max: number[]}|null} The voxel box written in C, or null.
      */
     applyConfirmed(c) {
         const C = this.C;
+        if (c.k === 'mbake') {
+            return this.applyBake(c);
+        }
+        if (isMeshKind(c.k)) {
+            this.applyMeshConfirmed(c);
+            return null;
+        }
         if (isStrokeKind(c.k)) {
             this.contributionOf(c.a).ops++;
             const box = footprint(c, C);
@@ -394,12 +631,28 @@ export class Engine {
             this.account(box, c.a, capture);
             return box;
         }
+        if (c.k === 'hz') {
+            // Someone started from a state without undo records. Every client forgets its records at this
+            // same point of the stream, so an undo can never mean different things on different clients.
+            this.history.clear();
+            this.meshHistory.clear();
+            return null;
+        }
         if (c.k === 'end') {
             this.history.end(c.a, c.s, C);
+            this.meshHistory.end(c.a, c.s, this.MC);
             return null;
         }
         if (c.k === 'undo' || c.k === 'redo') {
             const redo = c.k === 'redo';
+            if (this.meshHistory.has(c.a, c.t)) {
+                if (redo) {
+                    this.meshHistory.redo(c.a, c.t, this.MC);
+                } else {
+                    this.meshHistory.undo(c.a, c.t, this.MC);
+                }
+                this.polyStale = true;
+            }
             const box = this.history.boxFor(c.a, c.t, redo);
             if (!box) {
                 return null;
@@ -414,6 +667,143 @@ export class Engine {
             return box;
         }
         return null;
+    }
+
+    /**
+     * Applies a clean mesh op other than mbake to MC. An edit goes through the stroke's capture, and counts
+     * for its author unless the document refused it (a refused op did nothing).
+     *
+     * @param {object} c Clean mesh op with an author.
+     * @returns {void}
+     */
+    applyMeshConfirmed(c) {
+        const edit = MESH_EDIT_KINDS.indexOf(c.k) !== -1;
+        const MC = this.MC;
+        MC.rec = edit ? this.meshHistory.stroke(c.a, c.s, MC) : null;
+        let r;
+        try {
+            r = applyMeshOp(MC, c);
+        } finally {
+            MC.rec = null;
+        }
+        if (!r.ok) {
+            this.refusal = r.reason;
+        } else if (edit) {
+            this.contributionOf(c.a).ops++;
+        }
+    }
+
+    /**
+     * The confirmed mesh as a field. Overlapping parts are voxelised apart: counted together, their overlap
+     * would come out hollow.
+     *
+     * @returns {Grid|null} A new grid, or null when the mesh encloses no voxel.
+     */
+    bakeSolid() {
+        const C = this.C;
+        const solid = new Grid(C.nx, C.ny, C.nz, C.voxel, C.band);
+        const temp = new Grid(C.nx, C.ny, C.nz, C.voxel, C.band);
+        const out = solid.data;
+        const from = temp.data;
+        out.fill(temp.levels[temp.levels.length - 1]);
+        bakeGroups(this.MC).forEach((tris) => {
+            fillMesh(temp, tris);
+            for (let idx = 0; idx < out.length; idx++) {
+                if (from[idx] < out[idx]) {
+                    out[idx] = from[idx];
+                }
+            }
+        });
+        for (let idx = 0; idx < out.length; idx++) {
+            if (out[idx] < 0) {
+                return solid;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The voxel box of the mesh's faces grown by the band and a margin, clipped to the interior.
+     *
+     * @returns {{min: number[], max: number[]}|null} Inclusive voxel box, or null when the mesh lies entirely
+     *     outside the interior.
+     */
+    bakeBox() {
+        const C = this.C;
+        const verts = this.MC.verts;
+        const lo = [Infinity, Infinity, Infinity];
+        const hi = [-Infinity, -Infinity, -Infinity];
+        this.MC.faces.forEach((list) => {
+            list.forEach((id) => {
+                const p = verts.get(id);
+                for (let a = 0; a < 3; a++) {
+                    lo[a] = p[a] < lo[a] ? p[a] : lo[a];
+                    hi[a] = p[a] > hi[a] ? p[a] : hi[a];
+                }
+            });
+        });
+        const reach = C.band / C.voxel + BAKE_MARGIN;
+        const centre = [C.cx, C.cy, C.cz];
+        const size = [C.nx, C.ny, C.nz];
+        const min = [0, 0, 0];
+        const max = [0, 0, 0];
+        for (let a = 0; a < 3; a++) {
+            min[a] = Math.max(BORDER, Math.floor(lo[a] / C.voxel + centre[a] - reach));
+            max[a] = Math.min(size[a] - 1 - BORDER, Math.ceil(hi[a] / C.voxel + centre[a] + reach));
+            if (min[a] > max[a]) {
+                return null;
+            }
+        }
+        return {min, max};
+    }
+
+    /**
+     * mbake: the whole mesh into the clay layer, as one stroke of both layers. Voxelises the mesh on a temporary
+     * grid, keeps the lower distance of clay and mesh in the mesh's box, and deletes every face and vertex.
+     * Refused 'empty' when there are no faces.
+     *
+     * @param {object} c Clean mbake op with an author.
+     * @returns {{min: number[], max: number[]}|null} The voxel box written in C, or null.
+     */
+    applyBake(c) {
+        const C = this.C;
+        const MC = this.MC;
+        if (MC.faces.size === 0) {
+            this.refusal = 'empty';
+            return null;
+        }
+        const box = this.bakeBox();
+        const solid = box ? this.bakeSolid() : null;
+        if (!solid) {
+            // An open sheet encloses nothing: turning it into clay would only make it disappear.
+            this.refusal = 'nosolid';
+            return null;
+        }
+        this.contributionOf(c.a).ops++;
+        const capture = this.history.stroke(c.a, c.s, C);
+        copyBox(C, box, this.workC);
+        const {nx, ny, data} = C;
+        const from = solid.data;
+        for (let k = box.min[2]; k <= box.max[2]; k++) {
+            for (let j = box.min[1]; j <= box.max[1]; j++) {
+                let idx = box.min[0] + nx * (j + ny * k);
+                for (let i = box.min[0]; i <= box.max[0]; i++, idx++) {
+                    if (from[idx] < data[idx]) {
+                        data[idx] = from[idx];
+                    }
+                }
+            }
+        }
+        this.account(box, c.a, capture);
+        MC.rec = this.meshHistory.stroke(c.a, c.s, MC);
+        try {
+            Array.from(MC.faces.keys()).forEach((id) => MC.delFace(id));
+            Array.from(MC.verts.keys()).forEach((id) => MC.delVert(id));
+        } finally {
+            MC.rec = null;
+        }
+        this.polyStale = true;
+        return box;
     }
 
     /**
@@ -683,7 +1073,7 @@ export class Engine {
         if (isEpoch(epoch)) {
             this.epochValue = epoch;
         }
-        return writeSnapshot(this.C, this.seqValue, this.epochValue);
+        return writeSnapshot(this.C, this.seqValue, this.epochValue, {mesh: this.MC});
     }
 
     /**
@@ -696,7 +1086,7 @@ export class Engine {
      */
     async load(bytes) {
         const r = await readSnapshot(bytes);
-        this.reset(r.grid, r.seq, r.epoch || randomEpoch());
+        this.reset(r.grid, r.seq, r.epoch || randomEpoch(), r.mesh);
         return {seq: this.seqValue, epoch: this.epochValue};
     }
 

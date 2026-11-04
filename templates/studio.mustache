@@ -17,28 +17,41 @@
 {{!
     @template mod_vrmakerspace/studio
 
-    The sculpting studio: toolbar, the 3D canvas, the status line and the keyboard help. The
-    mod_vrmakerspace/studio module binds to it and starts the 3D view.
+    The studio: toolbar with the Sculpt and the Model panel, the 3D canvas, the status line and the
+    keyboard help. The mod_vrmakerspace/studio module binds to it and starts the 3D view.
 
     Classes required for JS:
     * d-none - hides the parts the studio shows once it knows what the device can do
 
     Data attributes required for JS:
     * data-region="mod_vrmakerspace-studioroot" data-title: the studio root and the activity name
-    * data-region toolbar, size, strength, shapeoptions, shape, textfield, text, stage, canvas, loading, nowebgl,
-      failed, statustext, message, vrhelp
-    * data-action tool (with data-tool), mirror, undo, redo, save, export (with data-format), vr, fullscreen
+    * data-region toolbar, methodswitch, sculptpanel, modelpanel, size, strength, shapeoptions, shape, textfield, text,
+      segments, stage, canvas, loading, nowebgl, failed, bakeconfirm, statustext, message, openedges, sculpthelp, modelhelp,
+      vrhelp, vrmodelhelp
+    * data-action tool (with data-tool), mirror, undo, redo, save, export (with data-format), vr, fullscreen,
+      method (with data-method), selectmode (with data-mode), select (with data-select), addshape (with data-shape),
+      modelaction (with data-tool), axis (with data-axis), oneshot (with data-oneshot), bakeconfirm, bakecancel
 
     Context variables required for this template:
-    * readonly - true when the sculpture can only be looked at
+    * readonly - true when the piece can only be looked at
     * title - the activity name
     * backurl - the activity page
+    * methods - the ways of making the activity allows: both, sculpt or model
+    * cansculpt - true when the activity has the Sculpt method: without it, the Sculpt controls are not rendered
+    * canmodel - true when the activity has the Model method: without it, the Model controls are not rendered
+    * showmethodswitch - true when there is a choice of method
+    * modelfirst - true when the studio opens in the Model method
 
     Example context (json):
     {
         "readonly": false,
-        "title": "Sculpt a head",
-        "backurl": "https://example.com/mod/vrmakerspace/view.php?id=2"
+        "title": "Make a head",
+        "backurl": "https://example.com/mod/vrmakerspace/view.php?id=2",
+        "methods": "both",
+        "cansculpt": true,
+        "canmodel": true,
+        "showmethodswitch": true,
+        "modelfirst": false
     }
 }}
 <div class="mod_vrmakerspace-studio" data-region="mod_vrmakerspace-studioroot" data-title="{{title}}"{{#readonly}} data-readonly="1"{{/readonly}}>
@@ -52,57 +65,19 @@
     <div class="mod_vrmakerspace-toolbar btn-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar"
             aria-label="{{#str}} tools, mod_vrmakerspace {{/str}}" data-region="toolbar">
         {{^readonly}}
-            <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} tools, mod_vrmakerspace {{/str}}">
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="grab"
-                        aria-pressed="false">{{#str}} tool_grab, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="twist"
-                        aria-pressed="false">{{#str}} tool_twist, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary active" data-action="tool" data-tool="add"
-                        aria-pressed="true">{{#str}} tool_add, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="carve"
-                        aria-pressed="false">{{#str}} tool_carve, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="smooth"
-                        aria-pressed="false">{{#str}} tool_smooth, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="inflate"
-                        aria-pressed="false">{{#str}} tool_inflate, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="pinch"
-                        aria-pressed="false">{{#str}} tool_pinch, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="flatten"
-                        aria-pressed="false">{{#str}} tool_flatten, mod_vrmakerspace {{/str}}</button>
+            {{#showmethodswitch}}
+            <div class="mod_vrmakerspace-methods btn-group d-none" role="group" aria-label="{{#str}} methods, mod_vrmakerspace {{/str}}"
+                    data-region="methodswitch">
+                <button type="button" class="btn btn-outline-dark{{^modelfirst}} active{{/modelfirst}}" data-action="method" data-method="sculpt"
+                        aria-pressed="{{^modelfirst}}true{{/modelfirst}}{{#modelfirst}}false{{/modelfirst}}"
+                        title="{{#str}} method_sculpt, mod_vrmakerspace {{/str}} (Tab)"
+                        aria-keyshortcuts="Tab">{{#str}} method_sculpt, mod_vrmakerspace {{/str}}</button>
+                <button type="button" class="btn btn-outline-dark{{#modelfirst}} active{{/modelfirst}}" data-action="method" data-method="model"
+                        aria-pressed="{{#modelfirst}}true{{/modelfirst}}{{^modelfirst}}false{{/modelfirst}}"
+                        title="{{#str}} method_model, mod_vrmakerspace {{/str}} (Tab)"
+                        aria-keyshortcuts="Tab">{{#str}} method_model, mod_vrmakerspace {{/str}}</button>
             </div>
-            <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} modellingtools, mod_vrmakerspace {{/str}}">
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="shape"
-                        aria-pressed="false">{{#str}} tool_shape, mod_vrmakerspace {{/str}}</button>
-                <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="cutshape"
-                        aria-pressed="false">{{#str}} tool_cutshape, mod_vrmakerspace {{/str}}</button>
-            </div>
-            <div class="d-none d-flex flex-wrap align-items-center gap-2" data-region="shapeoptions">
-                <label class="mb-0" for="{{uniqid}}-shape">{{#str}} shape, mod_vrmakerspace {{/str}}</label>
-                <select class="form-select w-auto" id="{{uniqid}}-shape" data-region="shape">
-                    <option value="sphere">{{#str}} shape_sphere, mod_vrmakerspace {{/str}}</option>
-                    <option value="cube">{{#str}} shape_cube, mod_vrmakerspace {{/str}}</option>
-                    <option value="cylinder">{{#str}} shape_cylinder, mod_vrmakerspace {{/str}}</option>
-                    <option value="cone">{{#str}} shape_cone, mod_vrmakerspace {{/str}}</option>
-                    <option value="torus">{{#str}} shape_torus, mod_vrmakerspace {{/str}}</option>
-                    <option value="text">{{#str}} shape_text, mod_vrmakerspace {{/str}}</option>
-                </select>
-                <span class="d-none d-flex align-items-center gap-2" data-region="textfield">
-                    <label class="mb-0" for="{{uniqid}}-text">{{#str}} shapetext, mod_vrmakerspace {{/str}}</label>
-                    <input type="text" class="form-control w-auto" id="{{uniqid}}-text" data-region="text" maxlength="16"
-                            size="12" value="ABC" autocomplete="off" spellcheck="false">
-                </span>
-            </div>
-            <button type="button" class="btn btn-outline-secondary" data-action="mirror" aria-pressed="false">{{#str}} mirror, mod_vrmakerspace {{/str}}</button>
-            <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
-                <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrmakerspace {{/str}}</label>
-                <input type="range" class="form-range" id="{{uniqid}}-size" data-region="size" min="4" max="80" step="1"
-                        value="20">
-            </div>
-            <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
-                <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrmakerspace {{/str}}</label>
-                <input type="range" class="form-range" id="{{uniqid}}-strength" data-region="strength" min="5" max="100"
-                        step="5" value="50">
-            </div>
+            {{/showmethodswitch}}
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-secondary" data-action="undo" disabled>{{#str}} undo, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-secondary" data-action="redo" disabled>{{#str}} redo, mod_vrmakerspace {{/str}}</button>
@@ -120,6 +95,146 @@
         </div>
         <button type="button" class="btn btn-primary d-none" data-action="vr" aria-pressed="false">{{#str}} entervr, mod_vrmakerspace {{/str}}</button>
         <button type="button" class="btn btn-outline-secondary" data-action="fullscreen" aria-pressed="false">{{#str}} fullscreen, mod_vrmakerspace {{/str}}</button>
+        {{^readonly}}
+            {{#cansculpt}}
+            <div class="mod_vrmakerspace-panel{{#modelfirst}} d-none{{/modelfirst}} d-flex flex-wrap align-items-center gap-2" data-region="sculptpanel">
+                <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} tools, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="grab"
+                            aria-pressed="false">{{#str}} tool_grab, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="twist"
+                            aria-pressed="false">{{#str}} tool_twist, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary active" data-action="tool" data-tool="add"
+                            aria-pressed="true">{{#str}} tool_add, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="carve"
+                            aria-pressed="false">{{#str}} tool_carve, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="smooth"
+                            aria-pressed="false">{{#str}} tool_smooth, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="inflate"
+                            aria-pressed="false">{{#str}} tool_inflate, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="pinch"
+                            aria-pressed="false">{{#str}} tool_pinch, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="flatten"
+                            aria-pressed="false">{{#str}} tool_flatten, mod_vrmakerspace {{/str}}</button>
+                </div>
+                <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} modellingtools, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="shape"
+                            aria-pressed="false">{{#str}} tool_shape, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="cutshape"
+                            aria-pressed="false">{{#str}} tool_cutshape, mod_vrmakerspace {{/str}}</button>
+                </div>
+                <div class="d-none d-flex flex-wrap align-items-center gap-2" data-region="shapeoptions">
+                    <label class="mb-0" for="{{uniqid}}-shape">{{#str}} shape, mod_vrmakerspace {{/str}}</label>
+                    <select class="form-select w-auto" id="{{uniqid}}-shape" data-region="shape">
+                        <option value="sphere">{{#str}} shape_sphere, mod_vrmakerspace {{/str}}</option>
+                        <option value="cube">{{#str}} shape_cube, mod_vrmakerspace {{/str}}</option>
+                        <option value="cylinder">{{#str}} shape_cylinder, mod_vrmakerspace {{/str}}</option>
+                        <option value="cone">{{#str}} shape_cone, mod_vrmakerspace {{/str}}</option>
+                        <option value="torus">{{#str}} shape_torus, mod_vrmakerspace {{/str}}</option>
+                        <option value="text">{{#str}} shape_text, mod_vrmakerspace {{/str}}</option>
+                    </select>
+                    <span class="d-none d-flex align-items-center gap-2" data-region="textfield">
+                        <label class="mb-0" for="{{uniqid}}-text">{{#str}} shapetext, mod_vrmakerspace {{/str}}</label>
+                        <input type="text" class="form-control w-auto" id="{{uniqid}}-text" data-region="text" maxlength="16"
+                                size="12" value="ABC" autocomplete="off" spellcheck="false">
+                    </span>
+                </div>
+                <button type="button" class="btn btn-outline-secondary" data-action="mirror" aria-pressed="false">{{#str}} mirror, mod_vrmakerspace {{/str}}</button>
+                <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
+                    <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrmakerspace {{/str}}</label>
+                    <input type="range" class="form-range" id="{{uniqid}}-size" data-region="size" min="4" max="80" step="1"
+                            value="20">
+                </div>
+                <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
+                    <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrmakerspace {{/str}}</label>
+                    <input type="range" class="form-range" id="{{uniqid}}-strength" data-region="strength" min="5" max="100"
+                            step="5" value="50">
+                </div>
+            </div>
+            {{/cansculpt}}
+            {{#canmodel}}
+            <div class="mod_vrmakerspace-panel mod_vrmakerspace-modelpanel{{^modelfirst}} d-none{{/modelfirst}} d-flex align-items-center gap-2"
+                    role="group" aria-label="{{#str}} method_model, mod_vrmakerspace {{/str}}" data-region="modelpanel">
+                <div class="btn-group" role="group" aria-label="{{#str}} selectmode, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="selectmode" data-mode="v" aria-pressed="false"
+                            title="{{#str}} select_vertex, mod_vrmakerspace {{/str}} (1)" aria-keyshortcuts="1">{{#str}} select_vertex, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="selectmode" data-mode="e" aria-pressed="false"
+                            title="{{#str}} select_edge, mod_vrmakerspace {{/str}} (2)" aria-keyshortcuts="2">{{#str}} select_edge, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="selectmode" data-mode="f" aria-pressed="true"
+                            title="{{#str}} select_face, mod_vrmakerspace {{/str}} (3)" aria-keyshortcuts="3">{{#str}} select_face, mod_vrmakerspace {{/str}}</button>
+                </div>
+                <div class="btn-group" role="group" aria-label="{{#str}} selectcommands, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="select" data-select="all"
+                            title="{{#str}} selectall, mod_vrmakerspace {{/str}} (A)" aria-keyshortcuts="A">{{#str}} selectall, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="select" data-select="none"
+                            title="{{#str}} selectnone, mod_vrmakerspace {{/str}} (Alt+A)" aria-keyshortcuts="Alt+A">{{#str}} selectnone, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="select" data-select="linked"
+                            title="{{#str}} selectlinked, mod_vrmakerspace {{/str}} (L)" aria-keyshortcuts="L">{{#str}} selectlinked, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="select" data-select="loop"
+                            title="{{#str}} selectloop, mod_vrmakerspace {{/str}} (Alt+click)">{{#str}} selectloop, mod_vrmakerspace {{/str}}</button>
+                </div>
+                <div class="dropdown">
+                    <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" id="{{uniqid}}-addshape"
+                            data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-haspopup="true"
+                            aria-expanded="false">{{#str}} addshape, mod_vrmakerspace {{/str}}</button>
+                    <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-addshape">
+                        <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="cube">{{#str}} mshape_cube, mod_vrmakerspace {{/str}}</button></li>
+                        <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="plane">{{#str}} mshape_plane, mod_vrmakerspace {{/str}}</button></li>
+                        <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="cylinder">{{#str}} mshape_cylinder, mod_vrmakerspace {{/str}}</button></li>
+                        <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="sphere">{{#str}} mshape_sphere, mod_vrmakerspace {{/str}}</button></li>
+                        <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="cone">{{#str}} mshape_cone, mod_vrmakerspace {{/str}}</button></li>
+                        <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="torus">{{#str}} mshape_torus, mod_vrmakerspace {{/str}}</button></li>
+                    </ul>
+                </div>
+                <div class="btn-group" role="group" aria-label="{{#str}} modelactions, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="select" aria-pressed="true"
+                            title="{{#str}} action_select, mod_vrmakerspace {{/str}}">{{#str}} action_select, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="move" aria-pressed="false"
+                            title="{{#str}} action_move, mod_vrmakerspace {{/str}} (G)" aria-keyshortcuts="G">{{#str}} action_move, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="rotate" aria-pressed="false"
+                            title="{{#str}} action_rotate, mod_vrmakerspace {{/str}} (R)" aria-keyshortcuts="R">{{#str}} action_rotate, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="scale" aria-pressed="false"
+                            title="{{#str}} action_scale, mod_vrmakerspace {{/str}} (S)" aria-keyshortcuts="S">{{#str}} action_scale, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="extrude" aria-pressed="false"
+                            title="{{#str}} action_extrude, mod_vrmakerspace {{/str}} (E)" aria-keyshortcuts="E">{{#str}} action_extrude, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="inset" aria-pressed="false"
+                            title="{{#str}} action_inset, mod_vrmakerspace {{/str}} (I)" aria-keyshortcuts="I">{{#str}} action_inset, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="bevel" aria-pressed="false"
+                            title="{{#str}} action_bevel, mod_vrmakerspace {{/str}} (Ctrl+B)" aria-keyshortcuts="Control+B">{{#str}} action_bevel, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="loopcut" aria-pressed="false"
+                            title="{{#str}} action_loopcut, mod_vrmakerspace {{/str}} (Ctrl+R)" aria-keyshortcuts="Control+R">{{#str}} action_loopcut, mod_vrmakerspace {{/str}}</button>
+                </div>
+                <div class="btn-group" role="group" aria-label="{{#str}} axislock, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="axis" data-axis="free" aria-pressed="true"
+                            title="{{#str}} axis_free, mod_vrmakerspace {{/str}}">{{#str}} axis_free, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="axis" data-axis="x" aria-pressed="false"
+                            title="{{#str}} axis_x, mod_vrmakerspace {{/str}} (X)">{{#str}} axis_x, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="axis" data-axis="y" aria-pressed="false"
+                            title="{{#str}} axis_y, mod_vrmakerspace {{/str}} (Y)">{{#str}} axis_y, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="axis" data-axis="z" aria-pressed="false"
+                            title="{{#str}} axis_z, mod_vrmakerspace {{/str}} (Z)">{{#str}} axis_z, mod_vrmakerspace {{/str}}</button>
+                </div>
+                <div class="mod_vrmakerspace-segments d-flex align-items-center gap-2">
+                    <label class="mb-0" for="{{uniqid}}-segments">{{#str}} segments, mod_vrmakerspace {{/str}}</label>
+                    <input type="number" class="form-control form-control-sm" id="{{uniqid}}-segments" data-region="segments"
+                            min="1" max="8" step="1" value="1">
+                </div>
+                <div class="btn-group" role="group" aria-label="{{#str}} modelcommands, mod_vrmakerspace {{/str}}">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="oneshot" data-oneshot="merge"
+                            title="{{#str}} oneshot_merge, mod_vrmakerspace {{/str}} (M)" aria-keyshortcuts="M">{{#str}} oneshot_merge, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="oneshot" data-oneshot="delete"
+                            title="{{#str}} oneshot_delete, mod_vrmakerspace {{/str}} (X)" aria-keyshortcuts="X">{{#str}} oneshot_delete, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="oneshot" data-oneshot="fill"
+                            title="{{#str}} oneshot_fill, mod_vrmakerspace {{/str}} (F)" aria-keyshortcuts="F">{{#str}} oneshot_fill, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="oneshot" data-oneshot="flip"
+                            title="{{#str}} oneshot_flip, mod_vrmakerspace {{/str}}">{{#str}} oneshot_flip, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="oneshot" data-oneshot="mirror"
+                            title="{{#str}} oneshot_mirror, mod_vrmakerspace {{/str}}">{{#str}} oneshot_mirror, mod_vrmakerspace {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="oneshot" data-oneshot="bake"
+                            title="{{#str}} oneshot_bake, mod_vrmakerspace {{/str}}">{{#str}} oneshot_bake, mod_vrmakerspace {{/str}}</button>
+                </div>
+            </div>
+            {{/canmodel}}
+        {{/readonly}}
     </div>
 
     <div class="alert alert-warning d-none" data-region="nowebgl">{{#str}} studio_nowebgl, mod_vrmakerspace {{/str}}</div>
@@ -132,17 +247,36 @@
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
             <span>{{#str}} studio_loading, mod_vrmakerspace {{/str}}</span>
         </div>
+        {{^readonly}}
+            {{#canmodel}}
+            <div class="mod_vrmakerspace-stageconfirm d-none" data-region="bakeconfirm" role="alertdialog"
+                    aria-describedby="{{uniqid}}-bakeconfirm" aria-label="{{#str}} oneshot_bake, mod_vrmakerspace {{/str}}">
+                <p class="mb-2" id="{{uniqid}}-bakeconfirm">{{#str}} bakeconfirm, mod_vrmakerspace {{/str}}</p>
+                <div class="d-flex flex-wrap justify-content-end gap-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-action="bakecancel">{{#str}} cancel, core {{/str}}</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="bakeconfirm">{{#str}} oneshot_bake, mod_vrmakerspace {{/str}}</button>
+                </div>
+            </div>
+            {{/canmodel}}
+        {{/readonly}}
     </div>
 
     <div class="mod_vrmakerspace-status small mt-2" role="status" aria-live="polite">
         <span data-region="statustext"></span>
         <span data-region="message"></span>
     </div>
+    <div class="mod_vrmakerspace-openedges small d-none" data-region="openedges"></div>
 
     <div class="mod_vrmakerspace-help small text-muted mt-2" id="{{uniqid}}-help">
         {{^readonly}}
-            <p class="mb-1">{{#str}} shortcuts, mod_vrmakerspace {{/str}}</p>
+            {{#cansculpt}}
+            <p class="mb-1{{#modelfirst}} d-none{{/modelfirst}}" data-region="sculpthelp">{{#str}} shortcuts, mod_vrmakerspace {{/str}}</p>
             <p class="mb-1 d-none" data-region="vrhelp">{{#str}} vrhelp, mod_vrmakerspace {{/str}}</p>
+            {{/cansculpt}}
+            {{#canmodel}}
+            <p class="mb-1{{^modelfirst}} d-none{{/modelfirst}}" data-region="modelhelp">{{#str}} modelshortcuts, mod_vrmakerspace {{/str}}</p>
+            <p class="mb-1 d-none" data-region="vrmodelhelp">{{#str}} vrmodelhelp, mod_vrmakerspace {{/str}}</p>
+            {{/canmodel}}
         {{/readonly}}
     </div>
 </div>

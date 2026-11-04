@@ -21,6 +21,10 @@
  * applies the R3/R4/R5 rounding (idempotent) and checks every range; ops come from other people's
  * browsers, so nothing else is ever trusted.
  *
+ * The polygon modelling kinds (m*, polyops.js) share the op stream: cleanOp() hands them to
+ * polyops.cleanMeshOp(), which adds the keys md, sm, ids, e, n, sc and allows 1000 bytes. They are not stroke
+ * kinds here: they have no footprint and do not touch the field (engine.js applies them to the mesh layer).
+ *
  * Field updates (all deterministic, see mathx.js), with falloff w(t) = (1 − t²)², t = |q − p| / r:
  * - add:    d ← d + st · (smin(d, |q − p| − r, k) − d), k = 0.25 r (polynomial smooth union);
  * - carve:  d ← d + st · (smax(d, r − |q − p|, k) − d) (smooth subtraction);
@@ -48,13 +52,21 @@ import {PI, R3, R4, R5, sin, cos, falloff} from './mathx.js';
 import {BORDER, QMAX, trilinear} from './grid.js';
 import {isShape, boundingRadius, prepare} from './shapes.js';
 import {isText} from './font.js';
+import {cleanMeshOp} from './polyops.js';
 
 /** Kinds that change the field as part of a stroke. */
 export const STROKE_KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist', 'inflate', 'pinch', 'flatten',
     'shape', 'cutshape']);
 
-/** Every op kind. */
-export const KINDS = Object.freeze(STROKE_KINDS.concat(['end', 'undo', 'redo', 'lock', 'unlock', 'save']));
+/**
+ * The mesh kinds, as polyops.MESH_KINDS lists them (tests/js/ops.test.mjs holds the two together). Named here, not
+ * imported, so that this module can be evaluated first or second whichever of the two a program imports first.
+ */
+const MESH_KIND_NAMES = Object.freeze(['msel', 'mprim', 'mxf', 'mext', 'minset', 'mbevel', 'mloop', 'mmerge', 'mdel',
+    'mfill', 'mflip', 'mmirror', 'mbake']);
+
+/** Every op kind: the clay kinds, the kinds both layers share and the mesh kinds. */
+export const KINDS = Object.freeze(STROKE_KINDS.concat(['end', 'undo', 'redo', 'lock', 'unlock', 'save', 'hz'], MESH_KIND_NAMES));
 
 /** Kinds whose ops carry an axis x and an angle g that turn about it (mirrored as an axial vector). */
 const TURNING_KINDS = Object.freeze(['twist', 'shape', 'cutshape']);
@@ -198,6 +210,9 @@ export function cleanOp(obj) {
     const k = obj.k;
     if (typeof k !== 'string' || KINDS.indexOf(k) === -1) {
         return null;
+    }
+    if (MESH_KIND_NAMES.indexOf(k) !== -1) {
+        return cleanMeshOp(obj);
     }
     const out = {k};
     if (obj.a !== undefined) {

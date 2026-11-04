@@ -14,11 +14,13 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Starting models of a sculpture: a clay lump, a sphere, a rounded cube, or nothing (empty, for
- * building with the shape tools).
+ * Starting models of a piece: a clay lump, a sphere, a rounded cube, nothing (empty, for building
+ * with the shape tools), or a polygon cube (meshcube: no clay, a cube in the mesh layer).
  *
- * Each model is a signed-distance function in sculpture-local metres, evaluated with the
+ * Each clay model is a signed-distance function in sculpture-local metres, evaluated with the
  * deterministic maths of mathx.js only, so every client builds the same starting grid bit for bit.
+ * The polygon cube is built with fixed element ids (author 'start', op index 1), so every client
+ * agrees on it as well.
  *
  * Dependency-free ES module: it runs in a module Web Worker and in Node (node --test).
  *
@@ -29,9 +31,13 @@
 
 import {sin} from './mathx.js';
 import {BORDER} from './grid.js';
+import {addPrimitive} from './polyprims.js';
 
 /** Names of the starting models. */
-export const MODELS = Object.freeze(['lump', 'sphere', 'cube', 'empty']);
+export const MODELS = Object.freeze(['lump', 'sphere', 'cube', 'empty', 'meshcube']);
+
+/** Half-extent of the starting polygon cube in metres. */
+const MESH_CUBE_H = 0.08;
 
 /** Lump ellipsoid radii in metres. */
 const LUMP_R = [0.11, 0.09, 0.10];
@@ -113,14 +119,14 @@ export function empty() {
     return 1;
 }
 
-/** Distance functions by model name. */
-const FUNCTIONS = Object.freeze({lump, sphere, cube, empty});
+/** Distance functions by model name. The polygon cube has no clay. */
+const FUNCTIONS = Object.freeze({lump, sphere, cube, empty, meshcube: empty});
 
 /**
  * Whether a model name is known.
  *
  * @param {string} name Model name.
- * @returns {boolean} True for lump, sphere, cube and empty.
+ * @returns {boolean} True for lump, sphere, cube, empty and meshcube.
  */
 export function isModel(name) {
     return MODELS.indexOf(name) !== -1;
@@ -131,7 +137,7 @@ export function isModel(name) {
  * border voxels of every face.
  *
  * @param {import('./grid.js').Grid} grid The grid to fill (overwritten).
- * @param {string} name 'lump', 'sphere', 'cube' or 'empty'.
+ * @param {string} name 'lump', 'sphere', 'cube', 'empty' or 'meshcube' (no clay).
  * @returns {import('./grid.js').Grid} The grid.
  */
 export function fillModel(grid, name) {
@@ -158,4 +164,19 @@ export function fillModel(grid, name) {
         }
     }
     return grid;
+}
+
+/**
+ * Fills a new mesh document with a starting model's mesh layer: the polygon cube for meshcube, nothing
+ * for the clay models.
+ *
+ * @param {import('./polymesh.js').PolyDoc} doc The empty document.
+ * @param {string} name Model name.
+ * @returns {import('./polymesh.js').PolyDoc} The document.
+ */
+export function fillMeshModel(doc, name) {
+    if (name === 'meshcube') {
+        addPrimitive(doc, 'cube', 'start', 1, [0, 0, 0], MESH_CUBE_H, null, 0, 16);
+    }
+    return doc;
 }

@@ -24,7 +24,7 @@ use mod_vrmakerspace\local\companion_manager;
 use mod_vrmakerspace\local\session_manager;
 
 /**
- * A short-lived token to sculpt a group sculpture over the companion service (vrroom-sync).
+ * A short-lived token to work on a group piece over the companion service (vrroom-sync).
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -74,7 +74,7 @@ class companion_join extends external_api {
             'url' => new external_value(PARAM_RAW, 'WebSocket address of the companion service'),
             'token' => new external_value(PARAM_RAW, 'Join token (a JWT)'),
             'expires' => new external_value(PARAM_INT, 'When the token expires'),
-            'room' => new external_value(PARAM_ALPHANUM, 'The sculpture\'s room id'),
+            'room' => new external_value(PARAM_ALPHANUM, 'The piece\'s room id'),
             'peerid' => new external_value(PARAM_ALPHANUM, 'The caller\'s peer id in the room'),
             'name' => new external_value(PARAM_RAW, 'The caller\'s display name, plain text'),
             'max' => new external_value(PARAM_INT, 'Most people in the room'),

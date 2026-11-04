@@ -31,9 +31,10 @@
  * - view: read-only, a given version, no network.
  *
  * Every client applies the confirmed ops in sequence order, so all converge. An incoming op is
- * parsed with a size limit, rebuilt from its known keys, its author is set from the transport's
- * identity of the sender, then it goes to the engine; the engine's own checks (ops.cleanOp) run
- * in the worker.
+ * parsed with a size limit, rebuilt from its known keys (mod_vrmakerspace/net/opwire), its author is
+ * set from the transport's identity of the sender, then it goes to the engine; the engine's own
+ * checks (ops.cleanOp) run in the worker. Mesh ops travel like clay ops, and the state transfers
+ * carry the mesh and the selections, because both are in the snapshot.
  *
  * The leader saves (solo: self; pair: the host; companion: the connected peer with the smallest
  * peer id): every autosavems when the sequence moved, on saveNow(), when the page is hidden and on
@@ -51,6 +52,9 @@
  * - saving   {}
  * - saved    {version}
  * - savefailed {message}
+ * - historyreset {}: undo records started again, here (a state was loaded) or for the whole room (an 'hz' op)
+ * - meshrefused {op, reason}: the engine's event passed on: an own mesh op changed nothing. It can
+ *            come again for the same op when a state load puts our unconfirmed ops back on top.
  *
  * @module     mod_vrmakerspace/net/session
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -64,23 +68,11 @@ import {encode, decode} from 'vrroomruntime_builtin/live/codec';
 import {Emitter} from 'mod_vrmakerspace/net/emitter';
 import {createPairTransport} from 'mod_vrmakerspace/net/pairtransport';
 import {createCompanionTransport} from 'mod_vrmakerspace/net/companiontransport';
+import {MAX_INDEX, MAX_OP_TEXT, fitsWire, isVec3, parseOp, rebuildOp} from 'mod_vrmakerspace/net/opwire';
 
 /** Grid size and voxel size of every sculpture (contract §2). */
 const DIMS = 128;
 const VOXEL = 0.004;
-
-/** Op kinds (contract §3). */
-const KINDS = Object.freeze(['add', 'carve', 'smooth', 'grab', 'twist', 'inflate', 'pinch', 'flatten', 'shape', 'cutshape',
-    'end', 'undo', 'redo', 'lock', 'unlock', 'save']);
-
-/** Longest string value of an op (sh, tx). */
-const MAX_OP_STRING = 40;
-
-/** Largest op JSON accepted from the network, in characters. */
-const MAX_OP_TEXT = 1024;
-
-/** Largest op index and stroke id. */
-const MAX_INDEX = 2147483647;
 
 /** Largest snapshot fetched from Moodle, in bytes. */
 const MAX_SNAPSHOT = 33554432;
@@ -297,91 +289,6 @@ const stampHeader = (bytes, seq, epoch) => {
 const cleanEpoch = (value) => (typeof value === 'string' && /^[0-9a-f]{16}$/.test(value) ? value : '');
 
 /**
- * Whether a value is an array of three finite numbers.
- *
- * @param {*} value
- * @returns {boolean}
- */
-const isVec3 = (value) => Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'number' && isFinite(v));
-
-/**
- * Whether a value is an integer 1..MAX_INDEX.
- *
- * @param {*} value
- * @returns {boolean}
- */
-const isIndex = (value) => Number.isInteger(value) && value >= 1 && value <= MAX_INDEX;
-
-/**
- * Rebuild an op from its known keys in the wire order, with the given author. Types are checked
- * here; ranges are the engine's (ops.cleanOp).
- *
- * @param {*} source Op-like object.
- * @param {string} author Author id to stamp.
- * @returns {Object|null}
- */
-const rebuildOp = (source, author) => {
-    if (!source || typeof source !== 'object' || Array.isArray(source) || KINDS.indexOf(source.k) === -1) {
-        return null;
-    }
-    const op = {k: source.k, a: author};
-    if (source.s !== undefined) {
-        if (!isIndex(source.s)) {
-            return null;
-        }
-        op.s = source.s;
-    }
-    if (!isIndex(source.i)) {
-        return null;
-    }
-    op.i = source.i;
-    const vectors = ['p', 'd', 'x'];
-    const numbers = ['r', 'st', 'g'];
-    const strings = ['sh', 'tx'];
-    ['p', 'r', 'st', 'd', 'x', 'g', 't', 'm', 'sh', 'tx'].forEach((key) => {
-        if (source[key] === undefined) {
-            return;
-        }
-        if (vectors.indexOf(key) !== -1) {
-            op[key] = isVec3(source[key]) ? source[key].slice() : undefined;
-        } else if (numbers.indexOf(key) !== -1) {
-            op[key] = typeof source[key] === 'number' && isFinite(source[key]) ? source[key] : undefined;
-        } else if (strings.indexOf(key) !== -1) {
-            const value = source[key];
-            op[key] = typeof value === 'string' && value.length <= MAX_OP_STRING ? value : undefined;
-        } else {
-            op[key] = isIndex(source[key]) ? source[key] : undefined;
-        }
-    });
-    for (const key of Object.keys(op)) {
-        if (op[key] === undefined) {
-            return null;
-        }
-    }
-    return op;
-};
-
-/**
- * Parse an op received from the network.
- *
- * @param {*} text Op JSON.
- * @param {string} author The sender's author id (from the transport, never from the op).
- * @returns {Object|null}
- */
-const parseOp = (text, author) => {
-    if (typeof text !== 'string' || text === '' || text.length > MAX_OP_TEXT) {
-        return null;
-    }
-    let source;
-    try {
-        source = JSON.parse(text);
-    } catch (error) {
-        return null;
-    }
-    return rebuildOp(source, author);
-};
-
-/**
  * The first op index of this page: it grows with the clock (20 per second since 2026), so a
  * reloaded page continues above the indexes it used before.
  *
@@ -427,6 +334,9 @@ class Session extends Emitter {
         const c = config || {};
         this.config = c;
         this.engine = c.engine;
+        if (this.engine && typeof this.engine.on === 'function') {
+            this.engine.on('meshrefused', (detail) => this.emit('meshrefused', detail));
+        }
         this.cmid = Number(c.cmid) || 0;
         this.sessionid = Number(c.sessionid) || 0;
         this.user = {id: Number(c.user && c.user.id) || 0, name: String((c.user && c.user.name) || '')};
@@ -448,6 +358,14 @@ class Session extends Emitter {
         this.upload = null;
         // Role: 'sequencer' (solo, pair host), 'client' (pair guest, companion), 'detached', 'view'.
         this.role = 'detached';
+        // A state carries no undo records, so whoever starts from one has none for earlier strokes. The 'hz' op has
+        // the whole room forget its records at one point of the stream, which keeps every undo the same everywhere.
+        // Pair: the host sends it before it serializes a state; barrierseq is where it last did.
+        this.barrierseq = 0;
+        // Companion: null, or 'need' (state loaded, catching up) or 'sent' (hz not yet back).
+        this.barrier = null;
+        // Companion: an undo arrived while we were catching up, so our state may not match the room's.
+        this.barrierstale = false;
         this.myauthor = 'u' + this.user.id;
         this.index = firstIndex();
         // Confirmed sequence in the room's numbering; the engine's numbering is seq + offset.
@@ -638,7 +556,7 @@ class Session extends Emitter {
         }
         const op = rebuildOp(Object.assign({}, source, {i: this.nextIndex()}), this.myauthor);
         const text = op ? JSON.stringify(op) : '';
-        if (!op || text.length > MAX_OP_TEXT) {
+        if (!op || !fitsWire(op, text)) {
             return false;
         }
         if (this.role === 'sequencer') {
@@ -963,6 +881,12 @@ class Session extends Emitter {
         }
         this.seq = roomseq;
         this.lastsavedseq = roomseq;
+        if (bytes) {
+            this.barrierseq = roomseq;
+            this.barrier = this.companion ? 'need' : null;
+            this.barrierstale = false;
+            this.emit('historyreset', {});
+        }
         this.locks.clear();
         this.outbox.forEach((entry) => {
             // A load drops every pending op; without a load only the ops held back are applied.
@@ -1016,6 +940,9 @@ class Session extends Emitter {
             this.locks.delete(op.a);
         } else if (op.k === 'save' && this.servesSaveFor(op.a)) {
             this.save().catch((error) => Log.debug(error));
+        } else if (op.k === 'hz') {
+            this.emit('historyreset', {});
+            this.barrierDone(op);
         }
         if (this.pair && this.role === 'sequencer') {
             const text = JSON.stringify(op);
@@ -1370,6 +1297,7 @@ class Session extends Emitter {
     async startCompanion() {
         this.role = 'client';
         this.synced = false;
+        this.barrier = 'need';
         this.setStatus('connecting');
         const transport = createCompanionTransport({cmid: this.cmid, sessionid: this.sessionid});
         this.companion = transport;
@@ -1585,6 +1513,9 @@ class Session extends Emitter {
     applyEntry(entry) {
         const op = parseOp(entry.d, entry.p);
         if (op) {
+            if (this.barrier !== null && (op.k === 'undo' || op.k === 'redo') && entry.p !== this.myauthor) {
+                this.barrierstale = true;
+            }
             this.engine.confirmed(op, entry.n + this.offset);
             if (entry.p === this.myauthor) {
                 this.ownConfirmed(op.i);
@@ -1632,7 +1563,43 @@ class Session extends Emitter {
         this.synced = true;
         this.gap = null;
         this.updateStatus();
+        this.sendBarrier();
         this.flushOutbox();
+    }
+
+    /**
+     * Caught up from a state: have the room forget its undo records, because we hold none from before it.
+     * With nobody else here there is nothing to keep in step.
+     */
+    sendBarrier() {
+        if (this.barrier !== 'need') {
+            return;
+        }
+        if (!this.companion.peers().length) {
+            this.barrier = null;
+            this.barrierstale = false;
+            return;
+        }
+        this.barrier = 'sent';
+        this.submit({k: 'hz'});
+    }
+
+    /**
+     * Our 'hz' came back. If someone's undo arrived before it, that undo may have changed strokes we knew
+     * nothing about, so fetch a state from after it.
+     *
+     * @param {Object} op The confirmed 'hz' op.
+     */
+    barrierDone(op) {
+        if (this.barrier !== 'sent' || op.a !== this.myauthor) {
+            return;
+        }
+        const stale = this.barrierstale;
+        this.barrier = null;
+        this.barrierstale = false;
+        if (stale && this.companion.peers().length) {
+            this.onGap(this.seq, this.seq + 1);
+        }
     }
 
     /**
@@ -1911,6 +1878,10 @@ class Session extends Emitter {
     async sendHostState() {
         const transfer = ++this.transfer;
         this.guestsynced = false;
+        if (this.seq !== this.barrierseq) {
+            this.submit({k: 'hz'});
+            this.barrierseq = this.seq;
+        }
         const offset = this.offset;
         const serialized = await this.engine.serialize(this.epoch);
         if (transfer !== this.transfer || this.role !== 'sequencer' || !this.linkopen || !this.remote) {

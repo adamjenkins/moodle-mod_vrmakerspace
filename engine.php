@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Serves the sculpting engine's JavaScript modules (js/engine) to the studio's Web Worker.
+ * Serves the engine's JavaScript modules (js/engine) to the studio's Web Worker.
  *
  * URL: /mod/vrmakerspace/engine.php/<plugin version>/<file>.js. The version is part of the path, so the
  * modules' relative imports ('./grid.js') carry it too: an upgrade changes every URL, and the files can

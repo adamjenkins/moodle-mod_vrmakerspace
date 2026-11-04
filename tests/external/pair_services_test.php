@@ -72,9 +72,9 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
             ]);
         }
         $this->teacher = $gen->create_and_enrol($course, 'editingteacher');
-        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
-        $this->session = $sculpt->create_session(['vrmakerspaceid' => $this->vrmakerspace->id, 'groupid' => $group->id]);
-        $this->othersession = $sculpt->create_session(['vrmakerspaceid' => $this->vrmakerspace->id, 'groupid' => $othergroup->id]);
+        $maker = $gen->get_plugin_generator('mod_vrmakerspace');
+        $this->session = $maker->create_session(['vrmakerspaceid' => $this->vrmakerspace->id, 'groupid' => $group->id]);
+        $this->othersession = $maker->create_session(['vrmakerspaceid' => $this->vrmakerspace->id, 'groupid' => $othergroup->id]);
     }
 
     /**
@@ -286,7 +286,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $a = $this->join('a');
         $this->join('b');
 
-        // A member of another group cannot join this group's sculpture.
+        // A member of another group cannot join this group's piece.
         $this->setUser($this->students['d']);
         $this->assert_error('cannotsculpt', fn() => pair_join::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id));
         $this->assert_error('cannotsculpt', fn() => pair_poll::execute(
@@ -314,7 +314,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
     }
 
     /**
-     * A teacher may not join; a closed sculpture cannot be joined; individual work has no pairs.
+     * A teacher may not join; a closed piece cannot be joined; individual work has no pairs.
      */
     public function test_gates(): void {
         global $DB;

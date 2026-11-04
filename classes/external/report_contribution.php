@@ -23,7 +23,7 @@ use core_external\external_value;
 use mod_vrmakerspace\local\contribution_manager;
 
 /**
- * Add to the caller's recorded share of a sculpture.
+ * Add to the caller's recorded share of a piece.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>

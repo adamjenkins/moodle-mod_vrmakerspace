@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Presence in the studio: the other sculptors as a head with a visor, two hands and a name label.
+ * Presence in the studio: the other makers as a head with a visor, two hands and a name label.
  *
  * Everything lives under the sculpture's group, because poses are shared in the sculpture's
  * frame: each person sees the others where they stand relative to the sculpture, wherever each of
@@ -39,6 +39,9 @@ const TIMEOUT = 10000;
 
 /** Head sphere radius (m). */
 const HEAD_RADIUS = 0.085;
+
+/** A head nearer than this to the viewer's eye is not drawn (m): two people often share a viewpoint. */
+const HEAD_HIDE_DISTANCE = 0.35;
 
 /** Height of the name label above the head centre (m). */
 const LABEL_HEIGHT = 0.16;
@@ -291,10 +294,15 @@ export const createPresence = (THREE, parent, options = {}) => {
      *
      * @param {Object} person Person record.
      * @param {Object} sample {h, l, r}
+     * @param {?Object} viewer The viewer's eye {x, y, z} in the same frame, if known.
      */
-    const show = (person, sample) => {
+    const show = (person, sample, viewer) => {
         applyPose(person.head, sample.h);
         person.label.position.set(sample.h[0], sample.h[1] + LABEL_HEIGHT, sample.h[2]);
+        const near = !!viewer && Math.hypot(sample.h[0] - viewer.x, sample.h[1] - viewer.y, sample.h[2] - viewer.z)
+            < HEAD_HIDE_DISTANCE;
+        person.head.visible = !near;
+        person.label.visible = !near;
         if (person.mode === '3d') {
             person.lefthand.visible = false;
             person.righthand.visible = false;
@@ -374,8 +382,9 @@ export const createPresence = (THREE, parent, options = {}) => {
          * Move every figure to its pose for this frame; remove people gone quiet.
          *
          * @param {number} nowms Local time (ms).
+         * @param {?Object} [viewer] The viewer's eye {x, y, z} in the figures' frame: a head on top of it is hidden.
          */
-        tick(nowms) {
+        tick(nowms, viewer = null) {
             if (disposed) {
                 return;
             }
@@ -387,7 +396,7 @@ export const createPresence = (THREE, parent, options = {}) => {
                 }
                 const sample = person.interpolator.sample(now);
                 if (sample) {
-                    show(person, sample);
+                    show(person, sample, viewer);
                 }
             });
         },

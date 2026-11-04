@@ -51,9 +51,9 @@ final class session_services_test extends \core_external\tests\externallib_testc
         $othergroup = $gen->create_group(['courseid' => $course->id]);
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $member->id]);
         $gen->create_group_member(['groupid' => $othergroup->id, 'userid' => $outsider->id]);
-        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
-        $session = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $group->id]);
-        $othersession = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $othergroup->id]);
+        $maker = $gen->get_plugin_generator('mod_vrmakerspace');
+        $session = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $group->id]);
+        $othersession = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $othergroup->id]);
         return [$vrmakerspace, $session, $member, $outsider, $teacher, $othersession];
     }
 
@@ -98,7 +98,7 @@ final class session_services_test extends \core_external\tests\externallib_testc
     }
 
     /**
-     * Refused: another group's sculpture, another activity's cmid, an activity that does not track.
+     * Refused: another group's piece, another activity's cmid, an activity that does not track.
      */
     public function test_report_contribution_refusals(): void {
         global $DB;
@@ -106,7 +106,8 @@ final class session_services_test extends \core_external\tests\externallib_testc
         [$vrmakerspace, $session, $member, $outsider] = $this->setup_activity();
 
         $this->setUser($outsider);
-        $this->assert_error('cannotsculpt', fn() => report_contribution::execute((int)$vrmakerspace->cmid, (int)$session->id, 1, 1, 1));
+        $cmid = (int)$vrmakerspace->cmid;
+        $this->assert_error('cannotsculpt', fn() => report_contribution::execute($cmid, (int)$session->id, 1, 1, 1));
 
         $other = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $vrmakerspace->course,
             'workmode' => session_manager::MODE_GROUP, 'trackcontributions' => 1]);

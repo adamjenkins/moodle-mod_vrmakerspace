@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Tests of the studio page helper: which sculpture opens, in which mode, with which configuration.
+ * Tests of the studio page helper: which piece opens, in which mode, with which configuration.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -43,7 +43,7 @@ final class studio_helper_test extends \advanced_testcase {
     }
 
     /**
-     * Individual work: the student's own sculpture is created and opens in solo mode with the full config.
+     * Individual work: the student's own piece is created and opens in solo mode with the full config.
      */
     public function test_solo_config(): void {
         $this->resetAfterTest();
@@ -59,6 +59,7 @@ final class studio_helper_test extends \advanced_testcase {
         $this->assertSame((int)$cm->id, $config['cmid']);
         $this->assertSame((int)$resolved['session']->id, $config['sessionid']);
         $this->assertSame('cube', $config['model']);
+        $this->assertSame('both', $config['methods']);
         $this->assertSame('', $config['snapshoturl']);
         $this->assertSame(0, $config['version']);
         $this->assertSame(1, $config['maxusers']);
@@ -75,6 +76,54 @@ final class studio_helper_test extends \advanced_testcase {
             (int)$student->id,
             null
         ));
+    }
+
+    /**
+     * The studio is told the ways of making. A piece created before the teacher changed them gives way
+     * to a starting model that suits them, and an uploaded model that has gone does the same.
+     */
+    public function test_methods_in_config(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$vrmakerspace, $cm, $context, $student] = $this->make_activity(['methods' => 'model', 'startmodel' => 'meshcube']);
+        $this->setUser($student);
+        $resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$student->id, 0, 0);
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
+        $this->assertSame('model', $config['methods']);
+        $this->assertSame('meshcube', $config['model']);
+
+        $vrmakerspace->methods = 'sculpt';
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
+        $this->assertSame('sculpt', $config['methods']);
+        $this->assertSame('lump', $config['model']);
+
+        $vrmakerspace->methods = 'model';
+        $DB->set_field('vrmakerspace_sessions', 'startmodel', 'upload', ['id' => $resolved['session']->id]);
+        $resolved['session']->startmodel = 'upload';
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
+        $this->assertSame('meshcube', $config['model']);
+        $vrmakerspace->methods = 'both';
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
+        $this->assertSame('lump', $config['model']);
+    }
+
+    /**
+     * Which controls the template shows for each of the ways of making.
+     */
+    public function test_methods_context(): void {
+        $this->assertSame(
+            ['methods' => 'both', 'cansculpt' => true, 'canmodel' => true, 'showmethodswitch' => true, 'modelfirst' => false],
+            studio_helper::methods_context('both', 'lump')
+        );
+        $this->assertTrue(studio_helper::methods_context('both', 'meshcube')['modelfirst']);
+        $this->assertSame(
+            ['methods' => 'sculpt', 'cansculpt' => true, 'canmodel' => false, 'showmethodswitch' => false, 'modelfirst' => false],
+            studio_helper::methods_context('sculpt', 'meshcube')
+        );
+        $this->assertSame(
+            ['methods' => 'model', 'cansculpt' => false, 'canmodel' => true, 'showmethodswitch' => false, 'modelfirst' => true],
+            studio_helper::methods_context('model', 'empty')
+        );
     }
 
     /**
@@ -104,19 +153,19 @@ final class studio_helper_test extends \advanced_testcase {
     }
 
     /**
-     * Read-only: an older version (with its own file URL), a closed sculpture, and a teacher.
+     * Read-only: an older version (with its own file URL), a closed piece, and a teacher.
      */
     public function test_read_only(): void {
         global $DB;
         $this->resetAfterTest();
         [$vrmakerspace, $cm, $context, $student, $teacher] = $this->make_activity();
-        $sculpt = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
-        $session = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $student->id]);
-        $first = $sculpt->create_snapshot($session, (int)$student->id, 'one');
-        $sculpt->create_snapshot($session, (int)$student->id, 'two');
+        $maker = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $session = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $student->id]);
+        $first = $maker->create_snapshot($session, (int)$student->id, 'one');
+        $maker->create_snapshot($session, (int)$student->id, 'two');
         $this->setUser($student);
 
-        // The latest version is the sculpture itself: editable.
+        // The latest version is the piece itself: editable.
         $resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$student->id, (int)$session->id, 2);
         $this->assertFalse($resolved['readonly']);
 
@@ -128,7 +177,10 @@ final class studio_helper_test extends \advanced_testcase {
         $this->assertStringContainsString('/mod_vrmakerspace/snapshots/' . $first->id . '/', $config['snapshoturl']);
         $this->assertFalse($config['trackcontributions']);
         $this->assertSame(
-            get_string('studiotitleversion', 'vrmakerspace', ['owner' => get_string('yoursculpture', 'vrmakerspace'), 'version' => 1]),
+            get_string('studiotitleversion', 'vrmakerspace', [
+                'owner' => get_string('yoursculpture', 'vrmakerspace'),
+                'version' => 1,
+            ]),
             studio_helper::title($session, $context, (int)$student->id, $resolved['snapshot'])
         );
 
@@ -149,20 +201,20 @@ final class studio_helper_test extends \advanced_testcase {
     }
 
     /**
-     * Refused: another student's sculpture, a session of another activity, a missing version, a
+     * Refused: another student's piece, a session of another activity, a missing version, a
      * group-work student without a group.
      */
     public function test_refusals(): void {
         $this->resetAfterTest();
         [$vrmakerspace, $cm, $context, $student, , $course] = $this->make_activity();
         $other = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $sculpt = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
-        $session = $sculpt->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $student->id]);
+        $maker = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $session = $maker->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $student->id]);
 
         $this->setUser($other);
         try {
             studio_helper::resolve($vrmakerspace, $cm, $context, (int)$other->id, (int)$session->id, 0);
-            $this->fail('Another student opened the sculpture');
+            $this->fail('Another student opened the piece');
         } catch (\required_capability_exception $e) {
             $this->assertSame('nopermissions', $e->errorcode);
         }
@@ -186,7 +238,7 @@ final class studio_helper_test extends \advanced_testcase {
         $this->setUser($loner);
         try {
             studio_helper::resolve($groupwork, $groupcm, $groupcontext, (int)$loner->id, 0, 0);
-            $this->fail('A student without a group got a sculpture');
+            $this->fail('A student without a group got a piece');
         } catch (\moodle_exception $e) {
             $this->assertSame('nogroup', $e->errorcode);
         }

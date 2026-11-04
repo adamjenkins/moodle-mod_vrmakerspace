@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Grading page: every sculpture with its latest version, the members' shares, and their grades.
+ * Grading page: every piece with its latest version, the members' shares, and their grades.
  *
  * Also the gradebook's link to the activity's grading ("grade.php?id=<cmid>").
  *
@@ -59,7 +59,12 @@ if ((int)$vrmakerspace->grade > 0 && optional_param('savegrades', '', PARAM_RAW)
     $result = grading_helper::save($vrmakerspace, $gradable, $posted, $groupposted, (int)$USER->id);
     $errors = $result['errors'];
     if (!$errors) {
-        redirect($url, get_string('gradessaved', 'vrmakerspace', $result['saved']), null, \core\output\notification::NOTIFY_SUCCESS);
+        redirect(
+            $url,
+            get_string('gradessaved', 'vrmakerspace', $result['saved']),
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
     }
     \core\notification::error(get_string('gradesnotallsaved', 'vrmakerspace', count($errors)));
 }

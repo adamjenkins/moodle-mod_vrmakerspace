@@ -17,7 +17,7 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Grades of a sculpting activity: stored per user in vrmakerspace_grades and pushed to the gradebook.
+ * Grades of an activity: stored per user in vrmakerspace_grades and pushed to the gradebook.
  *
  * The gradebook flow (update_grades → grade_item_update → grade_update) follows mod_vrroom's grader,
  * which follows mod_gear's lib.php.
@@ -117,7 +117,16 @@ class grader {
             $params['reset'] = true;
             $grades = null;
         }
-        return (int)grade_update('mod/vrmakerspace', $vrmakerspace->course, 'mod', 'vrmakerspace', $vrmakerspace->id, 0, $grades, $params);
+        return (int)grade_update(
+            'mod/vrmakerspace',
+            $vrmakerspace->course,
+            'mod',
+            'vrmakerspace',
+            $vrmakerspace->id,
+            0,
+            $grades,
+            $params
+        );
     }
 
     /**
@@ -129,7 +138,16 @@ class grader {
     public static function grade_item_delete(\stdClass $vrmakerspace): int {
         global $CFG;
         require_once($CFG->libdir . '/gradelib.php');
-        return (int)grade_update('mod/vrmakerspace', $vrmakerspace->course, 'mod', 'vrmakerspace', $vrmakerspace->id, 0, null, ['deleted' => 1]);
+        return (int)grade_update(
+            'mod/vrmakerspace',
+            $vrmakerspace->course,
+            'mod',
+            'vrmakerspace',
+            $vrmakerspace->id,
+            0,
+            null,
+            ['deleted' => 1]
+        );
     }
 
     /**

@@ -25,7 +25,7 @@
 /**
  * Defines the structure of vrmakerspace.xml.
  *
- * The activity always; with user data, the sculptures (sessions) with their versions (snapshots, and
+ * The activity always; with user data, the pieces (sessions) with their versions (snapshots, and
  * their files) and their members' shares (contributions), and the grades. A grade is written as
  * usergrade so no element contains a child of its own name. Live connections of pair work (peers and
  * their messages) last minutes and are never backed up.
@@ -40,8 +40,8 @@ class backup_vrmakerspace_activity_structure_step extends backup_activity_struct
         $userinfo = $this->get_setting_value('userinfo');
 
         $vrmakerspace = new backup_nested_element('vrmakerspace', ['id'], [
-            'name', 'intro', 'introformat', 'startmodel', 'workmode', 'connectmode', 'maxusers', 'trackcontributions',
-            'grade', 'timecreated', 'timemodified',
+            'name', 'intro', 'introformat', 'methods', 'startmodel', 'workmode', 'connectmode', 'maxusers',
+            'trackcontributions', 'grade', 'timecreated', 'timemodified',
         ]);
 
         $sessions = new backup_nested_element('sessions');

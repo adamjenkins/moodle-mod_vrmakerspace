@@ -26,7 +26,7 @@ require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 
 /**
- * Backup and restore of an activity with its sculptures, versions, files and grades.
+ * Backup and restore of an activity with its pieces, versions, files and grades.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -84,7 +84,7 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
-     * Settings, a group sculpture with two versions and their files, a member's share, a grade and
+     * Settings, a group piece with two versions and their files, a member's share, a grade and
      * another activity's uploaded starting model survive; live connections do not.
      */
     public function test_backup_restore_with_user_data(): void {
@@ -93,7 +93,7 @@ final class backup_restore_test extends \advanced_testcase {
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
         $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'startmodel' => 'cube',
-            'workmode' => session_manager::MODE_GROUP, 'connectmode' => 'companion', 'maxusers' => 4,
+            'methods' => 'sculpt', 'workmode' => session_manager::MODE_GROUP, 'connectmode' => 'companion', 'maxusers' => 4,
             'trackcontributions' => 1]);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $group = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Otters']);
@@ -114,8 +114,24 @@ final class backup_restore_test extends \advanced_testcase {
             'filename' => 'owl.obj'], "v 0 0 0\n");
         $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'name' => 'Owl',
             'startmodel' => 'upload', 'startmodelfile' => $draftid]);
+        // A third is modelled from a polygon cube, with a student's saved piece of clay and mesh.
+        $modelled = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'name' => 'Boxes',
+            'methods' => 'model', 'startmodel' => 'meshcube']);
+        $modelledsession = $generator->create_session(['vrmakerspaceid' => $modelled->id, 'userid' => $student->id]);
+        $generator->create_snapshot($modelledsession, (int)$student->id, 'boxes', 3);
 
         $newcourseid = $this->backup_and_restore($course);
+
+        $boxes = $DB->get_record('vrmakerspace', ['course' => $newcourseid, 'name' => 'Boxes'], '*', MUST_EXIST);
+        $this->assertSame(['model', 'meshcube'], [$boxes->methods, $boxes->startmodel]);
+        $boxessession = $DB->get_record('vrmakerspace_sessions', ['vrmakerspaceid' => $boxes->id], '*', MUST_EXIST);
+        $this->assertSame('meshcube', $boxessession->startmodel);
+        $boxescm = get_coursemodule_from_instance('vrmakerspace', $boxes->id, $newcourseid, false, MUST_EXIST);
+        $boxesversions = array_values(session_manager::get_snapshots((int)$boxessession->id));
+        $this->assertSame(
+            $generator->snapshot_data('boxes', 3),
+            session_manager::get_snapshot_file($boxesversions[0], \context_module::instance($boxescm->id))->get_content()
+        );
 
         $owl = $DB->get_record('vrmakerspace', ['course' => $newcourseid, 'name' => 'Owl'], '*', MUST_EXIST);
         $this->assertSame('upload', $owl->startmodel);
@@ -125,6 +141,7 @@ final class backup_restore_test extends \advanced_testcase {
 
         $restored = $DB->get_record('vrmakerspace', ['course' => $newcourseid, 'startmodel' => 'cube'], '*', MUST_EXIST);
         $this->assertSame('cube', $restored->startmodel);
+        $this->assertSame('sculpt', $restored->methods);
         $this->assertSame('companion', $restored->connectmode);
         $this->assertSame(4, (int)$restored->maxusers);
         $newsession = $DB->get_record('vrmakerspace_sessions', ['vrmakerspaceid' => $restored->id], '*', MUST_EXIST);

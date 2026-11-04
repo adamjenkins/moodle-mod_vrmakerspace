@@ -64,7 +64,7 @@ class view_helper {
     }
 
     /**
-     * The name of a sculpture's owner: the group's name, or the user's full name.
+     * The name of a piece's owner: the group's name, or the user's full name.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
@@ -84,12 +84,12 @@ class view_helper {
     }
 
     /**
-     * The address of the sculpting studio.
+     * The address of the studio.
      *
      * @param \context_module $context the activity context
-     * @param int $sessionid a sculpture, or 0 for the user's own
-     * @param int $version a saved version to look at, or 0 for the current sculpture
-     * @param int $groupid for the user's own group sculpture: which group (0 for the first)
+     * @param int $sessionid a piece, or 0 for the user's own
+     * @param int $version a saved version to look at, or 0 for the current piece
+     * @param int $groupid for the user's own group piece: which group (0 for the first)
      * @return \moodle_url
      */
     public static function studio_url(
@@ -112,7 +112,7 @@ class view_helper {
     }
 
     /**
-     * Every sculpture of an activity a teacher may see: in separate groups without access to all
+     * Every piece of an activity a teacher may see: in separate groups without access to all
      * groups, only the work of the teacher's own groups and of their members.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
@@ -144,7 +144,7 @@ class view_helper {
     }
 
     /**
-     * The members' shares of a sculpture, for a table.
+     * The members' shares of a piece, for a table.
      *
      * @param int $sessionid the session id
      * @param \context_module $context the activity context
@@ -167,6 +167,16 @@ class view_helper {
     }
 
     /**
+     * The text of an activity's ways of making.
+     *
+     * @param \stdClass $vrmakerspace the vrmakerspace row
+     * @return string
+     */
+    public static function methods_text(\stdClass $vrmakerspace): string {
+        return get_string('methods_' . session_manager::methods($vrmakerspace), 'vrmakerspace');
+    }
+
+    /**
      * The text of a status.
      *
      * @param \stdClass $session the session row
@@ -177,7 +187,7 @@ class view_helper {
     }
 
     /**
-     * The management links of a sculpture (close or reopen, reset), for users with managesessions.
+     * The management links of a piece (close or reopen, reset), for users with managesessions.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context

@@ -1,4 +1,4 @@
-/* The sculpting studio (templates/studio.mustache). */
+/* The studio (templates/studio.mustache). */
 
 .mod_vrmakerspace-studio {
     position: relative;
@@ -10,8 +10,18 @@
     row-gap: 0.5rem;
 }
 
+.mod_vrmakerspace-studio .mod_vrmakerspace-panel {
+    flex: 1 1 100%;
+    min-width: 0;
+    row-gap: 0.5rem;
+}
+
 .mod_vrmakerspace-studio .mod_vrmakerspace-slider {
     min-width: 10rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-segments input {
+    width: 4.5rem;
 }
 
 .mod_vrmakerspace-studio .mod_vrmakerspace-slider .form-range {
@@ -65,6 +75,29 @@
     content: none;
 }
 
+.mod_vrmakerspace-studio .mod_vrmakerspace-openedges {
+    color: #b02a37;
+}
+
+/* The confirmation of Turn into clay lies over the 3D view, so the page does not jump. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-modelpanel {
+    flex-wrap: wrap;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-stageconfirm {
+    position: absolute;
+    top: 0.5rem;
+    left: 50%;
+    width: calc(100% - 1rem);
+    max-width: 32rem;
+    transform: translateX(-50%);
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    background-color: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #1d2125);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
+}
+
 /* Full screen: the browser's own (Fullscreen API) or the full-window fallback class. */
 .mod_vrmakerspace-studio:fullscreen,
 .mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen {
@@ -84,6 +117,11 @@
     z-index: 1050;
 }
 
+.mod_vrmakerspace-studio:fullscreen .mod_vrmakerspace-toolbar,
+.mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen .mod_vrmakerspace-toolbar {
+    flex: 0 0 auto;
+}
+
 .mod_vrmakerspace-studio:fullscreen .mod_vrmakerspace-stage,
 .mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen .mod_vrmakerspace-stage {
     flex: 1 1 auto;
@@ -98,12 +136,34 @@
 
 /* Phones: the toolbar wraps, groups take the full width, the canvas keeps most of the screen. */
 @media (max-width: 575.98px) {
-    .mod_vrmakerspace-studio .mod_vrmakerspace-toolbar > .btn-group:first-child {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-panel > .btn-group:first-child,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-methods {
         width: 100%;
     }
 
-    .mod_vrmakerspace-studio .mod_vrmakerspace-toolbar > .btn-group:first-child .btn {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-panel > .btn-group:first-child .btn,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-methods .btn {
         flex: 1 1 auto;
+    }
+
+    /* The Model panel stays one row that scrolls sideways, so the 3D view stays where it is. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-modelpanel {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-modelpanel > * {
+        flex: 0 0 auto;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-modelpanel > .btn-group:first-child {
+        width: auto;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-modelpanel .btn {
+        min-height: 2.5rem;
+        white-space: nowrap;
     }
 
     .mod_vrmakerspace-studio .mod_vrmakerspace-slider {

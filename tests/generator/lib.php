@@ -25,7 +25,7 @@
 use mod_vrmakerspace\local\session_manager;
 
 /**
- * Data generator for mod_vrmakerspace: activities, sculptures and saved versions.
+ * Data generator for mod_vrmakerspace: activities, pieces and saved versions.
  */
 class mod_vrmakerspace_generator extends testing_module_generator {
     /**
@@ -37,6 +37,7 @@ class mod_vrmakerspace_generator extends testing_module_generator {
      */
     public function create_instance($record = null, ?array $options = null) {
         $record = (array)($record ?? []) + [
+            'methods' => session_manager::METHODS_BOTH,
             'startmodel' => 'lump',
             'workmode' => session_manager::MODE_INDIVIDUAL,
             'connectmode' => session_manager::CONNECTION_PAIR,
@@ -48,7 +49,7 @@ class mod_vrmakerspace_generator extends testing_module_generator {
     }
 
     /**
-     * Create (or find) a sculpture.
+     * Create (or find) a piece.
      *
      * @param array $record vrmakerspaceid, and groupid or userid
      * @return stdClass the session row
@@ -60,20 +61,30 @@ class mod_vrmakerspace_generator extends testing_module_generator {
     }
 
     /**
-     * The bytes of a valid "VRSC" version 1 snapshot: an uncompressed grid of $dim voxels per axis whose
-     * voxel bytes repeat $tag (so different tags give different files).
+     * The bytes of a valid "VRSC" snapshot: an uncompressed grid of $dim voxels per axis whose voxel bytes
+     * repeat $tag (so different tags give different files) and, in version 2, an empty mesh, so that the
+     * studio can read the file as well.
      *
-     * @param string $tag the bytes the payload repeats
+     * @param string $tag the bytes the grid repeats
      * @param int $seq the edit sequence number in the header (stored as the version's opcount)
      * @param int $dim the grid size on each axis (8..256)
+     * @param int $version the format version: session_manager::SNAPSHOT_VERSIONS
      * @return string
      */
-    public function snapshot_data(string $tag = 'test', int $seq = 1, int $dim = 8): string {
+    public function snapshot_data(
+        string $tag = 'test',
+        int $seq = 1,
+        int $dim = 8,
+        int $version = session_manager::SNAPSHOT_VERSION
+    ): string {
         $tag = $tag === '' ? "\x7f" : $tag;
         $count = $dim * $dim * $dim;
         $payload = substr(str_repeat($tag, intdiv($count, strlen($tag)) + 1), 0, $count);
+        if ($version === session_manager::SNAPSHOT_VERSION) {
+            $payload = pack('V', $count) . $payload . '{"v":[],"f":[],"s":[]}';
+        }
         return session_manager::SNAPSHOT_MAGIC
-            . pack('vvvvvv', session_manager::SNAPSHOT_VERSION, 0, $dim, $dim, $dim, 0)
+            . pack('vvvvvv', $version, 0, $dim, $dim, $dim, 0)
             . pack('g', 0.004)
             . pack('g', 0.012)
             . pack('V', $seq)
@@ -83,7 +94,7 @@ class mod_vrmakerspace_generator extends testing_module_generator {
     }
 
     /**
-     * Save a version of a sculpture.
+     * Save a version of a piece.
      *
      * @param stdClass $session the session row
      * @param int $userid who saves it
@@ -104,7 +115,7 @@ class mod_vrmakerspace_generator extends testing_module_generator {
     }
 
     /**
-     * Save a version of a user's own sculpture (created when needed), for Behat's "versions" entity.
+     * Save a version of a user's own piece (created when needed), for Behat's "versions" entity.
      *
      * @param array $record vrmakerspaceid and userid
      * @return stdClass the snapshot row
@@ -115,7 +126,7 @@ class mod_vrmakerspace_generator extends testing_module_generator {
     }
 
     /**
-     * Record a member's share of a sculpture directly.
+     * Record a member's share of a piece directly.
      *
      * @param stdClass $session the session row
      * @param int $userid the member

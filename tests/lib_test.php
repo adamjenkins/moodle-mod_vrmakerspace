@@ -57,6 +57,39 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
+     * The ways of making are saved, an unknown value becomes both, and a starting model that does not
+     * suit them gives way: this is what a form's save, a generator and a restore all go through.
+     */
+    public function test_methods_normalised(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $clean = fn(array $data) => vrmakerspace_clean_instance_data((object)$data);
+
+        $data = $clean([]);
+        $this->assertSame(['both', 'lump'], [$data->methods, $data->startmodel]);
+        $data = $clean(['methods' => 'telepathy', 'startmodel' => 'meshcube']);
+        $this->assertSame(['both', 'meshcube'], [$data->methods, $data->startmodel]);
+        $data = $clean(['methods' => 'model']);
+        $this->assertSame(['model', 'meshcube'], [$data->methods, $data->startmodel]);
+        $data = $clean(['methods' => 'model', 'startmodel' => 'upload']);
+        $this->assertSame(['model', 'meshcube'], [$data->methods, $data->startmodel]);
+        $data = $clean(['methods' => 'model', 'startmodel' => 'empty']);
+        $this->assertSame(['model', 'empty'], [$data->methods, $data->startmodel]);
+        $data = $clean(['methods' => 'sculpt', 'startmodel' => 'meshcube']);
+        $this->assertSame(['sculpt', 'lump'], [$data->methods, $data->startmodel]);
+        $data = $clean(['methods' => 'sculpt', 'startmodel' => 'sphere']);
+        $this->assertSame(['sculpt', 'sphere'], [$data->methods, $data->startmodel]);
+
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id]);
+        $record = $DB->get_record('vrmakerspace', ['id' => $vrmakerspace->id]);
+        $this->assertSame('both', $record->methods);
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'methods' => 'model']);
+        $record = $DB->get_record('vrmakerspace', ['id' => $vrmakerspace->id]);
+        $this->assertSame(['model', 'meshcube'], [$record->methods, $record->startmodel]);
+    }
+
+    /**
      * The connection: pair forces two people; companion keeps 2..8; individual work is always pair;
      * an unknown value becomes pair.
      */
@@ -77,7 +110,7 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
-     * Deleting the activity deletes its sculptures, versions, files, grades and grade item.
+     * Deleting the activity deletes its pieces, versions, files, grades and grade item.
      */
     public function test_delete_instance_removes_everything(): void {
         global $DB, $CFG;
@@ -106,13 +139,14 @@ final class lib_test extends \advanced_testcase {
         $this->assertSame(0, $DB->count_records('vrmakerspace_sessions'));
         $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots'));
         $this->assertSame(0, $DB->count_records('vrmakerspace_grades'));
-        $this->assertSame([], get_file_storage()->get_area_files($context->id, 'mod_vrmakerspace', 'snapshots', false, 'id', false));
+        $files = get_file_storage()->get_area_files($context->id, 'mod_vrmakerspace', 'snapshots', false, 'id', false);
+        $this->assertSame([], $files);
         $this->assertFalse(\grade_item::fetch(['itemtype' => 'mod', 'itemmodule' => 'vrmakerspace',
             'iteminstance' => $vrmakerspace->id, 'courseid' => $course->id]));
     }
 
     /**
-     * Course reset with the box ticked deletes the sculptures of every activity in the course only.
+     * Course reset with the box ticked deletes the pieces of every activity in the course only.
      */
     public function test_reset_userdata(): void {
         global $DB;

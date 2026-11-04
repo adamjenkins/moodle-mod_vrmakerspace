@@ -17,36 +17,54 @@
 namespace mod_vrmakerspace\local;
 
 /**
- * Sculpting sessions (one sculpture each) and their saved versions.
+ * Sessions (one piece of work each, with a clay layer and a polygon mesh layer) and their saved versions.
  *
  * A session belongs to one user (individual mode, groupid 0) or one group (group mode, userid 0).
  * Each saved version is a row in vrmakerspace_snapshots and one file in the snapshots file area of the
- * module context, item id = the snapshot id. A snapshot file is in the "VRSC" format (version 1): a
- * 48-byte little-endian header followed by one signed byte per voxel, optionally deflate-compressed;
- * the header is checked before anything is stored.
+ * module context, item id = the snapshot id. A snapshot file is in the "VRSC" format: a 48-byte
+ * little-endian header followed by one signed byte per voxel and, in version 2, the mesh, optionally
+ * deflate-compressed; the header is checked before anything is stored.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class session_manager {
-    /** @var int One sculpture per user. */
+    /** @var int One piece per user. */
     public const MODE_INDIVIDUAL = 0;
 
-    /** @var int One shared sculpture per group. */
+    /** @var int One shared piece per group. */
     public const MODE_GROUP = 1;
 
-    /** @var int Sculpting allowed. */
+    /** @var int Changes allowed. */
     public const STATUS_OPEN = 0;
 
     /** @var int Read-only. */
     public const STATUS_CLOSED = 1;
 
+    /** @var string Students can both sculpt clay and model the mesh. */
+    public const METHODS_BOTH = 'both';
+
+    /** @var string Students can only sculpt clay. */
+    public const METHODS_SCULPT = 'sculpt';
+
+    /** @var string Students can only model the mesh. */
+    public const METHODS_MODEL = 'model';
+
+    /** @var string[] The activity's ways of making; the first is the default. */
+    public const METHODS = [self::METHODS_BOTH, self::METHODS_SCULPT, self::METHODS_MODEL];
+
     /** @var string The starting model the teacher uploads (a file in MODEL_FILEAREA). */
     public const MODEL_UPLOAD = 'upload';
 
-    /** @var string[] The starting models: three primitives, nothing, and an uploaded model. */
-    public const START_MODELS = ['lump', 'sphere', 'cube', 'empty', self::MODEL_UPLOAD];
+    /** @var string The starting model with no clay and no mesh. */
+    public const MODEL_EMPTY = 'empty';
+
+    /** @var string The starting model with no clay and a cube in the mesh layer. */
+    public const MODEL_MESHCUBE = 'meshcube';
+
+    /** @var string[] The starting models: three clay primitives, a polygon cube, nothing, and an uploaded model. */
+    public const START_MODELS = ['lump', 'sphere', 'cube', self::MODEL_MESHCUBE, self::MODEL_EMPTY, self::MODEL_UPLOAD];
 
     /** @var string The file area holding the uploaded starting model (item 0). */
     public const MODEL_FILEAREA = 'startmodel';
@@ -57,7 +75,7 @@ class session_manager {
     /** @var int Largest uploaded starting model, in bytes (the studio fetches at most 32 MB). */
     public const MODEL_MAXBYTES = 33554432;
 
-    /** @var string First bytes of every snapshot file (the sculpture format's magic number). */
+    /** @var string First bytes of every snapshot file (the format's magic number). */
     public const SNAPSHOT_MAGIC = 'VRSC';
 
     /** @var int Default largest snapshot, in bytes, when the admin setting is not set. */
@@ -78,8 +96,17 @@ class session_manager {
     /** @var int Bytes of a snapshot's header. */
     public const SNAPSHOT_HEADER_SIZE = 48;
 
-    /** @var int The snapshot format version this plugin reads and writes. */
-    public const SNAPSHOT_VERSION = 1;
+    /** @var int The snapshot format version the studio writes: clay and mesh. */
+    public const SNAPSHOT_VERSION = 2;
+
+    /** @var int The older snapshot format version, clay only. */
+    public const SNAPSHOT_VERSION_CLAY = 1;
+
+    /** @var int[] The snapshot format versions accepted. */
+    public const SNAPSHOT_VERSIONS = [self::SNAPSHOT_VERSION_CLAY, self::SNAPSHOT_VERSION];
+
+    /** @var int Bytes of the grid length that starts a version 2 payload. */
+    public const SNAPSHOT_GRID_LENGTH_SIZE = 4;
 
     /** @var int Header flag: the payload is deflate-raw compressed. */
     public const SNAPSHOT_FLAG_DEFLATE = 1;
@@ -96,11 +123,11 @@ class session_manager {
     /** @var float Largest voxel size, metres. */
     public const SNAPSHOT_MAX_VOXEL = 0.05;
 
-    /** @var string[] What a teacher can do to a sculpture on the manage page. */
+    /** @var string[] What a teacher can do to a piece on the manage page. */
     public const MANAGE_ACTIONS = ['close', 'reopen', 'reset'];
 
     /**
-     * The groups a user may sculpt in for a group-mode activity: their groups in the activity's grouping.
+     * The groups a user may work in for a group-mode activity: their groups in the activity's grouping.
      *
      * @param \cm_info|\stdClass $cm the course module
      * @param int $userid the user
@@ -111,7 +138,7 @@ class session_manager {
     }
 
     /**
-     * The session a user sculpts in, created on first use.
+     * The session a user works in, created on first use.
      *
      * Individual mode: the user's own session. Group mode: the session of $groupid, which must be one of
      * the user's groups in the activity's grouping; when $groupid is 0 the user's first such group.
@@ -181,7 +208,61 @@ class session_manager {
     }
 
     /**
-     * Whether an activity is done in groups (one shared sculpture per group).
+     * A ways-of-making value, or the default when it is not one of METHODS.
+     *
+     * @param string $methods the value
+     * @return string
+     */
+    public static function clean_methods(string $methods): string {
+        return in_array($methods, self::METHODS, true) ? $methods : self::METHODS[0];
+    }
+
+    /**
+     * An activity's ways of making: one of METHODS.
+     *
+     * @param \stdClass $vrmakerspace the vrmakerspace row
+     * @return string
+     */
+    public static function methods(\stdClass $vrmakerspace): string {
+        return self::clean_methods((string)($vrmakerspace->methods ?? ''));
+    }
+
+    /**
+     * Whether a starting model suits the ways of making: modelling alone starts from the polygon cube or
+     * from nothing, since clay could not be changed; sculpting alone cannot start from the polygon cube.
+     *
+     * @param string $methods one of METHODS
+     * @param string $model the starting model
+     * @return bool
+     */
+    public static function start_model_allowed(string $methods, string $model): bool {
+        if (!in_array($model, self::START_MODELS, true)) {
+            return false;
+        }
+        return match ($methods) {
+            self::METHODS_MODEL => $model === self::MODEL_MESHCUBE || $model === self::MODEL_EMPTY,
+            self::METHODS_SCULPT => $model !== self::MODEL_MESHCUBE,
+            default => true,
+        };
+    }
+
+    /**
+     * The starting model to use with the ways of making: the given one when it suits them, otherwise
+     * the polygon cube for modelling alone and the default for anything else.
+     *
+     * @param string $methods one of METHODS
+     * @param string $model the starting model
+     * @return string
+     */
+    public static function start_model_for_methods(string $methods, string $model): string {
+        if (self::start_model_allowed($methods, $model)) {
+            return $model;
+        }
+        return $methods === self::METHODS_MODEL ? self::MODEL_MESHCUBE : self::START_MODELS[0];
+    }
+
+    /**
+     * Whether an activity is done in groups (one shared piece per group).
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return bool
@@ -234,7 +315,7 @@ class session_manager {
     }
 
     /**
-     * Whether a user may see a session's sculpture and history.
+     * Whether a user may see a session's piece and history.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
@@ -249,7 +330,7 @@ class session_manager {
     }
 
     /**
-     * Whether a user may sculpt in (save versions of) a session.
+     * Whether a user may work on (save versions of) a session.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
@@ -273,16 +354,19 @@ class session_manager {
     }
 
     /**
-     * Check a snapshot's header against the "VRSC" format, version 1.
+     * Check a snapshot's header against the "VRSC" format, versions 1 and 2.
      *
-     * Header (little-endian): 0 "VRSC"; 4 u16 format version (1); 6 u16 flags (bit 0 = deflate-raw
-     * payload, no other bits); 8, 10, 12 u16 grid size on x, y, z (8..256 each); 14 u16 reserved;
+     * Header (little-endian): 0 "VRSC"; 4 u16 format version (1 or 2); 6 u16 flags (bit 0 = deflate-raw
+     * sections, no other bits); 8, 10, 12 u16 grid size on x, y, z (8..256 each); 14 u16 reserved;
      * 16 f32 voxel size in metres (0.0005..0.05); 20 f32 band in metres (> 0); 24 u32 the edit sequence
-     * number the data reflects; 28 16 bytes epoch; 44 u32 payload length (file length - 48). An
-     * uncompressed payload holds exactly one byte per voxel.
+     * number the data reflects; 28 16 bytes epoch; 44 u32 payload length (file length - 48).
+     *
+     * The payload of version 1 is the grid section alone. The payload of version 2 is u32 grid length,
+     * the grid section, then the mesh section (the rest, which the studio parses strictly when it reads
+     * the file). An uncompressed grid section holds exactly one byte per voxel.
      *
      * @param string $data the snapshot bytes
-     * @return array the header: version, flags, nx, ny, nz, voxel, band, seq, epoch, length
+     * @return array the header: version, flags, nx, ny, nz, voxel, band, seq, epoch, length, gridlength
      * @throws \moodle_exception snapshotinvalid
      */
     public static function validate_snapshot(string $data): array {
@@ -294,7 +378,9 @@ class session_manager {
         $header['epoch'] = substr($data, 28, 16);
         $header['length'] = unpack('V', substr($data, 44, 4))[1];
 
-        $valid = $header['version'] === self::SNAPSHOT_VERSION
+        $header['gridlength'] = $header['length'];
+
+        $valid = in_array($header['version'], self::SNAPSHOT_VERSIONS, true)
             && ($header['flags'] & ~self::SNAPSHOT_FLAG_DEFLATE) === 0
             && $header['length'] === $size - self::SNAPSHOT_HEADER_SIZE
             && is_finite($header['voxel'])
@@ -305,8 +391,19 @@ class session_manager {
         foreach (['nx', 'ny', 'nz'] as $axis) {
             $valid = $valid && $header[$axis] >= self::SNAPSHOT_MIN_DIM && $header[$axis] <= self::SNAPSHOT_MAX_DIM;
         }
+        if ($valid && $header['version'] === self::SNAPSHOT_VERSION) {
+            $room = $header['length'] - self::SNAPSHOT_GRID_LENGTH_SIZE;
+            $valid = $room >= 0;
+            if ($valid) {
+                $header['gridlength'] = unpack(
+                    'V',
+                    substr($data, self::SNAPSHOT_HEADER_SIZE, self::SNAPSHOT_GRID_LENGTH_SIZE)
+                )[1];
+                $valid = $header['gridlength'] > 0 && $header['gridlength'] <= $room;
+            }
+        }
         if ($valid && !($header['flags'] & self::SNAPSHOT_FLAG_DEFLATE)) {
-            $valid = $header['length'] === $header['nx'] * $header['ny'] * $header['nz'];
+            $valid = $header['gridlength'] === $header['nx'] * $header['ny'] * $header['nz'];
         }
         if (!$valid) {
             throw new \moodle_exception('snapshotinvalid', 'mod_vrmakerspace');
@@ -315,7 +412,7 @@ class session_manager {
     }
 
     /**
-     * Save a new version of a session's sculpture.
+     * Save a new version of a session's piece.
      *
      * The caller has checked can_make(). The data is checked here: not over the size limit, and a
      * valid "VRSC" header (validate_snapshot()). The version's operation count is the header's
@@ -389,7 +486,7 @@ class session_manager {
      * @return string
      */
     public static function snapshot_filename(\stdClass $snapshot): string {
-        return 'sculpture-v' . (int)$snapshot->version . '.vrsc';
+        return 'piece-v' . (int)$snapshot->version . '.vrsc';
     }
 
     /**
@@ -493,7 +590,7 @@ class session_manager {
     }
 
     /**
-     * Close or reopen a sculpture.
+     * Close or reopen a piece.
      *
      * @param \stdClass $session the session row; its status is updated too
      * @param int $status STATUS_OPEN or STATUS_CLOSED
@@ -512,8 +609,8 @@ class session_manager {
     }
 
     /**
-     * Start a sculpture again: delete every version (with its file), the recorded contributions and the
-     * live connections. The sculpture itself, its owner and its status stay.
+     * Start a piece again: delete every version (with its file), the recorded contributions and the
+     * live connections. The piece itself, its owner and its status stay.
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
@@ -533,7 +630,7 @@ class session_manager {
     }
 
     /**
-     * Carry out a teacher's action on a sculpture (the caller has checked managesessions and sesskey).
+     * Carry out a teacher's action on a piece (the caller has checked managesessions and sesskey).
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context

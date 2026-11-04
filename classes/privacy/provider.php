@@ -30,15 +30,15 @@ use mod_vrmakerspace\local\session_manager;
 /**
  * Privacy provider for mod_vrmakerspace.
  *
- * Personal data: a user's own sculptures (vrmakerspace_sessions with their userid) with every saved version
- * (vrmakerspace_snapshots and the snapshots file area), the versions they saved of a group's sculpture,
- * their grades (vrmakerspace_grades: as the graded user and as the grader), their share of a sculpture
+ * Personal data: a user's own pieces (vrmakerspace_sessions with their userid) with every saved version
+ * (vrmakerspace_snapshots and the snapshots file area), the versions they saved of a group's piece,
+ * their grades (vrmakerspace_grades: as the graded user and as the grader), their share of a piece
  * (vrmakerspace_contrib), and, briefly, their live connections of pair work (vrmakerspace_peers) with the
- * connection messages they sent (vrmakerspace_signals). Live sculpting also sends data outside Moodle: to
+ * connection messages they sent (vrmakerspace_signals). Working together live also sends data outside Moodle: to
  * the partner's browser (pair work) and to the companion service (companion work).
  *
- * Deleting one user deletes their own sculptures, grades, shares, connections and messages. A group's
- * sculpture is the group's shared work, so it is kept, and the versions the user saved are anonymised
+ * Deleting one user deletes their own pieces, grades, shares, connections and messages. A group's
+ * piece is the group's shared work, so it is kept, and the versions the user saved are anonymised
  * (userid 0).
  *
  * @package    mod_vrmakerspace
@@ -181,11 +181,13 @@ class provider implements
             return;
         }
         $params = ['id' => $vrmakerspaceid];
-        $userlist->add_from_sql('userid', 'SELECT userid FROM {vrmakerspace_sessions} WHERE vrmakerspaceid = :id AND userid > 0', $params);
+        $sql = 'SELECT userid FROM {vrmakerspace_sessions} WHERE vrmakerspaceid = :id AND userid > 0';
+        $userlist->add_from_sql('userid', $sql, $params);
         $userlist->add_from_sql('userid', 'SELECT sn.userid FROM {vrmakerspace_snapshots} sn
                 JOIN {vrmakerspace_sessions} s ON s.id = sn.sessionid WHERE s.vrmakerspaceid = :id AND sn.userid > 0', $params);
         $userlist->add_from_sql('userid', 'SELECT userid FROM {vrmakerspace_grades} WHERE vrmakerspaceid = :id', $params);
-        $userlist->add_from_sql('grader', 'SELECT grader FROM {vrmakerspace_grades} WHERE vrmakerspaceid = :id AND grader > 0', $params);
+        $sql = 'SELECT grader FROM {vrmakerspace_grades} WHERE vrmakerspaceid = :id AND grader > 0';
+        $userlist->add_from_sql('grader', $sql, $params);
         $live = ['vrmakerspace_contrib' => 'userid', 'vrmakerspace_peers' => 'userid', 'vrmakerspace_signals' => 'fromuserid'];
         foreach ($live as $table => $field) {
             $userlist->add_from_sql($field, "SELECT t.{$field} AS {$field} FROM {{$table}} t
@@ -211,7 +213,7 @@ class provider implements
             $data = helper::get_context_data($context, $contextlist->get_user());
             helper::export_context_files($context, $contextlist->get_user());
 
-            $sculptures = [];
+            $pieces = [];
             $sessions = $DB->get_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspaceid], 'id ASC');
             foreach ($sessions as $session) {
                 $own = (int)$session->userid === $userid;
@@ -237,16 +239,16 @@ class provider implements
                 if (!$own && !$versions && !$live) {
                     continue;
                 }
-                $sculptures[] = (object)([
-                    'sculpture' => (int)$session->id,
+                $pieces[] = (object)([
+                    'piece' => (int)$session->id,
                     'yourown' => transform::yesno($own),
                     'timecreated' => transform::datetime($session->timecreated),
                     'timemodified' => transform::datetime($session->timemodified),
                     'versions' => $versions,
                 ] + $live);
             }
-            if ($sculptures) {
-                $data->sculptures = $sculptures;
+            if ($pieces) {
+                $data->pieces = $pieces;
             }
 
             $grade = $DB->get_record('vrmakerspace_grades', ['vrmakerspaceid' => $vrmakerspaceid, 'userid' => $userid]);
@@ -317,11 +319,12 @@ class provider implements
         [$usersql, $userparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
         $params = ['vrmakerspaceid' => $vrmakerspaceid] + $userparams;
 
-        // Their own sculptures, with every version.
-        $sessions = $DB->get_records_select('vrmakerspace_sessions', "vrmakerspaceid = :vrmakerspaceid AND userid $usersql", $params);
+        // Their own pieces, with every version.
+        $select = "vrmakerspaceid = :vrmakerspaceid AND userid $usersql";
+        $sessions = $DB->get_records_select('vrmakerspace_sessions', $select, $params);
         session_manager::delete_sessions($sessions, $context);
 
-        // Versions of a group's sculpture they saved: kept for the group, anonymised.
+        // Versions of a group's piece they saved: kept for the group, anonymised.
         $DB->set_field_select(
             'vrmakerspace_snapshots',
             'userid',
@@ -333,7 +336,7 @@ class provider implements
         $DB->delete_records_select('vrmakerspace_grades', "vrmakerspaceid = :vrmakerspaceid AND userid $usersql", $params);
         $DB->set_field_select('vrmakerspace_grades', 'grader', 0, "vrmakerspaceid = :vrmakerspaceid AND grader $usersql", $params);
 
-        // Their shares of the group's sculptures, their live connections and the messages they sent.
+        // Their shares of the group's pieces, their live connections and the messages they sent.
         $insessions = "sessionid IN (SELECT id FROM {vrmakerspace_sessions} WHERE vrmakerspaceid = :vrmakerspaceid)";
         $DB->delete_records_select('vrmakerspace_contrib', "userid $usersql AND $insessions", $params);
         $sessionids = array_map(
@@ -346,7 +349,7 @@ class provider implements
     }
 
     /**
-     * A user's share of a sculpture, live connections and messages sent, for the export.
+     * A user's share of a piece, live connections and messages sent, for the export.
      *
      * @param int $sessionid the session id
      * @param int $userid the user

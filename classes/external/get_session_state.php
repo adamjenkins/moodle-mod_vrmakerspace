@@ -23,7 +23,7 @@ use core_external\external_value;
 use mod_vrmakerspace\local\session_manager;
 
 /**
- * The state of a sculpting session, for the studio and late joiners.
+ * The state of a session, for the studio and late joiners.
  *
  * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
