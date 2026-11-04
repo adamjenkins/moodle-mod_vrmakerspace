@@ -1,24 +1,24 @@
 /* The sculpting studio (templates/studio.mustache). */
 
-.mod_vrsculpt-studio {
+.mod_vrmakerspace-studio {
     position: relative;
     display: flex;
     flex-direction: column;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-toolbar {
+.mod_vrmakerspace-studio .mod_vrmakerspace-toolbar {
     row-gap: 0.5rem;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-slider {
+.mod_vrmakerspace-studio .mod_vrmakerspace-slider {
     min-width: 10rem;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-slider .form-range {
+.mod_vrmakerspace-studio .mod_vrmakerspace-slider .form-range {
     width: 8rem;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-stage {
+.mod_vrmakerspace-studio .mod_vrmakerspace-stage {
     position: relative;
     width: 100%;
     height: 70vh;
@@ -28,7 +28,7 @@
     background-color: #c9ccd1;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-canvas {
+.mod_vrmakerspace-studio .mod_vrmakerspace-canvas {
     display: block;
     width: 100%;
     height: 100%;
@@ -36,11 +36,11 @@
     outline: none;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-canvas:focus-visible {
+.mod_vrmakerspace-studio .mod_vrmakerspace-canvas:focus-visible {
     box-shadow: inset 0 0 0 3px #0f6cbf;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-loading {
+.mod_vrmakerspace-studio .mod_vrmakerspace-loading {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -52,22 +52,22 @@
     opacity: 0.92;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-status {
+.mod_vrmakerspace-studio .mod_vrmakerspace-status {
     min-height: 1.5em;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-status [data-region="message"]:not(:empty)::before {
+.mod_vrmakerspace-studio .mod_vrmakerspace-status [data-region="message"]:not(:empty)::before {
     content: "\00b7";
     margin: 0 0.4em;
 }
 
-.mod_vrsculpt-studio .mod_vrsculpt-status [data-region="statustext"]:empty + [data-region="message"]::before {
+.mod_vrmakerspace-studio .mod_vrmakerspace-status [data-region="statustext"]:empty + [data-region="message"]::before {
     content: none;
 }
 
 /* Full screen: the browser's own (Fullscreen API) or the full-window fallback class. */
-.mod_vrsculpt-studio:fullscreen,
-.mod_vrsculpt-studio.mod_vrsculpt-fullscreen {
+.mod_vrmakerspace-studio:fullscreen,
+.mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen {
     width: 100%;
     height: 100%;
     padding: 0.5rem;
@@ -75,7 +75,7 @@
     overflow: auto;
 }
 
-.mod_vrsculpt-studio.mod_vrsculpt-fullscreen {
+.mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen {
     position: fixed;
     top: 0;
     right: 0;
@@ -84,50 +84,50 @@
     z-index: 1050;
 }
 
-.mod_vrsculpt-studio:fullscreen .mod_vrsculpt-stage,
-.mod_vrsculpt-studio.mod_vrsculpt-fullscreen .mod_vrsculpt-stage {
+.mod_vrmakerspace-studio:fullscreen .mod_vrmakerspace-stage,
+.mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen .mod_vrmakerspace-stage {
     flex: 1 1 auto;
     height: auto;
     min-height: 12rem;
 }
 
-.mod_vrsculpt-studio:fullscreen .mod_vrsculpt-help,
-.mod_vrsculpt-studio.mod_vrsculpt-fullscreen .mod_vrsculpt-help {
+.mod_vrmakerspace-studio:fullscreen .mod_vrmakerspace-help,
+.mod_vrmakerspace-studio.mod_vrmakerspace-fullscreen .mod_vrmakerspace-help {
     display: none;
 }
 
 /* Phones: the toolbar wraps, groups take the full width, the canvas keeps most of the screen. */
 @media (max-width: 575.98px) {
-    .mod_vrsculpt-studio .mod_vrsculpt-toolbar > .btn-group:first-child {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-toolbar > .btn-group:first-child {
         width: 100%;
     }
 
-    .mod_vrsculpt-studio .mod_vrsculpt-toolbar > .btn-group:first-child .btn {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-toolbar > .btn-group:first-child .btn {
         flex: 1 1 auto;
     }
 
-    .mod_vrsculpt-studio .mod_vrsculpt-slider {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-slider {
         flex: 1 1 100%;
     }
 
-    .mod_vrsculpt-studio .mod_vrsculpt-slider .form-range {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-slider .form-range {
         flex: 1 1 auto;
         width: auto;
     }
 
-    .mod_vrsculpt-studio .mod_vrsculpt-stage {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-stage {
         height: 60vh;
     }
 }
 
 /* The grading page's quick view popup. */
-.mod_vrsculpt-quickview .mod_vrsculpt-quickview-stage {
+.mod_vrmakerspace-quickview .mod_vrmakerspace-quickview-stage {
     height: 65vh;
     min-height: 280px;
     background: #c9ccd1;
 }
 
-.mod_vrsculpt-quickview .mod_vrsculpt-quickview-canvas {
+.mod_vrmakerspace-quickview .mod_vrmakerspace-quickview-canvas {
     display: block;
     width: 100%;
     height: 100%;
@@ -135,6 +135,6 @@
     outline: none;
 }
 
-.mod_vrsculpt-quickview .mod_vrsculpt-quickview-canvas:focus-visible {
+.mod_vrmakerspace-quickview .mod_vrmakerspace-quickview-canvas:focus-visible {
     box-shadow: inset 0 0 0 3px #0f6cbf;
 }

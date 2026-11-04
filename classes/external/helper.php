@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\pair_manager;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\pair_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
- * Shared code of the mod_vrsculpt web services.
+ * Shared code of the mod_vrmakerspace web services.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -37,16 +37,16 @@ class helper {
      *
      * @param int $cmid the course module id
      * @param int $sessionid the session id
-     * @return array [\stdClass $vrsculpt, \cm_info $cm, \context_module $context, \stdClass $session]
+     * @return array [\stdClass $vrmakerspace, \cm_info $cm, \context_module $context, \stdClass $session]
      */
     public static function load(int $cmid, int $sessionid): array {
         global $DB;
-        [, $cm] = get_course_and_cm_from_cmid($cmid, 'vrsculpt');
+        [, $cm] = get_course_and_cm_from_cmid($cmid, 'vrmakerspace');
         $context = \context_module::instance($cm->id);
         \core_external\external_api::validate_context($context);
-        $vrsculpt = $DB->get_record('vrsculpt', ['id' => $cm->instance], '*', MUST_EXIST);
-        $session = session_manager::get_session($sessionid, $vrsculpt);
-        return [$vrsculpt, $cm, $context, $session];
+        $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $cm->instance], '*', MUST_EXIST);
+        $session = session_manager::get_session($sessionid, $vrmakerspace);
+        return [$vrmakerspace, $cm, $context, $session];
     }
 
     /**
@@ -56,33 +56,33 @@ class helper {
      * @param \context_module $context the activity context
      * @param int $userid the user
      * @return void
-     * @throws \required_capability_exception without mod/vrsculpt:sculpt
+     * @throws \required_capability_exception without mod/vrmakerspace:make
      * @throws \moodle_exception cannotsculpt
      */
     public static function require_sculptor(\stdClass $session, \context_module $context, int $userid): void {
-        require_capability('mod/vrsculpt:sculpt', $context);
-        if (!session_manager::can_sculpt($session, $context, $userid)) {
-            throw new \moodle_exception('cannotsculpt', 'mod_vrsculpt');
+        require_capability('mod/vrmakerspace:make', $context);
+        if (!session_manager::can_make($session, $context, $userid)) {
+            throw new \moodle_exception('cannotsculpt', 'mod_vrmakerspace');
         }
     }
 
     /**
      * The state of a session.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
      * @param int $userid the user asking
      * @return array see state_structure()
      */
-    public static function state(\stdClass $vrsculpt, \stdClass $session, \context_module $context, int $userid): array {
+    public static function state(\stdClass $vrmakerspace, \stdClass $session, \context_module $context, int $userid): array {
         $latest = session_manager::get_latest_snapshot((int)$session->id);
         return [
             'sessionid' => (int)$session->id,
-            'connection' => session_manager::is_group_work($vrsculpt) ? session_manager::connection($vrsculpt) : '',
+            'connection' => session_manager::is_group_work($vrmakerspace) ? session_manager::connection($vrmakerspace) : '',
             'startmodel' => session_manager::clean_start_model((string)$session->startmodel),
             'status' => (int)$session->status,
-            'cansculpt' => session_manager::can_sculpt($session, $context, $userid),
+            'cansculpt' => session_manager::can_make($session, $context, $userid),
             'version' => $latest ? (int)$latest->version : 0,
             'opcount' => $latest ? (int)$latest->opcount : 0,
             'timesaved' => $latest ? (int)$latest->timecreated : 0,
@@ -112,13 +112,13 @@ class helper {
     /**
      * Refuse a pair-work call for an activity whose sculptures are not sculpted in pairs.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return void
      * @throws \moodle_exception notpairwork
      */
-    public static function require_pair_work(\stdClass $vrsculpt): void {
-        if (!pair_manager::allowed($vrsculpt)) {
-            throw new \moodle_exception('notpairwork', 'mod_vrsculpt');
+    public static function require_pair_work(\stdClass $vrmakerspace): void {
+        if (!pair_manager::allowed($vrmakerspace)) {
+            throw new \moodle_exception('notpairwork', 'mod_vrmakerspace');
         }
     }
 

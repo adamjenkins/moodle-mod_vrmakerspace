@@ -18,12 +18,12 @@
  *
  * Modes:
  * - solo: one person; this client sequences its own ops.
- * - pair: two people over a direct WebRTC connection (mod_vrsculpt/net/pairtransport), no server
+ * - pair: two people over a direct WebRTC connection (mod_vrmakerspace/net/pairtransport), no server
  *   of its own. The host sequences: its own ops like solo, the guest's ops with the guest's author
  *   id (from Moodle's peer list, never from the guest) and the next sequence number, and sends
  *   every confirmed op to the guest. A new connection starts with the host's confirmed state.
  *   When the host goes away, Moodle makes the guest the host and its pending ops are promoted.
- * - companion: up to eight people through vrroom-sync (mod_vrsculpt/net/companiontransport),
+ * - companion: up to eight people through vrroom-sync (mod_vrmakerspace/net/companiontransport),
  *   which sequences every op; the author of an op is the peer id of the frame. Late joiners load
  *   the latest saved version and ask for the ops after it (replay); a gap in the server's ring is
  *   filled by asking the leader to save, then loading that version. Falls back to pair when the
@@ -38,7 +38,7 @@
  * The leader saves (solo: self; pair: the host; companion: the connected peer with the smallest
  * peer id): every autosavems when the sequence moved, on saveNow(), when the page is hidden and on
  * stop(). A save sends the serialized confirmed state (header seq and epoch set to the room's
- * numbering) to mod_vrsculpt_save_snapshot.
+ * numbering) to mod_vrmakerspace_save_snapshot.
  *
  * Events (detail objects):
  * - status   {state, text}: state solo|connecting|waiting|connected|reconnecting|resyncing|full|
@@ -52,7 +52,7 @@
  * - saved    {version}
  * - savefailed {message}
  *
- * @module     mod_vrsculpt/net/session
+ * @module     mod_vrmakerspace/net/session
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -61,9 +61,9 @@ import Ajax from 'core/ajax';
 import Log from 'core/log';
 import {getStrings} from 'core/str';
 import {encode, decode} from 'vrroomruntime_builtin/live/codec';
-import {Emitter} from 'mod_vrsculpt/net/emitter';
-import {createPairTransport} from 'mod_vrsculpt/net/pairtransport';
-import {createCompanionTransport} from 'mod_vrsculpt/net/companiontransport';
+import {Emitter} from 'mod_vrmakerspace/net/emitter';
+import {createPairTransport} from 'mod_vrmakerspace/net/pairtransport';
+import {createCompanionTransport} from 'mod_vrmakerspace/net/companiontransport';
 
 /** Grid size and voxel size of every sculpture (contract §2). */
 const DIMS = 128;
@@ -92,7 +92,7 @@ const POSE_INTERVAL = 1000 / 15;
 const MAX_POSE_PER_SECOND = 30;
 
 /** Scene id of the pose messages (the codec requires one; the sculpture has a single scene). */
-const POSE_SCENE = 'vrsculpt';
+const POSE_SCENE = 'vrmakerspace';
 
 /** While filling a gap, look for a newer saved version this often (ms). */
 const GAP_POLL = 3000;
@@ -151,7 +151,7 @@ const STATUS_KEYS = Object.freeze({
 });
 
 /** Prefix of debug log lines. */
-const LOGPREFIX = 'mod_vrsculpt/net/session: ';
+const LOGPREFIX = 'mod_vrmakerspace/net/session: ';
 
 /**
  * Turn a web-service rejection into an Error carrying an errorcode.
@@ -602,7 +602,7 @@ class Session extends Emitter {
             this.setStatus('view');
             return;
         }
-        const state = await callService('mod_vrsculpt_get_session_state', {cmid: this.cmid, sessionid: this.sessionid});
+        const state = await callService('mod_vrmakerspace_get_session_state', {cmid: this.cmid, sessionid: this.sessionid});
         this.version = Number(state.version) || 0;
         const url = this.config.snapshoturl || state.url || '';
         const bytes = url ? await this.fetchSnapshot(url) : null;
@@ -773,7 +773,7 @@ class Session extends Emitter {
             return;
         }
         try {
-            const values = await getStrings(missing.map((key) => ({key: key, component: 'mod_vrsculpt'})));
+            const values = await getStrings(missing.map((key) => ({key: key, component: 'mod_vrmakerspace'})));
             missing.forEach((key, index) => {
                 this.texts[key] = values[index];
             });
@@ -891,7 +891,7 @@ class Session extends Emitter {
      * @returns {Promise<{version: number, bytes: (Uint8Array|null), header: (Object|null)}>}
      */
     async latestSnapshot() {
-        const state = await callService('mod_vrsculpt_get_session_state', {cmid: this.cmid, sessionid: this.sessionid}, true);
+        const state = await callService('mod_vrmakerspace_get_session_state', {cmid: this.cmid, sessionid: this.sessionid}, true);
         const version = Number(state.version) || 0;
         if (Number(state.status) === 1) {
             this.markClosed();
@@ -1183,7 +1183,7 @@ class Session extends Emitter {
             // The confirmed state may have moved on between the request and the answer.
             const roomseq = isFinite(engineseq) ? engineseq - offset : seq;
             stampHeader(bytes, roomseq, epoch);
-            result = await callService('mod_vrsculpt_save_snapshot', {
+            result = await callService('mod_vrmakerspace_save_snapshot', {
                 cmid: this.cmid,
                 sessionid: this.sessionid,
                 data: toBase64(bytes),
@@ -1313,7 +1313,7 @@ class Session extends Emitter {
             if (delta.ops <= 0 && delta.added <= 0 && delta.removed <= 0) {
                 return;
             }
-            const result = await callService('mod_vrsculpt_report_contribution', {
+            const result = await callService('mod_vrmakerspace_report_contribution', {
                 cmid: this.cmid,
                 sessionid: this.sessionid,
                 ops: Math.max(0, delta.ops),
@@ -1684,7 +1684,7 @@ class Session extends Emitter {
         const giveup = Date.now() - gap.started > GAP_GIVE_UP || !this.companion.peers().length;
         let latest = null;
         try {
-            const state = await callService('mod_vrsculpt_get_session_state', {cmid: this.cmid, sessionid: this.sessionid},
+            const state = await callService('mod_vrmakerspace_get_session_state', {cmid: this.cmid, sessionid: this.sessionid},
                 true);
             const version = Number(state.version) || 0;
             if (state.url && (version !== gap.version || giveup)) {

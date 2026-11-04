@@ -37,7 +37,7 @@
  * Scratch buffers are module-level and reused between calls; the returned arrays are fresh copies
  * that the caller may transfer.
  *
- * @module     mod_vrsculpt/engine/mesher
+ * @module     mod_vrmakerspace/engine/mesher
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

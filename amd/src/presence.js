@@ -26,7 +26,7 @@
  * The colour of a person comes from a hash of their peer id, as vrroom's avatars do it; the name
  * label is drawn on a canvas with fillText (plain text, never HTML).
  *
- * @module     mod_vrsculpt/presence
+ * @module     mod_vrmakerspace/presence
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -147,7 +147,7 @@ const applyPose = (object, pose) => {
 export const createPresence = (THREE, parent, options = {}) => {
     const delay = Number.isFinite(Number(options.delay)) ? Math.max(0, Number(options.delay)) : 120;
     const group = new THREE.Group();
-    group.name = 'vrsculpt-presence';
+    group.name = 'vrmakerspace-presence';
     parent.add(group);
 
     // Shared by every person.
@@ -224,7 +224,7 @@ export const createPresence = (THREE, parent, options = {}) => {
         const cursormaterial = new THREE.MeshBasicMaterial({color: colour, transparent: true, opacity: 0.7, depthWrite: false});
 
         const figure = new THREE.Group();
-        figure.name = 'vrsculpt-peer';
+        figure.name = 'vrmakerspace-peer';
         figure.visible = false;
 
         const head = new THREE.Group();

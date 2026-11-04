@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Pair work: two members of a group sculpt their group's sculpture together, browser to browser.
  *
  * Needs no server of its own: the two browsers find each other through Moodle. Each one is a row of
- * vrsculpt_peers with a random peer key made here, kept while its studio polls (pair_poll); after
+ * vrmakerspace_peers with a random peer key made here, kept while its studio polls (pair_poll); after
  * ACTIVE seconds without a poll it no longer counts. At most MAX_PEERS rows of a session are active.
  * One of them is the host, which orders every edit; when no active host remains, the earliest active
  * peer becomes the host. The connection messages (WebRTC offers, answers and candidates) are rows of
- * vrsculpt_signals, only ever stored between two active peers of the same session, and deleted when
+ * vrmakerspace_signals, only ever stored between two active peers of the same session, and deleted when
  * the recipient confirms them or after EXPIRY seconds (scheduled task). Every rule is enforced here;
  * nothing the browser sends is trusted.
  *
@@ -32,7 +32,7 @@ namespace mod_vrsculpt\local;
  * ids, a lock per room) follows vrroomruntime_builtin's room_manager, which adapts it from mod_gear's
  * sync_session service.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -72,7 +72,7 @@ final class pair_manager {
     public const NAME_MAX = 100;
 
     /** @var string Lock type of the session locks. */
-    private const LOCK_TYPE = 'mod_vrsculpt_pair';
+    private const LOCK_TYPE = 'mod_vrmakerspace_pair';
 
     /** @var int Peer keys per IN (...) list. */
     private const CHUNK = 500;
@@ -102,14 +102,14 @@ final class pair_manager {
      * Group work with the pair connection; also group work with the companion connection while the
      * companion service is not available, so the studio can fall back to working with one partner.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return bool
      */
-    public static function allowed(\stdClass $vrsculpt): bool {
-        if (!session_manager::is_group_work($vrsculpt)) {
+    public static function allowed(\stdClass $vrmakerspace): bool {
+        if (!session_manager::is_group_work($vrmakerspace)) {
             return false;
         }
-        return session_manager::connection($vrsculpt) === session_manager::CONNECTION_PAIR
+        return session_manager::connection($vrmakerspace) === session_manager::CONNECTION_PAIR
             || !companion_manager::is_available();
     }
 
@@ -130,14 +130,14 @@ final class pair_manager {
 
         $lock = self::lock($sessionid);
         try {
-            $existing = $DB->get_record('vrsculpt_peers', ['sessionid' => $sessionid, 'userid' => $userid]);
+            $existing = $DB->get_record('vrmakerspace_peers', ['sessionid' => $sessionid, 'userid' => $userid]);
             if ($existing) {
                 self::delete_peers([$existing]);
             }
             self::purge_stale($sessionid, $now);
             $active = self::active_rows($sessionid, $now);
             if (count($active) >= self::MAX_PEERS) {
-                throw new \moodle_exception('sessionfull', 'mod_vrsculpt');
+                throw new \moodle_exception('sessionfull', 'mod_vrmakerspace');
             }
             $hashost = false;
             foreach ($active as $row) {
@@ -151,7 +151,7 @@ final class pair_manager {
                 'lastseen' => $now,
                 'timecreated' => $now,
             ];
-            $peer->id = $DB->insert_record('vrsculpt_peers', $peer);
+            $peer->id = $DB->insert_record('vrmakerspace_peers', $peer);
         } finally {
             $lock->release();
         }
@@ -184,11 +184,11 @@ final class pair_manager {
         $sessionid = (int)$session->id;
         $peer = self::own_peer($sessionid, $userid, $peerkey);
 
-        $DB->set_field('vrsculpt_peers', 'lastseen', $now, ['id' => $peer->id]);
+        $DB->set_field('vrmakerspace_peers', 'lastseen', $now, ['id' => $peer->id]);
         $peer->lastseen = $now;
         if ($afterid > 0) {
             $DB->delete_records_select(
-                'vrsculpt_signals',
+                'vrmakerspace_signals',
                 'sessionid = :sessionid AND topeerkey = :peerkey AND id <= :afterid',
                 ['sessionid' => $sessionid, 'peerkey' => $peer->peerkey, 'afterid' => $afterid]
             );
@@ -202,7 +202,7 @@ final class pair_manager {
                     self::purge_stale($sessionid, $now);
                     $active = self::active_rows($sessionid, $now);
                     if ($active) {
-                        $DB->set_field('vrsculpt_peers', 'role', self::ROLE_HOST, ['id' => reset($active)->id]);
+                        $DB->set_field('vrmakerspace_peers', 'role', self::ROLE_HOST, ['id' => reset($active)->id]);
                     }
                 }
             } finally {
@@ -213,7 +213,7 @@ final class pair_manager {
 
         $signals = [];
         $rows = $DB->get_records_select(
-            'vrsculpt_signals',
+            'vrmakerspace_signals',
             'sessionid = :sessionid AND topeerkey = :peerkey AND id > :afterid',
             ['sessionid' => $sessionid, 'peerkey' => $peer->peerkey, 'afterid' => max(0, $afterid)],
             'id ASC',
@@ -252,27 +252,27 @@ final class pair_manager {
         $sessionid = (int)$session->id;
 
         if (strlen($payload) > self::MAX_PAYLOAD) {
-            throw new \moodle_exception('signaltoolarge', 'mod_vrsculpt');
+            throw new \moodle_exception('signaltoolarge', 'mod_vrmakerspace');
         }
         if ($payload === '' || !mb_check_encoding($payload, 'UTF-8')) {
-            throw new \moodle_exception('signalinvalid', 'mod_vrsculpt');
+            throw new \moodle_exception('signalinvalid', 'mod_vrmakerspace');
         }
         $peer = self::own_peer($sessionid, $userid, $peerkey);
         if ((int)$peer->lastseen < $now - self::ACTIVE) {
-            throw new \moodle_exception('peergone', 'mod_vrsculpt');
+            throw new \moodle_exception('peergone', 'mod_vrmakerspace');
         }
         $to = null;
         if (self::is_peerkey($topeerkey) && $topeerkey !== $peer->peerkey) {
-            $to = $DB->get_record('vrsculpt_peers', ['sessionid' => $sessionid, 'peerkey' => $topeerkey]);
+            $to = $DB->get_record('vrmakerspace_peers', ['sessionid' => $sessionid, 'peerkey' => $topeerkey]);
         }
         if (!$to || (int)$to->lastseen < $now - self::ACTIVE) {
-            throw new \moodle_exception('peernotfound', 'mod_vrsculpt');
+            throw new \moodle_exception('peernotfound', 'mod_vrmakerspace');
         }
-        $pending = $DB->count_records('vrsculpt_signals', ['sessionid' => $sessionid, 'topeerkey' => $to->peerkey]);
+        $pending = $DB->count_records('vrmakerspace_signals', ['sessionid' => $sessionid, 'topeerkey' => $to->peerkey]);
         if ($pending >= self::MAX_PENDING) {
-            throw new \moodle_exception('signalqueuefull', 'mod_vrsculpt');
+            throw new \moodle_exception('signalqueuefull', 'mod_vrmakerspace');
         }
-        $DB->insert_record('vrsculpt_signals', (object)[
+        $DB->insert_record('vrmakerspace_signals', (object)[
             'sessionid' => $sessionid,
             'frompeerkey' => $peer->peerkey,
             'topeerkey' => $to->peerkey,
@@ -280,7 +280,7 @@ final class pair_manager {
             'payload' => $payload,
             'timecreated' => $now,
         ]);
-        $DB->set_field('vrsculpt_peers', 'lastseen', $now, ['id' => $peer->id]);
+        $DB->set_field('vrmakerspace_peers', 'lastseen', $now, ['id' => $peer->id]);
     }
 
     /**
@@ -293,7 +293,7 @@ final class pair_manager {
      */
     public static function leave(\stdClass $session, int $userid, string $peerkey): void {
         global $DB;
-        $peer = $DB->get_record('vrsculpt_peers', ['sessionid' => $session->id, 'userid' => $userid]);
+        $peer = $DB->get_record('vrmakerspace_peers', ['sessionid' => $session->id, 'userid' => $userid]);
         if ($peer && hash_equals((string)$peer->peerkey, $peerkey)) {
             self::delete_peers([$peer]);
         }
@@ -311,7 +311,7 @@ final class pair_manager {
         global $DB;
         $userfields = \core_user\fields::for_name()->get_sql('u', true, '', '', true);
         $sql = "SELECT p.id, p.userid, p.peerkey, p.role {$userfields->selects}
-                  FROM {vrsculpt_peers} p
+                  FROM {vrmakerspace_peers} p
                   JOIN {user} u ON u.id = p.userid {$userfields->joins}
                  WHERE p.sessionid = :sessionid
                    AND p.id <> :self
@@ -380,10 +380,10 @@ final class pair_manager {
         $now = $now ?? time();
         $cutoff = $now - self::EXPIRY;
 
-        $peers = $DB->get_records_select('vrsculpt_peers', 'lastseen < ?', [$cutoff], 'id ASC', 'id, sessionid, peerkey');
+        $peers = $DB->get_records_select('vrmakerspace_peers', 'lastseen < ?', [$cutoff], 'id ASC', 'id, sessionid, peerkey');
         $signals = self::delete_peers($peers);
-        $old = $DB->count_records_select('vrsculpt_signals', 'timecreated < ?', [$cutoff]);
-        $DB->delete_records_select('vrsculpt_signals', 'timecreated < ?', [$cutoff]);
+        $old = $DB->count_records_select('vrmakerspace_signals', 'timecreated < ?', [$cutoff]);
+        $DB->delete_records_select('vrmakerspace_signals', 'timecreated < ?', [$cutoff]);
         return ['peers' => count($peers), 'signals' => $signals + $old];
     }
 
@@ -408,8 +408,8 @@ final class pair_manager {
             $signalselect .= " AND sessionid $insql";
             $params += $inparams;
         }
-        self::delete_peers($DB->get_records_select('vrsculpt_peers', $select, $params, '', 'id, sessionid, peerkey'));
-        $DB->delete_records_select('vrsculpt_signals', $signalselect, $params);
+        self::delete_peers($DB->get_records_select('vrmakerspace_peers', $select, $params, '', 'id, sessionid, peerkey'));
+        $DB->delete_records_select('vrmakerspace_signals', $signalselect, $params);
     }
 
     /**
@@ -418,14 +418,14 @@ final class pair_manager {
      * @param int $sessionid the session id
      * @param int $userid the user
      * @param string $peerkey the peer key the client sent
-     * @return \stdClass the vrsculpt_peers row
+     * @return \stdClass the vrmakerspace_peers row
      * @throws \moodle_exception peergone when the row is gone or its key was replaced by a newer join
      */
     private static function own_peer(int $sessionid, int $userid, string $peerkey): \stdClass {
         global $DB;
-        $peer = $DB->get_record('vrsculpt_peers', ['sessionid' => $sessionid, 'userid' => $userid]);
+        $peer = $DB->get_record('vrmakerspace_peers', ['sessionid' => $sessionid, 'userid' => $userid]);
         if (!$peer || !self::is_peerkey($peerkey) || !hash_equals((string)$peer->peerkey, $peerkey)) {
-            throw new \moodle_exception('peergone', 'mod_vrsculpt');
+            throw new \moodle_exception('peergone', 'mod_vrmakerspace');
         }
         return $peer;
     }
@@ -435,12 +435,12 @@ final class pair_manager {
      *
      * @param int $sessionid the session id
      * @param int $now current time
-     * @return \stdClass[] vrsculpt_peers rows keyed by id
+     * @return \stdClass[] vrmakerspace_peers rows keyed by id
      */
     private static function active_rows(int $sessionid, int $now): array {
         global $DB;
         return $DB->get_records_select(
-            'vrsculpt_peers',
+            'vrmakerspace_peers',
             'sessionid = ? AND lastseen >= ?',
             [$sessionid, $now - self::ACTIVE],
             'timecreated ASC, id ASC'
@@ -457,7 +457,7 @@ final class pair_manager {
     private static function has_active_host(int $sessionid, int $now): bool {
         global $DB;
         return $DB->record_exists_select(
-            'vrsculpt_peers',
+            'vrmakerspace_peers',
             'sessionid = ? AND role = ? AND lastseen >= ?',
             [$sessionid, self::ROLE_HOST, $now - self::ACTIVE]
         );
@@ -473,7 +473,7 @@ final class pair_manager {
     private static function purge_stale(int $sessionid, int $now): void {
         global $DB;
         self::delete_peers($DB->get_records_select(
-            'vrsculpt_peers',
+            'vrmakerspace_peers',
             'sessionid = ? AND lastseen < ?',
             [$sessionid, $now - self::ACTIVE],
             '',
@@ -484,7 +484,7 @@ final class pair_manager {
     /**
      * Delete peers with the messages sent to or by them.
      *
-     * @param \stdClass[] $peers vrsculpt_peers rows (id, sessionid, peerkey)
+     * @param \stdClass[] $peers vrmakerspace_peers rows (id, sessionid, peerkey)
      * @return int how many messages were deleted
      */
     private static function delete_peers(array $peers): int {
@@ -498,10 +498,10 @@ final class pair_manager {
             [$tosql, $toparams] = $DB->get_in_or_equal($keys, SQL_PARAMS_NAMED, 'to');
             [$fromsql, $fromparams] = $DB->get_in_or_equal($keys, SQL_PARAMS_NAMED, 'from');
             $select = "topeerkey $tosql OR frompeerkey $fromsql";
-            $deleted += $DB->count_records_select('vrsculpt_signals', $select, $toparams + $fromparams);
-            $DB->delete_records_select('vrsculpt_signals', $select, $toparams + $fromparams);
+            $deleted += $DB->count_records_select('vrmakerspace_signals', $select, $toparams + $fromparams);
+            $DB->delete_records_select('vrmakerspace_signals', $select, $toparams + $fromparams);
             [$idsql, $idparams] = $DB->get_in_or_equal(array_map(fn($p) => (int)$p->id, $chunk));
-            $DB->delete_records_select('vrsculpt_peers', "id $idsql", $idparams);
+            $DB->delete_records_select('vrmakerspace_peers', "id $idsql", $idparams);
         }
         return $deleted;
     }
@@ -517,7 +517,7 @@ final class pair_manager {
         $factory = \core\lock\lock_config::get_lock_factory(self::LOCK_TYPE);
         $lock = $factory->get_lock('session_' . $sessionid, self::LOCK_TIMEOUT);
         if (!$lock) {
-            throw new \moodle_exception('pairbusy', 'mod_vrsculpt');
+            throw new \moodle_exception('pairbusy', 'mod_vrmakerspace');
         }
         return $lock;
     }

@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled tasks of mod_vrsculpt.
+ * Scheduled tasks of mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
     [
-        'classname' => \mod_vrsculpt\task\cleanup::class,
+        'classname' => \mod_vrmakerspace\task\cleanup::class,
         'blocking' => 0,
         'minute' => '*/15',
         'hour' => '*',

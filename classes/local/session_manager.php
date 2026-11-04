@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Sculpting sessions (one sculpture each) and their saved versions.
  *
  * A session belongs to one user (individual mode, groupid 0) or one group (group mode, userid 0).
- * Each saved version is a row in vrsculpt_snapshots and one file in the snapshots file area of the
+ * Each saved version is a row in vrmakerspace_snapshots and one file in the snapshots file area of the
  * module context, item id = the snapshot id. A snapshot file is in the "VRSC" format (version 1): a
  * 48-byte little-endian header followed by one signed byte per voxel, optionally deflate-compressed;
  * the header is checked before anything is stored.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -116,14 +116,14 @@ class session_manager {
      * Individual mode: the user's own session. Group mode: the session of $groupid, which must be one of
      * the user's groups in the activity's grouping; when $groupid is 0 the user's first such group.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \cm_info|\stdClass $cm the course module
      * @param int $userid the user
      * @param int $groupid group mode only: the group, 0 for the user's first
      * @return \stdClass|null the session row, or null when a group-mode user has no (such) group
      */
-    public static function get_or_create_for_user(\stdClass $vrsculpt, $cm, int $userid, int $groupid = 0): ?\stdClass {
-        if ((int)$vrsculpt->workmode === self::MODE_GROUP) {
+    public static function get_or_create_for_user(\stdClass $vrmakerspace, $cm, int $userid, int $groupid = 0): ?\stdClass {
+        if ((int)$vrmakerspace->workmode === self::MODE_GROUP) {
             $groups = self::get_user_groups($cm, $userid);
             if ($groupid) {
                 if (!isset($groups[$groupid])) {
@@ -134,38 +134,38 @@ class session_manager {
             } else {
                 return null;
             }
-            return self::get_or_create($vrsculpt, $groupid, 0);
+            return self::get_or_create($vrmakerspace, $groupid, 0);
         }
-        return self::get_or_create($vrsculpt, 0, $userid);
+        return self::get_or_create($vrmakerspace, 0, $userid);
     }
 
     /**
      * Find or create the session of one owner.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param int $groupid the group (group mode) or 0
      * @param int $userid the user (individual mode) or 0
      * @return \stdClass the session row
      */
-    public static function get_or_create(\stdClass $vrsculpt, int $groupid, int $userid): \stdClass {
+    public static function get_or_create(\stdClass $vrmakerspace, int $groupid, int $userid): \stdClass {
         global $DB;
 
-        $conditions = ['vrsculptid' => $vrsculpt->id, 'groupid' => $groupid, 'userid' => $userid];
-        if ($session = $DB->get_record('vrsculpt_sessions', $conditions)) {
+        $conditions = ['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $groupid, 'userid' => $userid];
+        if ($session = $DB->get_record('vrmakerspace_sessions', $conditions)) {
             return $session;
         }
         $now = time();
         $session = (object)($conditions + [
-            'startmodel' => self::clean_start_model((string)$vrsculpt->startmodel),
+            'startmodel' => self::clean_start_model((string)$vrmakerspace->startmodel),
             'status' => self::STATUS_OPEN,
             'timecreated' => $now,
             'timemodified' => $now,
         ]);
         try {
-            $session->id = $DB->insert_record('vrsculpt_sessions', $session);
+            $session->id = $DB->insert_record('vrmakerspace_sessions', $session);
         } catch (\dml_write_exception $e) {
-            // Another request created it first (unique index vrsculptid, groupid, userid).
-            return $DB->get_record('vrsculpt_sessions', $conditions, '*', MUST_EXIST);
+            // Another request created it first (unique index vrmakerspaceid, groupid, userid).
+            return $DB->get_record('vrmakerspace_sessions', $conditions, '*', MUST_EXIST);
         }
         return $session;
     }
@@ -183,21 +183,21 @@ class session_manager {
     /**
      * Whether an activity is done in groups (one shared sculpture per group).
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return bool
      */
-    public static function is_group_work(\stdClass $vrsculpt): bool {
-        return (int)$vrsculpt->workmode === self::MODE_GROUP;
+    public static function is_group_work(\stdClass $vrmakerspace): bool {
+        return (int)$vrmakerspace->workmode === self::MODE_GROUP;
     }
 
     /**
      * The connection of an activity's group work: one of CONNECTIONS, pair when unknown.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return string
      */
-    public static function connection(\stdClass $vrsculpt): string {
-        $connection = (string)($vrsculpt->connectmode ?? '');
+    public static function connection(\stdClass $vrmakerspace): string {
+        $connection = (string)($vrmakerspace->connectmode ?? '');
         return in_array($connection, self::CONNECTIONS, true) ? $connection : self::CONNECTION_PAIR;
     }
 
@@ -205,15 +205,15 @@ class session_manager {
      * Load a session of this activity.
      *
      * @param int $sessionid the session id (client-supplied: never trusted on its own)
-     * @param \stdClass $vrsculpt the activity it must belong to
+     * @param \stdClass $vrmakerspace the activity it must belong to
      * @return \stdClass the session row
      * @throws \moodle_exception invalidsession when it does not exist or belongs to another activity
      */
-    public static function get_session(int $sessionid, \stdClass $vrsculpt): \stdClass {
+    public static function get_session(int $sessionid, \stdClass $vrmakerspace): \stdClass {
         global $DB;
-        $session = $DB->get_record('vrsculpt_sessions', ['id' => $sessionid]);
-        if (!$session || (int)$session->vrsculptid !== (int)$vrsculpt->id) {
-            throw new \moodle_exception('invalidsession', 'mod_vrsculpt');
+        $session = $DB->get_record('vrmakerspace_sessions', ['id' => $sessionid]);
+        if (!$session || (int)$session->vrmakerspaceid !== (int)$vrmakerspace->id) {
+            throw new \moodle_exception('invalidsession', 'mod_vrmakerspace');
         }
         return $session;
     }
@@ -242,10 +242,10 @@ class session_manager {
      * @return bool
      */
     public static function can_view(\stdClass $session, \context_module $context, int $userid): bool {
-        if (!has_capability('mod/vrsculpt:view', $context, $userid)) {
+        if (!has_capability('mod/vrmakerspace:view', $context, $userid)) {
             return false;
         }
-        return self::is_owner($session, $userid) || has_capability('mod/vrsculpt:viewallsubmissions', $context, $userid);
+        return self::is_owner($session, $userid) || has_capability('mod/vrmakerspace:viewallsubmissions', $context, $userid);
     }
 
     /**
@@ -256,9 +256,9 @@ class session_manager {
      * @param int $userid the user
      * @return bool
      */
-    public static function can_sculpt(\stdClass $session, \context_module $context, int $userid): bool {
+    public static function can_make(\stdClass $session, \context_module $context, int $userid): bool {
         return (int)$session->status === self::STATUS_OPEN
-            && has_capability('mod/vrsculpt:sculpt', $context, $userid)
+            && has_capability('mod/vrmakerspace:make', $context, $userid)
             && self::is_owner($session, $userid);
     }
 
@@ -268,7 +268,7 @@ class session_manager {
      * @return int
      */
     public static function max_snapshot_size(): int {
-        $size = (int)get_config('mod_vrsculpt', 'maxsnapshotsize');
+        $size = (int)get_config('mod_vrmakerspace', 'maxsnapshotsize');
         return $size > 0 ? $size : self::DEFAULT_MAX_SNAPSHOT_SIZE;
     }
 
@@ -288,7 +288,7 @@ class session_manager {
     public static function validate_snapshot(string $data): array {
         $size = strlen($data);
         if ($size <= self::SNAPSHOT_HEADER_SIZE || substr($data, 0, 4) !== self::SNAPSHOT_MAGIC) {
-            throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
+            throw new \moodle_exception('snapshotinvalid', 'mod_vrmakerspace');
         }
         $header = unpack('vversion/vflags/vnx/vny/vnz/vreserved/gvoxel/gband/Vseq', substr($data, 4, 24));
         $header['epoch'] = substr($data, 28, 16);
@@ -309,7 +309,7 @@ class session_manager {
             $valid = $header['length'] === $header['nx'] * $header['ny'] * $header['nz'];
         }
         if (!$valid) {
-            throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
+            throw new \moodle_exception('snapshotinvalid', 'mod_vrmakerspace');
         }
         return $header;
     }
@@ -317,7 +317,7 @@ class session_manager {
     /**
      * Save a new version of a session's sculpture.
      *
-     * The caller has checked can_sculpt(). The data is checked here: not over the size limit, and a
+     * The caller has checked can_make(). The data is checked here: not over the size limit, and a
      * valid "VRSC" header (validate_snapshot()). The version's operation count is the header's
      * sequence number: the number of confirmed edits the data reflects.
      *
@@ -328,7 +328,7 @@ class session_manager {
      * @param \context_module $context the activity context
      * @param int $userid who saves it
      * @param string $data the snapshot bytes
-     * @return \stdClass the new vrsculpt_snapshots row, or the latest one when the data is the same
+     * @return \stdClass the new vrmakerspace_snapshots row, or the latest one when the data is the same
      * @throws \moodle_exception snapshottoolarge or snapshotinvalid
      */
     public static function save_snapshot(
@@ -341,7 +341,7 @@ class session_manager {
 
         $size = strlen($data);
         if ($size > self::max_snapshot_size()) {
-            throw new \moodle_exception('snapshottoolarge', 'mod_vrsculpt', '', display_size(self::max_snapshot_size()));
+            throw new \moodle_exception('snapshottoolarge', 'mod_vrmakerspace', '', display_size(self::max_snapshot_size()));
         }
         $header = self::validate_snapshot($data);
 
@@ -355,7 +355,7 @@ class session_manager {
 
         $transaction = $DB->start_delegated_transaction();
         $version = (int)$DB->get_field_sql(
-            'SELECT COALESCE(MAX(version), 0) FROM {vrsculpt_snapshots} WHERE sessionid = ?',
+            'SELECT COALESCE(MAX(version), 0) FROM {vrmakerspace_snapshots} WHERE sessionid = ?',
             [$session->id]
         ) + 1;
         $now = time();
@@ -367,17 +367,17 @@ class session_manager {
             'filesize' => $size,
             'timecreated' => $now,
         ];
-        $snapshot->id = $DB->insert_record('vrsculpt_snapshots', $snapshot);
+        $snapshot->id = $DB->insert_record('vrmakerspace_snapshots', $snapshot);
         get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
-            'component' => 'mod_vrsculpt',
+            'component' => 'mod_vrmakerspace',
             'filearea' => self::FILEAREA,
             'itemid' => $snapshot->id,
             'filepath' => '/',
             'filename' => self::snapshot_filename($snapshot),
             'userid' => $userid,
         ], $data);
-        $DB->set_field('vrsculpt_sessions', 'timemodified', $now, ['id' => $session->id]);
+        $DB->set_field('vrmakerspace_sessions', 'timemodified', $now, ['id' => $session->id]);
         $transaction->allow_commit();
         return $snapshot;
     }
@@ -385,7 +385,7 @@ class session_manager {
     /**
      * The file name of a snapshot.
      *
-     * @param \stdClass $snapshot the vrsculpt_snapshots row
+     * @param \stdClass $snapshot the vrmakerspace_snapshots row
      * @return string
      */
     public static function snapshot_filename(\stdClass $snapshot): string {
@@ -395,14 +395,14 @@ class session_manager {
     /**
      * The file of a snapshot.
      *
-     * @param \stdClass $snapshot the vrsculpt_snapshots row
+     * @param \stdClass $snapshot the vrmakerspace_snapshots row
      * @param \context_module $context the activity context
      * @return \stored_file|null
      */
     public static function get_snapshot_file(\stdClass $snapshot, \context_module $context): ?\stored_file {
         $file = get_file_storage()->get_file(
             $context->id,
-            'mod_vrsculpt',
+            'mod_vrmakerspace',
             self::FILEAREA,
             $snapshot->id,
             '/',
@@ -418,7 +418,7 @@ class session_manager {
      * @return \stored_file|null
      */
     public static function start_model_file(\context_module $context): ?\stored_file {
-        $files = get_file_storage()->get_area_files($context->id, 'mod_vrsculpt', self::MODEL_FILEAREA, 0, 'id', false);
+        $files = get_file_storage()->get_area_files($context->id, 'mod_vrmakerspace', self::MODEL_FILEAREA, 0, 'id', false);
         foreach ($files as $file) {
             if (self::start_model_format($file->get_filename()) !== '') {
                 return $file;
@@ -441,14 +441,14 @@ class session_manager {
     /**
      * The URL of a snapshot's file.
      *
-     * @param \stdClass $snapshot the vrsculpt_snapshots row
+     * @param \stdClass $snapshot the vrmakerspace_snapshots row
      * @param \context_module $context the activity context
      * @return \moodle_url
      */
     public static function snapshot_url(\stdClass $snapshot, \context_module $context): \moodle_url {
         return \moodle_url::make_pluginfile_url(
             $context->id,
-            'mod_vrsculpt',
+            'mod_vrmakerspace',
             self::FILEAREA,
             $snapshot->id,
             '/',
@@ -461,22 +461,22 @@ class session_manager {
      * All versions of a session, oldest first.
      *
      * @param int $sessionid the session id
-     * @return \stdClass[] vrsculpt_snapshots rows keyed by id
+     * @return \stdClass[] vrmakerspace_snapshots rows keyed by id
      */
     public static function get_snapshots(int $sessionid): array {
         global $DB;
-        return $DB->get_records('vrsculpt_snapshots', ['sessionid' => $sessionid], 'version ASC');
+        return $DB->get_records('vrmakerspace_snapshots', ['sessionid' => $sessionid], 'version ASC');
     }
 
     /**
      * The latest version of a session.
      *
      * @param int $sessionid the session id
-     * @return \stdClass|null the vrsculpt_snapshots row, or null when nothing was saved yet
+     * @return \stdClass|null the vrmakerspace_snapshots row, or null when nothing was saved yet
      */
     public static function get_latest_snapshot(int $sessionid): ?\stdClass {
         global $DB;
-        $records = $DB->get_records('vrsculpt_snapshots', ['sessionid' => $sessionid], 'version DESC', '*', 0, 1);
+        $records = $DB->get_records('vrmakerspace_snapshots', ['sessionid' => $sessionid], 'version DESC', '*', 0, 1);
         return $records ? reset($records) : null;
     }
 
@@ -485,11 +485,11 @@ class session_manager {
      *
      * @param int $sessionid the session id
      * @param int $version the version number
-     * @return \stdClass|null the vrsculpt_snapshots row, or null when there is no such version
+     * @return \stdClass|null the vrmakerspace_snapshots row, or null when there is no such version
      */
     public static function get_snapshot_by_version(int $sessionid, int $version): ?\stdClass {
         global $DB;
-        return $DB->get_record('vrsculpt_snapshots', ['sessionid' => $sessionid, 'version' => $version]) ?: null;
+        return $DB->get_record('vrmakerspace_snapshots', ['sessionid' => $sessionid, 'version' => $version]) ?: null;
     }
 
     /**
@@ -503,10 +503,10 @@ class session_manager {
     public static function set_status(\stdClass $session, int $status): void {
         global $DB;
         if ($status !== self::STATUS_OPEN && $status !== self::STATUS_CLOSED) {
-            throw new \moodle_exception('invalidstatus', 'mod_vrsculpt');
+            throw new \moodle_exception('invalidstatus', 'mod_vrmakerspace');
         }
         $now = time();
-        $DB->update_record('vrsculpt_sessions', (object)['id' => $session->id, 'status' => $status, 'timemodified' => $now]);
+        $DB->update_record('vrmakerspace_sessions', (object)['id' => $session->id, 'status' => $status, 'timemodified' => $now]);
         $session->status = $status;
         $session->timemodified = $now;
     }
@@ -522,14 +522,14 @@ class session_manager {
     public static function reset_session(\stdClass $session, \context_module $context): void {
         global $DB;
         $fs = get_file_storage();
-        foreach ($DB->get_records('vrsculpt_snapshots', ['sessionid' => $session->id], '', 'id') as $snapshot) {
-            $fs->delete_area_files($context->id, 'mod_vrsculpt', self::FILEAREA, $snapshot->id);
+        foreach ($DB->get_records('vrmakerspace_snapshots', ['sessionid' => $session->id], '', 'id') as $snapshot) {
+            $fs->delete_area_files($context->id, 'mod_vrmakerspace', self::FILEAREA, $snapshot->id);
         }
-        $DB->delete_records('vrsculpt_snapshots', ['sessionid' => $session->id]);
-        $DB->delete_records('vrsculpt_contrib', ['sessionid' => $session->id]);
-        $DB->delete_records('vrsculpt_signals', ['sessionid' => $session->id]);
-        $DB->delete_records('vrsculpt_peers', ['sessionid' => $session->id]);
-        $DB->set_field('vrsculpt_sessions', 'timemodified', time(), ['id' => $session->id]);
+        $DB->delete_records('vrmakerspace_snapshots', ['sessionid' => $session->id]);
+        $DB->delete_records('vrmakerspace_contrib', ['sessionid' => $session->id]);
+        $DB->delete_records('vrmakerspace_signals', ['sessionid' => $session->id]);
+        $DB->delete_records('vrmakerspace_peers', ['sessionid' => $session->id]);
+        $DB->set_field('vrmakerspace_sessions', 'timemodified', time(), ['id' => $session->id]);
     }
 
     /**
@@ -538,7 +538,7 @@ class session_manager {
      * @param \stdClass $session the session row
      * @param \context_module $context the activity context
      * @param string $action one of MANAGE_ACTIONS
-     * @return string the lang string key (mod_vrsculpt) of the message telling what was done
+     * @return string the lang string key (mod_vrmakerspace) of the message telling what was done
      * @throws \moodle_exception invalidaction
      */
     public static function manage(\stdClass $session, \context_module $context, string $action): string {
@@ -553,13 +553,13 @@ class session_manager {
                 self::reset_session($session, $context);
                 return 'managedone_reset';
         }
-        throw new \moodle_exception('invalidaction', 'mod_vrsculpt');
+        throw new \moodle_exception('invalidaction', 'mod_vrmakerspace');
     }
 
     /**
      * Delete sessions with their versions, files, live connections and contributions.
      *
-     * @param \stdClass[] $sessions vrsculpt_sessions rows
+     * @param \stdClass[] $sessions vrmakerspace_sessions rows
      * @param \context_module $context the activity context they belong to
      * @return void
      */
@@ -570,15 +570,15 @@ class session_manager {
         }
         $fs = get_file_storage();
         [$insql, $params] = $DB->get_in_or_equal(array_map(fn($s) => (int)$s->id, $sessions));
-        $snapshots = $DB->get_records_select('vrsculpt_snapshots', "sessionid $insql", $params, '', 'id');
+        $snapshots = $DB->get_records_select('vrmakerspace_snapshots', "sessionid $insql", $params, '', 'id');
         foreach ($snapshots as $snapshot) {
-            $fs->delete_area_files($context->id, 'mod_vrsculpt', self::FILEAREA, $snapshot->id);
+            $fs->delete_area_files($context->id, 'mod_vrmakerspace', self::FILEAREA, $snapshot->id);
         }
-        $DB->delete_records_select('vrsculpt_snapshots', "sessionid $insql", $params);
-        $DB->delete_records_select('vrsculpt_contrib', "sessionid $insql", $params);
-        $DB->delete_records_select('vrsculpt_signals', "sessionid $insql", $params);
-        $DB->delete_records_select('vrsculpt_peers', "sessionid $insql", $params);
-        $DB->delete_records_select('vrsculpt_sessions', "id $insql", $params);
+        $DB->delete_records_select('vrmakerspace_snapshots', "sessionid $insql", $params);
+        $DB->delete_records_select('vrmakerspace_contrib', "sessionid $insql", $params);
+        $DB->delete_records_select('vrmakerspace_signals', "sessionid $insql", $params);
+        $DB->delete_records_select('vrmakerspace_peers', "sessionid $insql", $params);
+        $DB->delete_records_select('vrmakerspace_sessions', "id $insql", $params);
     }
 
     /**
@@ -586,27 +586,27 @@ class session_manager {
      *
      * For an activity whose course module is already gone, so that it has no context.
      *
-     * @param int $vrsculptid the vrsculpt id
+     * @param int $vrmakerspaceid the vrmakerspace id
      * @return void
      */
-    public static function delete_rows(int $vrsculptid): void {
+    public static function delete_rows(int $vrmakerspaceid): void {
         global $DB;
-        $select = 'sessionid IN (SELECT id FROM {vrsculpt_sessions} WHERE vrsculptid = ?)';
-        foreach (['vrsculpt_snapshots', 'vrsculpt_contrib', 'vrsculpt_signals', 'vrsculpt_peers'] as $table) {
-            $DB->delete_records_select($table, $select, [$vrsculptid]);
+        $select = 'sessionid IN (SELECT id FROM {vrmakerspace_sessions} WHERE vrmakerspaceid = ?)';
+        foreach (['vrmakerspace_snapshots', 'vrmakerspace_contrib', 'vrmakerspace_signals', 'vrmakerspace_peers'] as $table) {
+            $DB->delete_records_select($table, $select, [$vrmakerspaceid]);
         }
-        $DB->delete_records('vrsculpt_sessions', ['vrsculptid' => $vrsculptid]);
+        $DB->delete_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspaceid]);
     }
 
     /**
      * Delete every session of an activity, with everything that belongs to them.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \context_module $context its context
      * @return void
      */
-    public static function delete_all(\stdClass $vrsculpt, \context_module $context): void {
-        self::delete_rows((int)$vrsculpt->id);
-        get_file_storage()->delete_area_files($context->id, 'mod_vrsculpt', self::FILEAREA);
+    public static function delete_all(\stdClass $vrmakerspace, \context_module $context): void {
+        self::delete_rows((int)$vrmakerspace->id);
+        get_file_storage()->delete_area_files($context->id, 'mod_vrmakerspace', self::FILEAREA);
     }
 }

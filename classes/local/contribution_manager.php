@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Each member's share of a sculpture, when the activity tracks contributions.
@@ -24,7 +24,7 @@ namespace mod_vrsculpt\local;
  * increment is capped per report, and at most one report per user and sculpture is accepted every
  * MIN_INTERVAL seconds. The shares are a guide for the teacher, not a proof.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -70,10 +70,10 @@ final class contribution_manager {
         $removed = self::clamp_volume($removed);
 
         $conditions = ['sessionid' => (int)$session->id, 'userid' => $userid];
-        $record = $DB->get_record('vrsculpt_contrib', $conditions);
+        $record = $DB->get_record('vrmakerspace_contrib', $conditions);
         if (!$record) {
             try {
-                $DB->insert_record('vrsculpt_contrib', (object)($conditions + [
+                $DB->insert_record('vrmakerspace_contrib', (object)($conditions + [
                     'ops' => $ops,
                     'added' => round($added, 2),
                     'removed' => round($removed, 2),
@@ -91,7 +91,7 @@ final class contribution_manager {
         }
         // Only add when the row still carries the report time read above, so two reports at once count once.
         $DB->execute(
-            'UPDATE {vrsculpt_contrib}
+            'UPDATE {vrmakerspace_contrib}
                 SET ops = ops + :ops, added = :added, removed = :removed, timemodified = :now1, lastreport = :now2
               WHERE id = :id AND lastreport = :lastreport',
             [
@@ -104,7 +104,7 @@ final class contribution_manager {
                 'lastreport' => $record->lastreport,
             ]
         );
-        return (int)$DB->get_field('vrsculpt_contrib', 'lastreport', ['id' => $record->id]) === $now;
+        return (int)$DB->get_field('vrmakerspace_contrib', 'lastreport', ['id' => $record->id]) === $now;
     }
 
     /**
@@ -119,7 +119,7 @@ final class contribution_manager {
      */
     public static function summary(int $sessionid): array {
         global $DB;
-        $rows = $DB->get_records('vrsculpt_contrib', ['sessionid' => $sessionid], 'id ASC');
+        $rows = $DB->get_records('vrmakerspace_contrib', ['sessionid' => $sessionid], 'id ASC');
         $totalvolume = 0.0;
         $totalops = 0;
         foreach ($rows as $row) {

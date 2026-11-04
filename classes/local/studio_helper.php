@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Which sculpture the studio page opens, and how: the configuration of the studio's JavaScript.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -50,7 +50,7 @@ final class studio_helper {
      * saved version. The studio is read-only for users who may not sculpt the sculpture, for a closed
      * sculpture, and for any version but the latest.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \cm_info|\stdClass $cm the course module
      * @param \context_module $context the activity context
      * @param int $userid the user (never from the client)
@@ -62,7 +62,7 @@ final class studio_helper {
      * @throws \required_capability_exception when the user may not see the sculpture
      */
     public static function resolve(
-        \stdClass $vrsculpt,
+        \stdClass $vrmakerspace,
         $cm,
         \context_module $context,
         int $userid,
@@ -71,15 +71,15 @@ final class studio_helper {
         int $groupid = 0
     ): array {
         if ($sessionid) {
-            $session = session_manager::get_session($sessionid, $vrsculpt);
+            $session = session_manager::get_session($sessionid, $vrmakerspace);
             if (!session_manager::can_view($session, $context, $userid)) {
-                throw new \required_capability_exception($context, 'mod/vrsculpt:viewallsubmissions', 'nopermissions', '');
+                throw new \required_capability_exception($context, 'mod/vrmakerspace:viewallsubmissions', 'nopermissions', '');
             }
         } else {
-            require_capability('mod/vrsculpt:sculpt', $context, $userid);
-            $session = session_manager::get_or_create_for_user($vrsculpt, $cm, $userid, $groupid);
+            require_capability('mod/vrmakerspace:make', $context, $userid);
+            $session = session_manager::get_or_create_for_user($vrmakerspace, $cm, $userid, $groupid);
             if (!$session) {
-                throw new \moodle_exception('nogroup', 'mod_vrsculpt');
+                throw new \moodle_exception('nogroup', 'mod_vrmakerspace');
             }
         }
 
@@ -88,51 +88,51 @@ final class studio_helper {
         if ($version) {
             $snapshot = session_manager::get_snapshot_by_version((int)$session->id, $version);
             if (!$snapshot) {
-                throw new \moodle_exception('invalidversion', 'mod_vrsculpt');
+                throw new \moodle_exception('invalidversion', 'mod_vrmakerspace');
             }
         }
         $old = $snapshot && $latest && (int)$snapshot->version < (int)$latest->version;
-        $readonly = $old || !session_manager::can_sculpt($session, $context, $userid);
+        $readonly = $old || !session_manager::can_make($session, $context, $userid);
         return ['session' => $session, 'snapshot' => $snapshot, 'latest' => $latest, 'readonly' => $readonly];
     }
 
     /**
      * The studio mode of a sculpture.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param bool $readonly whether the studio only shows the sculpture
      * @return string one of the MODE_* constants
      */
-    public static function mode(\stdClass $vrsculpt, bool $readonly): string {
+    public static function mode(\stdClass $vrmakerspace, bool $readonly): string {
         if ($readonly) {
             return self::MODE_VIEW;
         }
-        if (!session_manager::is_group_work($vrsculpt)) {
+        if (!session_manager::is_group_work($vrmakerspace)) {
             return self::MODE_SOLO;
         }
-        return session_manager::connection($vrsculpt) === session_manager::CONNECTION_COMPANION
+        return session_manager::connection($vrmakerspace) === session_manager::CONNECTION_COMPANION
             ? self::MODE_COMPANION : self::MODE_PAIR;
     }
 
     /**
-     * The configuration passed to mod_vrsculpt/studio init().
+     * The configuration passed to mod_vrmakerspace/studio init().
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \context_module $context the activity context
      * @param \stdClass $user the user
      * @param array $resolved what resolve() returned
      * @return array
      */
-    public static function config(\stdClass $vrsculpt, \context_module $context, \stdClass $user, array $resolved): array {
+    public static function config(\stdClass $vrmakerspace, \context_module $context, \stdClass $user, array $resolved): array {
         $session = $resolved['session'];
         $snapshot = $resolved['snapshot'];
         $readonly = (bool)$resolved['readonly'];
-        $mode = self::mode($vrsculpt, $readonly);
+        $mode = self::mode($vrmakerspace, $readonly);
 
         $maxusers = 1;
-        if (session_manager::is_group_work($vrsculpt)) {
-            $maxusers = session_manager::connection($vrsculpt) === session_manager::CONNECTION_COMPANION
-                ? min(8, max(2, (int)$vrsculpt->maxusers)) : pair_manager::MAX_PEERS;
+        if (session_manager::is_group_work($vrmakerspace)) {
+            $maxusers = session_manager::connection($vrmakerspace) === session_manager::CONNECTION_COMPANION
+                ? min(8, max(2, (int)$vrmakerspace->maxusers)) : pair_manager::MAX_PEERS;
         }
         // An uploaded starting model that has gone (the activity now starts from a primitive) falls back
         // to the clay lump, as an unknown model does.
@@ -143,7 +143,7 @@ final class studio_helper {
         }
         $modelurl = $modelfile ? \moodle_url::make_pluginfile_url(
             $context->id,
-            'mod_vrsculpt',
+            'mod_vrmakerspace',
             session_manager::MODEL_FILEAREA,
             0,
             '/',
@@ -166,12 +166,12 @@ final class studio_helper {
             'snapshoturl' => $readonly && $snapshot ? session_manager::snapshot_url($snapshot, $context)->out(false) : '',
             'version' => $snapshot ? (int)$snapshot->version : 0,
             'workerurl' => $workerurl->out(false),
-            'trackcontributions' => !$readonly && session_manager::is_group_work($vrsculpt)
-                && !empty($vrsculpt->trackcontributions),
+            'trackcontributions' => !$readonly && session_manager::is_group_work($vrmakerspace)
+                && !empty($vrmakerspace->trackcontributions),
             'maxusers' => $maxusers,
             'autosavems' => self::AUTOSAVE_MS,
             'contributionms' => self::CONTRIBUTION_MS,
-            'backurl' => (new \moodle_url('/mod/vrsculpt/view.php', ['id' => $context->instanceid]))->out(false),
+            'backurl' => (new \moodle_url('/mod/vrmakerspace/view.php', ['id' => $context->instanceid]))->out(false),
         ];
     }
 
@@ -183,7 +183,7 @@ final class studio_helper {
      * @return \moodle_url
      */
     public static function worker_url(): \moodle_url {
-        return new \moodle_url('/mod/vrsculpt/engine.php/' . (int)get_config('mod_vrsculpt', 'version') . '/worker.js');
+        return new \moodle_url('/mod/vrmakerspace/engine.php/' . (int)get_config('mod_vrmakerspace', 'version') . '/worker.js');
     }
 
     /**
@@ -198,15 +198,15 @@ final class studio_helper {
     public static function title(\stdClass $session, \context_module $context, int $userid, ?\stdClass $snapshot): string {
         $names = [];
         if ((int)$session->groupid) {
-            $owner = get_string('groupsculpture', 'vrsculpt', view_helper::owner_name($session, $context, $names));
+            $owner = get_string('groupsculpture', 'vrmakerspace', view_helper::owner_name($session, $context, $names));
         } else if ((int)$session->userid === $userid) {
-            $owner = get_string('yoursculpture', 'vrsculpt');
+            $owner = get_string('yoursculpture', 'vrmakerspace');
         } else {
-            $owner = get_string('sculptureof', 'vrsculpt', view_helper::owner_name($session, $context, $names));
+            $owner = get_string('sculptureof', 'vrmakerspace', view_helper::owner_name($session, $context, $names));
         }
         if (!$snapshot) {
             return $owner;
         }
-        return get_string('studiotitleversion', 'vrsculpt', ['owner' => $owner, 'version' => (int)$snapshot->version]);
+        return get_string('studiotitleversion', 'vrmakerspace', ['owner' => $owner, 'version' => (int)$snapshot->version]);
     }
 }

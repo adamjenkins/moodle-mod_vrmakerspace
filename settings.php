@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Site settings of mod_vrsculpt.
+ * Site settings of mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -30,10 +30,10 @@ if ($ADMIN->fulltree) {
         $sizes[$megabytes * 1048576] = display_size($megabytes * 1048576);
     }
     $settings->add(new admin_setting_configselect(
-        'mod_vrsculpt/maxsnapshotsize',
-        new lang_string('maxsnapshotsize', 'vrsculpt'),
-        new lang_string('maxsnapshotsize_desc', 'vrsculpt'),
-        \mod_vrsculpt\local\session_manager::DEFAULT_MAX_SNAPSHOT_SIZE,
+        'mod_vrmakerspace/maxsnapshotsize',
+        new lang_string('maxsnapshotsize', 'vrmakerspace'),
+        new lang_string('maxsnapshotsize_desc', 'vrmakerspace'),
+        \mod_vrmakerspace\local\session_manager::DEFAULT_MAX_SNAPSHOT_SIZE,
         $sizes
     ));
 }

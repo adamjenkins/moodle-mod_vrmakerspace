@@ -15,15 +15,15 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Behat data generator for mod_vrsculpt: saved versions of a student's sculpture.
+ * Behat data generator for mod_vrmakerspace: saved versions of a student's sculpture.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class behat_mod_vrsculpt_generator extends behat_generator_base {
+class behat_mod_vrmakerspace_generator extends behat_generator_base {
     /**
-     * The entities Behat can create: Given the following "mod_vrsculpt > versions" exist.
+     * The entities Behat can create: Given the following "mod_vrmakerspace > versions" exist.
      *
      * @return array
      */
@@ -33,13 +33,13 @@ class behat_mod_vrsculpt_generator extends behat_generator_base {
                 'singular' => 'version',
                 'datagenerator' => 'version',
                 'required' => ['activity', 'user'],
-                'switchids' => ['activity' => 'vrsculptid', 'user' => 'userid'],
+                'switchids' => ['activity' => 'vrmakerspaceid', 'user' => 'userid'],
             ],
         ];
     }
 
     /**
-     * The vrsculpt id of an activity, from its idnumber.
+     * The vrmakerspace id of an activity, from its idnumber.
      *
      * @param string $idnumber the course module idnumber
      * @return int

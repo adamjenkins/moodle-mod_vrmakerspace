@@ -14,24 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\privacy;
+namespace mod_vrmakerspace\privacy;
 
 use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
-use mod_vrsculpt\local\grader;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\grader;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * Tests of the privacy provider.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\privacy\provider::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\privacy\provider::class)]
 final class provider_test extends provider_testcase {
     /** @var \stdClass the course */
     private \stdClass $course;
@@ -65,8 +65,8 @@ final class provider_test extends provider_testcase {
         $this->resetAfterTest();
         $gen = $this->getDataGenerator();
         $this->course = $gen->create_course(['summary' => '']);
-        $this->solo = $gen->create_module('vrsculpt', ['course' => $this->course->id]);
-        $this->team = $gen->create_module('vrsculpt', ['course' => $this->course->id,
+        $this->solo = $gen->create_module('vrmakerspace', ['course' => $this->course->id]);
+        $this->team = $gen->create_module('vrmakerspace', ['course' => $this->course->id,
             'workmode' => session_manager::MODE_GROUP]);
         $this->alice = $gen->create_and_enrol($this->course, 'student');
         $this->bob = $gen->create_and_enrol($this->course, 'student');
@@ -75,12 +75,12 @@ final class provider_test extends provider_testcase {
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $this->alice->id]);
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $this->bob->id]);
 
-        $sculpt = $gen->get_plugin_generator('mod_vrsculpt');
-        $this->alicesession = $sculpt->create_session(['vrsculptid' => $this->solo->id, 'userid' => $this->alice->id]);
+        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
+        $this->alicesession = $sculpt->create_session(['vrmakerspaceid' => $this->solo->id, 'userid' => $this->alice->id]);
         $sculpt->create_snapshot($this->alicesession, (int)$this->alice->id, 'alice');
-        $bobsession = $sculpt->create_session(['vrsculptid' => $this->solo->id, 'userid' => $this->bob->id]);
+        $bobsession = $sculpt->create_session(['vrmakerspaceid' => $this->solo->id, 'userid' => $this->bob->id]);
         $sculpt->create_snapshot($bobsession, (int)$this->bob->id, 'bob');
-        $this->groupsession = $sculpt->create_session(['vrsculptid' => $this->team->id, 'groupid' => $group->id]);
+        $this->groupsession = $sculpt->create_session(['vrmakerspaceid' => $this->team->id, 'groupid' => $group->id]);
         $sculpt->create_snapshot($this->groupsession, (int)$this->alice->id, 'team1');
         $sculpt->create_snapshot($this->groupsession, (int)$this->bob->id, 'team2');
         grader::save_grade($this->solo, (int)$this->alice->id, 60.0, (int)$this->teacher->id);
@@ -91,10 +91,10 @@ final class provider_test extends provider_testcase {
         $this->add_peer($this->alice, 'a', 'host');
         $this->add_peer($this->bob, 'b', 'guest');
         global $DB;
-        $DB->insert_record('vrsculpt_signals', (object)['sessionid' => $this->groupsession->id,
+        $DB->insert_record('vrmakerspace_signals', (object)['sessionid' => $this->groupsession->id,
             'frompeerkey' => str_repeat('a', 32), 'topeerkey' => str_repeat('b', 32), 'fromuserid' => $this->alice->id,
             'payload' => '{"type":"description"}', 'timecreated' => time()]);
-        $DB->insert_record('vrsculpt_signals', (object)['sessionid' => $this->groupsession->id,
+        $DB->insert_record('vrmakerspace_signals', (object)['sessionid' => $this->groupsession->id,
             'frompeerkey' => str_repeat('b', 32), 'topeerkey' => str_repeat('c', 32), 'fromuserid' => $this->bob->id,
             'payload' => '{"type":"candidates"}', 'timecreated' => time()]);
     }
@@ -109,7 +109,7 @@ final class provider_test extends provider_testcase {
      */
     private function add_peer(\stdClass $user, string $char, string $role): void {
         global $DB;
-        $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $this->groupsession->id, 'userid' => $user->id,
+        $DB->insert_record('vrmakerspace_peers', (object)['sessionid' => $this->groupsession->id, 'userid' => $user->id,
             'peerkey' => str_repeat($char, 32), 'role' => $role, 'lastseen' => time(), 'timecreated' => time()]);
     }
 
@@ -117,11 +117,11 @@ final class provider_test extends provider_testcase {
      * Every table is described.
      */
     public function test_get_metadata(): void {
-        $collection = provider::get_metadata(new \core_privacy\local\metadata\collection('mod_vrsculpt'));
+        $collection = provider::get_metadata(new \core_privacy\local\metadata\collection('mod_vrmakerspace'));
         $names = array_map(fn($item) => $item->get_name(), $collection->get_collection());
         $this->assertEqualsCanonicalizing(
-            ['vrsculpt_sessions', 'vrsculpt_snapshots', 'vrsculpt_grades', 'vrsculpt_contrib', 'vrsculpt_peers',
-                'vrsculpt_signals', 'core_files', 'pairpartner', 'vrroomsync'],
+            ['vrmakerspace_sessions', 'vrmakerspace_snapshots', 'vrmakerspace_grades', 'vrmakerspace_contrib', 'vrmakerspace_peers',
+                'vrmakerspace_signals', 'core_files', 'pairpartner', 'vrroomsync'],
             $names
         );
     }
@@ -146,13 +146,13 @@ final class provider_test extends provider_testcase {
      * Users in a context: owners, version authors, graded users and graders.
      */
     public function test_get_users_in_context(): void {
-        $userlist = new userlist(\context_module::instance($this->solo->cmid), 'mod_vrsculpt');
+        $userlist = new userlist(\context_module::instance($this->solo->cmid), 'mod_vrmakerspace');
         provider::get_users_in_context($userlist);
         $this->assertEqualsCanonicalizing(
             [(int)$this->alice->id, (int)$this->bob->id, (int)$this->teacher->id],
             array_map('intval', $userlist->get_userids())
         );
-        $userlist = new userlist(\context_module::instance($this->team->cmid), 'mod_vrsculpt');
+        $userlist = new userlist(\context_module::instance($this->team->cmid), 'mod_vrmakerspace');
         provider::get_users_in_context($userlist);
         $this->assertEqualsCanonicalizing(
             [(int)$this->alice->id, (int)$this->bob->id],
@@ -166,14 +166,14 @@ final class provider_test extends provider_testcase {
     public function test_export_user_data(): void {
         $solo = \context_module::instance($this->solo->cmid);
         $team = \context_module::instance($this->team->cmid);
-        $this->export_context_data_for_user((int)$this->alice->id, $solo, 'mod_vrsculpt');
-        $this->export_context_data_for_user((int)$this->alice->id, $team, 'mod_vrsculpt');
+        $this->export_context_data_for_user((int)$this->alice->id, $solo, 'mod_vrmakerspace');
+        $this->export_context_data_for_user((int)$this->alice->id, $team, 'mod_vrmakerspace');
 
         $data = writer::with_context($solo)->get_data();
         $this->assertCount(1, $data->sculptures);
         $this->assertSame((int)$this->alicesession->id, $data->sculptures[0]->sculpture);
         $this->assertEquals('60.00', $data->grade);
-        $path = [get_string('privacy:path:sculpture', 'mod_vrsculpt', (int)$this->alicesession->id)];
+        $path = [get_string('privacy:path:sculpture', 'mod_vrmakerspace', (int)$this->alicesession->id)];
         $this->assertNotEmpty(writer::with_context($solo)->get_files($path));
 
         $data = writer::with_context($team)->get_data();
@@ -193,20 +193,20 @@ final class provider_test extends provider_testcase {
     public function test_live_data_only_user(): void {
         global $DB;
         $carol = $this->getDataGenerator()->create_and_enrol($this->course, 'student');
-        $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')
+        $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace')
             ->create_contribution($this->groupsession, (int)$carol->id, 1, 1.0, 0.0);
         $team = \context_module::instance($this->team->cmid);
 
         $this->assertEquals([$team->id], array_map('intval', provider::get_contexts_for_userid((int)$carol->id)->get_contextids()));
-        $userlist = new userlist($team, 'mod_vrsculpt');
+        $userlist = new userlist($team, 'mod_vrmakerspace');
         provider::get_users_in_context($userlist);
         $this->assertContains((int)$carol->id, array_map('intval', $userlist->get_userids()));
 
-        $this->export_context_data_for_user((int)$carol->id, $team, 'mod_vrsculpt');
+        $this->export_context_data_for_user((int)$carol->id, $team, 'mod_vrmakerspace');
         $data = writer::with_context($team)->get_data();
         $this->assertSame([], $data->sculptures[0]->versions);
         $this->assertSame(1, $data->sculptures[0]->contribution->operations);
-        $DB->delete_records('vrsculpt_contrib', ['userid' => $carol->id]);
+        $DB->delete_records('vrmakerspace_contrib', ['userid' => $carol->id]);
         $this->assertSame([], provider::get_contexts_for_userid((int)$carol->id)->get_contextids());
     }
 
@@ -217,22 +217,22 @@ final class provider_test extends provider_testcase {
         global $DB;
         $solo = \context_module::instance($this->solo->cmid);
         $team = \context_module::instance($this->team->cmid);
-        provider::delete_data_for_user(new approved_contextlist($this->alice, 'mod_vrsculpt', [$solo->id, $team->id]));
+        provider::delete_data_for_user(new approved_contextlist($this->alice, 'mod_vrmakerspace', [$solo->id, $team->id]));
 
-        $this->assertFalse($DB->record_exists('vrsculpt_sessions', ['id' => $this->alicesession->id]));
-        $this->assertFalse($DB->record_exists('vrsculpt_grades', ['userid' => $this->alice->id]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_snapshots', ['userid' => $this->alice->id]));
-        $this->assertSame(2, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $this->groupsession->id]));
-        $this->assertTrue($DB->record_exists('vrsculpt_sessions', ['vrsculptid' => $this->solo->id, 'userid' => $this->bob->id]));
-        $this->assertFalse($DB->record_exists('vrsculpt_contrib', ['userid' => $this->alice->id]));
-        $this->assertFalse($DB->record_exists('vrsculpt_peers', ['userid' => $this->alice->id]));
-        $this->assertFalse($DB->record_exists('vrsculpt_signals', ['fromuserid' => $this->alice->id]));
-        $this->assertTrue($DB->record_exists('vrsculpt_contrib', ['userid' => $this->bob->id]));
-        $this->assertTrue($DB->record_exists('vrsculpt_peers', ['userid' => $this->bob->id]));
-        $this->assertTrue($DB->record_exists('vrsculpt_signals', ['fromuserid' => $this->bob->id]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_sessions', ['id' => $this->alicesession->id]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_grades', ['userid' => $this->alice->id]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots', ['userid' => $this->alice->id]));
+        $this->assertSame(2, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $this->groupsession->id]));
+        $this->assertTrue($DB->record_exists('vrmakerspace_sessions', ['vrmakerspaceid' => $this->solo->id, 'userid' => $this->bob->id]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_contrib', ['userid' => $this->alice->id]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_peers', ['userid' => $this->alice->id]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_signals', ['fromuserid' => $this->alice->id]));
+        $this->assertTrue($DB->record_exists('vrmakerspace_contrib', ['userid' => $this->bob->id]));
+        $this->assertTrue($DB->record_exists('vrmakerspace_peers', ['userid' => $this->bob->id]));
+        $this->assertTrue($DB->record_exists('vrmakerspace_signals', ['fromuserid' => $this->bob->id]));
         $itemids = array_map(
             fn($f) => (int)$f->get_itemid(),
-            get_file_storage()->get_area_files($solo->id, 'mod_vrsculpt', 'snapshots', false, 'id', false)
+            get_file_storage()->get_area_files($solo->id, 'mod_vrmakerspace', 'snapshots', false, 'id', false)
         );
         $this->assertCount(1, $itemids);
     }
@@ -243,8 +243,8 @@ final class provider_test extends provider_testcase {
     public function test_delete_data_for_users_grader(): void {
         global $DB;
         $solo = \context_module::instance($this->solo->cmid);
-        provider::delete_data_for_users(new approved_userlist($solo, 'mod_vrsculpt', [(int)$this->teacher->id]));
-        $grade = $DB->get_record('vrsculpt_grades', ['userid' => $this->alice->id], '*', MUST_EXIST);
+        provider::delete_data_for_users(new approved_userlist($solo, 'mod_vrmakerspace', [(int)$this->teacher->id]));
+        $grade = $DB->get_record('vrmakerspace_grades', ['userid' => $this->alice->id], '*', MUST_EXIST);
         $this->assertSame(0, (int)$grade->grader);
     }
 
@@ -255,15 +255,15 @@ final class provider_test extends provider_testcase {
         global $DB;
         $solo = \context_module::instance($this->solo->cmid);
         provider::delete_data_for_all_users_in_context($solo);
-        $this->assertSame(0, $DB->count_records('vrsculpt_sessions', ['vrsculptid' => $this->solo->id]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_grades', ['vrsculptid' => $this->solo->id]));
-        $this->assertSame([], get_file_storage()->get_area_files($solo->id, 'mod_vrsculpt', 'snapshots', false, 'id', false));
-        $this->assertSame(2, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $this->groupsession->id]));
-        $this->assertSame(2, $DB->count_records('vrsculpt_contrib'));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_sessions', ['vrmakerspaceid' => $this->solo->id]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_grades', ['vrmakerspaceid' => $this->solo->id]));
+        $this->assertSame([], get_file_storage()->get_area_files($solo->id, 'mod_vrmakerspace', 'snapshots', false, 'id', false));
+        $this->assertSame(2, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $this->groupsession->id]));
+        $this->assertSame(2, $DB->count_records('vrmakerspace_contrib'));
 
         $team = \context_module::instance($this->team->cmid);
         provider::delete_data_for_all_users_in_context($team);
-        foreach (['vrsculpt_contrib', 'vrsculpt_peers', 'vrsculpt_signals', 'vrsculpt_sessions'] as $table) {
+        foreach (['vrmakerspace_contrib', 'vrmakerspace_peers', 'vrmakerspace_signals', 'vrmakerspace_sessions'] as $table) {
             $this->assertSame(0, $DB->count_records($table), $table);
         }
     }

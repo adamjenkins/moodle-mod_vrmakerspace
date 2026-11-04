@@ -20,7 +20,7 @@
  * listener cannot stop the network code. The same contract as the emitter of
  * vrroomruntime_builtin/live/transport.
  *
- * @module     mod_vrsculpt/net/emitter
+ * @module     mod_vrmakerspace/net/emitter
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

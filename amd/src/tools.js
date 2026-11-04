@@ -33,7 +33,7 @@
  * from a time-based value (8 per second since 2026) or past the last value this browser reserved,
  * whichever is higher.
  *
- * @module     mod_vrsculpt/tools
+ * @module     mod_vrmakerspace/tools
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -218,7 +218,7 @@ const makeCounter = (name) => {
     let value = 0;
     let reserved = 0;
     return (who) => {
-        const key = 'mod_vrsculpt_' + name + '_' + who;
+        const key = 'mod_vrmakerspace_' + name + '_' + who;
         if (author !== who) {
             author = who;
             const timebase = Math.floor((Date.now() - COUNTER_EPOCH) / 1000) * 8;

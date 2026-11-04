@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\pair_manager;
+use mod_vrmakerspace\local\pair_manager;
 
 /**
  * Leave a pair-work sculpture.
@@ -28,7 +28,7 @@ use mod_vrsculpt\local\pair_manager;
  * Only the caller's own row can be removed (it must carry the peer key sent); leaving needs no open
  * sculpture, so a studio can always let go of its connection.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -62,7 +62,7 @@ class pair_leave extends external_api {
             'peerkey' => $peerkey,
         ]);
         [, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
-        require_capability('mod/vrsculpt:sculpt', $context);
+        require_capability('mod/vrmakerspace:make', $context);
 
         pair_manager::leave($session, (int)$USER->id, $params['peerkey']);
         return ['ok' => true];

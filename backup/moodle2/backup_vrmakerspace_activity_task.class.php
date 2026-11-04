@@ -15,21 +15,21 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Backup task for mod_vrsculpt.
+ * Backup task for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->dirroot . '/mod/vrsculpt/backup/moodle2/backup_vrsculpt_stepslib.php');
+require_once($CFG->dirroot . '/mod/vrmakerspace/backup/moodle2/backup_vrmakerspace_stepslib.php');
 
 /**
  * Provides the steps to back up one VR sculpting activity.
  */
-class backup_vrsculpt_activity_task extends backup_activity_task {
+class backup_vrmakerspace_activity_task extends backup_activity_task {
     /**
      * No specific settings for this activity.
      *
@@ -44,7 +44,7 @@ class backup_vrsculpt_activity_task extends backup_activity_task {
      * @return void
      */
     protected function define_my_steps() {
-        $this->add_step(new backup_vrsculpt_activity_structure_step('vrsculpt_structure', 'vrsculpt.xml'));
+        $this->add_step(new backup_vrmakerspace_activity_structure_step('vrmakerspace_structure', 'vrmakerspace.xml'));
     }
 
     /**
@@ -59,12 +59,12 @@ class backup_vrsculpt_activity_task extends backup_activity_task {
         $base = preg_quote($CFG->wwwroot, '/');
 
         // Link to the list of VR sculpting activities.
-        $search = '/(' . $base . '\/mod\/vrsculpt\/index.php\?id\=)([0-9]+)/';
-        $content = preg_replace($search, '$@VRSCULPTINDEX*$2@$', $content);
+        $search = '/(' . $base . '\/mod\/vrmakerspace\/index.php\?id\=)([0-9]+)/';
+        $content = preg_replace($search, '$@VRMAKERSPACEINDEX*$2@$', $content);
 
         // Link to a VR sculpting activity by course module id.
-        $search = '/(' . $base . '\/mod\/vrsculpt\/view.php\?id\=)([0-9]+)/';
-        $content = preg_replace($search, '$@VRSCULPTVIEWBYID*$2@$', $content);
+        $search = '/(' . $base . '\/mod\/vrmakerspace\/view.php\?id\=)([0-9]+)/';
+        $content = preg_replace($search, '$@VRMAKERSPACEVIEWBYID*$2@$', $content);
 
         return $content;
     }

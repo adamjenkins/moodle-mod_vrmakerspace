@@ -25,12 +25,12 @@
  * this module does not decode; the session parses them with its own size limit.
  *
  * The close-code table, back-off and the frame shapes follow vrroomruntime_companion/syncprotocol
- * (the same author); this copy keeps mod_vrsculpt free of a hard dependency on the companion
+ * (the same author); this copy keeps mod_vrmakerspace free of a hard dependency on the companion
  * plugin.
  *
  * Dependency-free ES module (no imports) so that both grunt (AMD build) and node --test load it.
  *
- * @module     mod_vrsculpt/net/syncframes
+ * @module     mod_vrmakerspace/net/syncframes
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

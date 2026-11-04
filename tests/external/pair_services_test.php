@@ -14,28 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
-use mod_vrsculpt\local\companion_manager;
-use mod_vrsculpt\local\pair_manager;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\companion_manager;
+use mod_vrmakerspace\local\pair_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * Tests of the pair-work web services: join, poll, signal, leave.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\external\pair_join::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\external\pair_poll::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\external\pair_signal::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\external\pair_leave::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\local\pair_manager::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\external\pair_join::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\external\pair_poll::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\external\pair_signal::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\external\pair_leave::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\pair_manager::class)]
 final class pair_services_test extends \core_external\tests\externallib_testcase {
     /** @var \stdClass the group-work activity */
-    private \stdClass $vrsculpt;
+    private \stdClass $vrmakerspace;
 
     /** @var \stdClass the group's session */
     private \stdClass $session;
@@ -57,7 +57,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $this->resetAfterTest();
         $gen = $this->getDataGenerator();
         $course = $gen->create_course(['summary' => '']);
-        $this->vrsculpt = $gen->create_module('vrsculpt', [
+        $this->vrmakerspace = $gen->create_module('vrmakerspace', [
             'course' => $course->id,
             'workmode' => session_manager::MODE_GROUP,
             'connectmode' => session_manager::CONNECTION_PAIR,
@@ -72,9 +72,9 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
             ]);
         }
         $this->teacher = $gen->create_and_enrol($course, 'editingteacher');
-        $sculpt = $gen->get_plugin_generator('mod_vrsculpt');
-        $this->session = $sculpt->create_session(['vrsculptid' => $this->vrsculpt->id, 'groupid' => $group->id]);
-        $this->othersession = $sculpt->create_session(['vrsculptid' => $this->vrsculpt->id, 'groupid' => $othergroup->id]);
+        $sculpt = $gen->get_plugin_generator('mod_vrmakerspace');
+        $this->session = $sculpt->create_session(['vrmakerspaceid' => $this->vrmakerspace->id, 'groupid' => $group->id]);
+        $this->othersession = $sculpt->create_session(['vrmakerspaceid' => $this->vrmakerspace->id, 'groupid' => $othergroup->id]);
     }
 
     /**
@@ -88,7 +88,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $this->setUser($this->students[$name]);
         return external_api::clean_returnvalue(
             pair_join::execute_returns(),
-            pair_join::execute((int)$this->vrsculpt->cmid, $sessionid ?: (int)$this->session->id)
+            pair_join::execute((int)$this->vrmakerspace->cmid, $sessionid ?: (int)$this->session->id)
         );
     }
 
@@ -104,12 +104,12 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $this->setUser($this->students[$name]);
         return external_api::clean_returnvalue(
             pair_poll::execute_returns(),
-            pair_poll::execute((int)$this->vrsculpt->cmid, (int)$this->session->id, $peerkey, $afterid)
+            pair_poll::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id, $peerkey, $afterid)
         );
     }
 
     /**
-     * Assert that a call fails with a mod_vrsculpt error code.
+     * Assert that a call fails with a mod_vrmakerspace error code.
      *
      * @param string $errorcode the expected code
      * @param callable $call the call
@@ -158,10 +158,10 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $this->join('b');
         $this->assert_error('sessionfull', fn() => $this->join('c'));
 
-        $DB->set_field('vrsculpt_peers', 'lastseen', time() - pair_manager::ACTIVE - 5, ['peerkey' => $a['peerkey']]);
+        $DB->set_field('vrmakerspace_peers', 'lastseen', time() - pair_manager::ACTIVE - 5, ['peerkey' => $a['peerkey']]);
         $c = $this->join('c');
         $this->assertSame('host', $c['role']);
-        $this->assertFalse($DB->record_exists('vrsculpt_peers', ['peerkey' => $a['peerkey']]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_peers', ['peerkey' => $a['peerkey']]));
     }
 
     /**
@@ -172,7 +172,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $first = $this->join('a');
         $second = $this->join('a');
         $this->assertNotSame($first['peerkey'], $second['peerkey']);
-        $this->assertSame(1, $DB->count_records('vrsculpt_peers', ['sessionid' => $this->session->id]));
+        $this->assertSame(1, $DB->count_records('vrmakerspace_peers', ['sessionid' => $this->session->id]));
         $this->assert_error('peergone', fn() => $this->poll('a', $first['peerkey']));
     }
 
@@ -186,7 +186,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $payload = json_encode(['type' => 'description', 'sdp' => "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\n<b>&"]);
 
         $this->setUser($this->students['a']);
-        $cmid = (int)$this->vrsculpt->cmid;
+        $cmid = (int)$this->vrmakerspace->cmid;
         $result = pair_signal::execute($cmid, (int)$this->session->id, $a['peerkey'], $b['peerkey'], $payload);
         $this->assertTrue($result['ok']);
 
@@ -198,7 +198,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         // Unconfirmed: delivered again; confirmed: deleted.
         $this->assertCount(1, $this->poll('b', $b['peerkey'])['signals']);
         $this->assertSame([], $this->poll('b', $b['peerkey'], $polled['signals'][0]['id'])['signals']);
-        $this->assertSame(0, $DB->count_records('vrsculpt_signals'));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_signals'));
     }
 
     /**
@@ -208,7 +208,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $a = $this->join('a');
         $b = $this->join('b');
         $d = $this->join('d', (int)$this->othersession->id);
-        $cmid = (int)$this->vrsculpt->cmid;
+        $cmid = (int)$this->vrmakerspace->cmid;
         $sessionid = (int)$this->session->id;
         $this->setUser($this->students['a']);
 
@@ -236,7 +236,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $b = $this->join('b');
         $this->assertSame('guest', $b['role']);
 
-        $DB->set_field('vrsculpt_peers', 'lastseen', time() - pair_manager::ACTIVE - 1, ['peerkey' => $a['peerkey']]);
+        $DB->set_field('vrmakerspace_peers', 'lastseen', time() - pair_manager::ACTIVE - 1, ['peerkey' => $a['peerkey']]);
         $polled = $this->poll('b', $b['peerkey']);
         $this->assertSame('host', $polled['role']);
         $this->assertSame([], $polled['peers']);
@@ -255,14 +255,14 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $a = $this->join('a');
         $b = $this->join('b');
         $this->setUser($this->students['b']);
-        pair_signal::execute((int)$this->vrsculpt->cmid, (int)$this->session->id, $b['peerkey'], $a['peerkey'], '{}');
+        pair_signal::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id, $b['peerkey'], $a['peerkey'], '{}');
 
         $this->setUser($this->students['a']);
-        $result = pair_leave::execute((int)$this->vrsculpt->cmid, (int)$this->session->id, $a['peerkey']);
+        $result = pair_leave::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id, $a['peerkey']);
         $this->assertTrue($result['ok']);
-        $this->assertFalse($DB->record_exists('vrsculpt_peers', ['peerkey' => $a['peerkey']]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_signals'));
-        pair_leave::execute((int)$this->vrsculpt->cmid, (int)$this->session->id, $a['peerkey']);
+        $this->assertFalse($DB->record_exists('vrmakerspace_peers', ['peerkey' => $a['peerkey']]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_signals'));
+        pair_leave::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id, $a['peerkey']);
 
         $this->assertSame('host', $this->poll('b', $b['peerkey'])['role']);
     }
@@ -275,8 +275,8 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $a = $this->join('a');
         $this->join('b');
         $this->setUser($this->students['b']);
-        pair_leave::execute((int)$this->vrsculpt->cmid, (int)$this->session->id, $a['peerkey']);
-        $this->assertTrue($DB->record_exists('vrsculpt_peers', ['peerkey' => $a['peerkey']]));
+        pair_leave::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id, $a['peerkey']);
+        $this->assertTrue($DB->record_exists('vrmakerspace_peers', ['peerkey' => $a['peerkey']]));
     }
 
     /**
@@ -288,16 +288,16 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
 
         // A member of another group cannot join this group's sculpture.
         $this->setUser($this->students['d']);
-        $this->assert_error('cannotsculpt', fn() => pair_join::execute((int)$this->vrsculpt->cmid, (int)$this->session->id));
+        $this->assert_error('cannotsculpt', fn() => pair_join::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id));
         $this->assert_error('cannotsculpt', fn() => pair_poll::execute(
-            (int)$this->vrsculpt->cmid,
+            (int)$this->vrmakerspace->cmid,
             (int)$this->session->id,
             $a['peerkey'],
             0
         ));
 
         // The session id under another activity's cmid.
-        $other = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $this->vrsculpt->course,
+        $other = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $this->vrmakerspace->course,
             'workmode' => session_manager::MODE_GROUP]);
         $this->setUser($this->students['a']);
         $this->assert_error('invalidsession', fn() => pair_join::execute((int)$other->cmid, (int)$this->session->id));
@@ -320,18 +320,18 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         global $DB;
         $this->setUser($this->teacher);
         try {
-            pair_join::execute((int)$this->vrsculpt->cmid, (int)$this->session->id);
+            pair_join::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id);
             $this->fail('A teacher joined');
         } catch (\required_capability_exception $e) {
             $this->assertSame('nopermissions', $e->errorcode);
         }
 
-        $DB->set_field('vrsculpt_sessions', 'status', session_manager::STATUS_CLOSED, ['id' => $this->session->id]);
+        $DB->set_field('vrmakerspace_sessions', 'status', session_manager::STATUS_CLOSED, ['id' => $this->session->id]);
         $this->assert_error('cannotsculpt', fn() => $this->join('a'));
 
-        $solo = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $this->vrsculpt->course]);
-        $session = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt')
-            ->create_session(['vrsculptid' => $solo->id, 'userid' => $this->students['a']->id]);
+        $solo = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $this->vrmakerspace->course]);
+        $session = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace')
+            ->create_session(['vrmakerspaceid' => $solo->id, 'userid' => $this->students['a']->id]);
         $this->setUser($this->students['a']);
         $this->assert_error('notpairwork', fn() => pair_join::execute((int)$solo->cmid, (int)$session->id));
     }
@@ -342,7 +342,7 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
      */
     public function test_companion_activity_falls_back_to_pair(): void {
         global $DB;
-        $DB->set_field('vrsculpt', 'connectmode', session_manager::CONNECTION_COMPANION, ['id' => $this->vrsculpt->id]);
+        $DB->set_field('vrmakerspace', 'connectmode', session_manager::CONNECTION_COMPANION, ['id' => $this->vrmakerspace->id]);
         if (!companion_manager::is_available()) {
             $this->assertSame('host', $this->join('a')['role']);
         }
@@ -363,16 +363,16 @@ final class pair_services_test extends \core_external\tests\externallib_testcase
         $a = $this->join('a');
         $b = $this->join('b');
         $this->setUser($this->students['a']);
-        pair_signal::execute((int)$this->vrsculpt->cmid, (int)$this->session->id, $a['peerkey'], $b['peerkey'], '{}');
+        pair_signal::execute((int)$this->vrmakerspace->cmid, (int)$this->session->id, $a['peerkey'], $b['peerkey'], '{}');
 
         $old = time() - pair_manager::EXPIRY - 10;
-        $DB->set_field('vrsculpt_peers', 'lastseen', $old, ['peerkey' => $a['peerkey']]);
+        $DB->set_field('vrmakerspace_peers', 'lastseen', $old, ['peerkey' => $a['peerkey']]);
         $counts = pair_manager::purge_expired();
 
         $this->assertSame(1, $counts['peers']);
         $this->assertSame(1, $counts['signals']);
-        $this->assertFalse($DB->record_exists('vrsculpt_peers', ['peerkey' => $a['peerkey']]));
-        $this->assertTrue($DB->record_exists('vrsculpt_peers', ['peerkey' => $b['peerkey']]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_signals'));
+        $this->assertFalse($DB->record_exists('vrmakerspace_peers', ['peerkey' => $a['peerkey']]));
+        $this->assertTrue($DB->record_exists('vrmakerspace_peers', ['peerkey' => $b['peerkey']]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_signals'));
     }
 }

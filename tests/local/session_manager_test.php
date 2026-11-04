@@ -14,32 +14,32 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Tests of the sculpture and version data layer.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\local\session_manager::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\session_manager::class)]
 final class session_manager_test extends \advanced_testcase {
     /**
      * A course with an activity and its context.
      *
      * @param int $workmode session_manager::MODE_*
-     * @return array [\stdClass $course, \stdClass $vrsculpt, \cm_info $cm, \context_module $context]
+     * @return array [\stdClass $course, \stdClass $vrmakerspace, \cm_info $cm, \context_module $context]
      */
     private function make_activity(int $workmode = session_manager::MODE_INDIVIDUAL): array {
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
-        $vrsculpt = $this->getDataGenerator()->create_module('vrsculpt', [
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', [
             'course' => $course->id,
             'workmode' => $workmode,
             'startmodel' => 'sphere',
         ]);
-        $cm = get_fast_modinfo($course)->get_cm($vrsculpt->cmid);
-        return [$course, $vrsculpt, $cm, \context_module::instance($cm->id)];
+        $cm = get_fast_modinfo($course)->get_cm($vrmakerspace->cmid);
+        return [$course, $vrmakerspace, $cm, \context_module::instance($cm->id)];
     }
 
     /**
@@ -48,17 +48,17 @@ final class session_manager_test extends \advanced_testcase {
     public function test_individual_session_created_once(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt, $cm] = $this->make_activity();
+        [$course, $vrmakerspace, $cm] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
 
-        $first = session_manager::get_or_create_for_user($vrsculpt, $cm, (int)$user->id);
-        $second = session_manager::get_or_create_for_user($vrsculpt, $cm, (int)$user->id);
+        $first = session_manager::get_or_create_for_user($vrmakerspace, $cm, (int)$user->id);
+        $second = session_manager::get_or_create_for_user($vrmakerspace, $cm, (int)$user->id);
 
         $this->assertEquals($first->id, $second->id);
         $this->assertSame(0, (int)$first->groupid);
         $this->assertSame((int)$user->id, (int)$first->userid);
         $this->assertSame('sphere', $first->startmodel);
-        $this->assertSame(1, $DB->count_records('vrsculpt_sessions', ['vrsculptid' => $vrsculpt->id]));
+        $this->assertSame(1, $DB->count_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspace->id]));
     }
 
     /**
@@ -66,7 +66,7 @@ final class session_manager_test extends \advanced_testcase {
      */
     public function test_group_session_needs_membership(): void {
         $this->resetAfterTest();
-        [$course, $vrsculpt, $cm] = $this->make_activity(session_manager::MODE_GROUP);
+        [$course, $vrmakerspace, $cm] = $this->make_activity(session_manager::MODE_GROUP);
         $member = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $other = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $outsider = $this->getDataGenerator()->create_and_enrol($course, 'student');
@@ -75,13 +75,13 @@ final class session_manager_test extends \advanced_testcase {
         $this->getDataGenerator()->create_group_member(['groupid' => $group->id, 'userid' => $member->id]);
         $this->getDataGenerator()->create_group_member(['groupid' => $group->id, 'userid' => $other->id]);
 
-        $session = session_manager::get_or_create_for_user($vrsculpt, $cm, (int)$member->id);
+        $session = session_manager::get_or_create_for_user($vrmakerspace, $cm, (int)$member->id);
         $this->assertSame((int)$group->id, (int)$session->groupid);
         $this->assertSame(0, (int)$session->userid);
-        $this->assertEquals($session->id, session_manager::get_or_create_for_user($vrsculpt, $cm, (int)$other->id)->id);
+        $this->assertEquals($session->id, session_manager::get_or_create_for_user($vrmakerspace, $cm, (int)$other->id)->id);
 
-        $this->assertNull(session_manager::get_or_create_for_user($vrsculpt, $cm, (int)$outsider->id));
-        $this->assertNull(session_manager::get_or_create_for_user($vrsculpt, $cm, (int)$member->id, (int)$othergroup->id));
+        $this->assertNull(session_manager::get_or_create_for_user($vrmakerspace, $cm, (int)$outsider->id));
+        $this->assertNull(session_manager::get_or_create_for_user($vrmakerspace, $cm, (int)$member->id, (int)$othergroup->id));
     }
 
     /**
@@ -89,14 +89,14 @@ final class session_manager_test extends \advanced_testcase {
      */
     public function test_get_session_refuses_other_activity(): void {
         $this->resetAfterTest();
-        [$course, $vrsculpt] = $this->make_activity();
-        [, $othervrsculpt] = $this->make_activity();
+        [$course, $vrmakerspace] = $this->make_activity();
+        [, $othervrmakerspace] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $session = session_manager::get_or_create($othervrsculpt, 0, (int)$user->id);
+        $session = session_manager::get_or_create($othervrmakerspace, 0, (int)$user->id);
 
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('invalidsession', 'mod_vrsculpt'));
-        session_manager::get_session((int)$session->id, $vrsculpt);
+        $this->expectExceptionMessage(get_string('invalidsession', 'mod_vrmakerspace'));
+        session_manager::get_session((int)$session->id, $vrmakerspace);
     }
 
     /**
@@ -105,32 +105,32 @@ final class session_manager_test extends \advanced_testcase {
     public function test_access_rules(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt, , $context] = $this->make_activity();
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
         $owner = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
-        $session = session_manager::get_or_create($vrsculpt, 0, (int)$owner->id);
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$owner->id);
 
         $this->assertTrue(session_manager::can_view($session, $context, (int)$owner->id));
-        $this->assertTrue(session_manager::can_sculpt($session, $context, (int)$owner->id));
+        $this->assertTrue(session_manager::can_make($session, $context, (int)$owner->id));
         $this->assertFalse(session_manager::can_view($session, $context, (int)$student->id));
-        $this->assertFalse(session_manager::can_sculpt($session, $context, (int)$student->id));
+        $this->assertFalse(session_manager::can_make($session, $context, (int)$student->id));
         $this->assertTrue(session_manager::can_view($session, $context, (int)$teacher->id));
-        $this->assertFalse(session_manager::can_sculpt($session, $context, (int)$teacher->id));
+        $this->assertFalse(session_manager::can_make($session, $context, (int)$teacher->id));
 
-        $DB->set_field('vrsculpt_sessions', 'status', session_manager::STATUS_CLOSED, ['id' => $session->id]);
-        $session = $DB->get_record('vrsculpt_sessions', ['id' => $session->id]);
+        $DB->set_field('vrmakerspace_sessions', 'status', session_manager::STATUS_CLOSED, ['id' => $session->id]);
+        $session = $DB->get_record('vrmakerspace_sessions', ['id' => $session->id]);
         $this->assertTrue(session_manager::can_view($session, $context, (int)$owner->id));
-        $this->assertFalse(session_manager::can_sculpt($session, $context, (int)$owner->id));
+        $this->assertFalse(session_manager::can_make($session, $context, (int)$owner->id));
     }
 
     /**
      * The data generator.
      *
-     * @return \mod_vrsculpt_generator
+     * @return \mod_vrmakerspace_generator
      */
-    private function generator(): \mod_vrsculpt_generator {
-        return $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
+    private function generator(): \mod_vrmakerspace_generator {
+        return $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
     }
 
     /**
@@ -139,9 +139,9 @@ final class session_manager_test extends \advanced_testcase {
      */
     public function test_save_snapshot_versions_and_files(): void {
         $this->resetAfterTest();
-        [$course, $vrsculpt, , $context] = $this->make_activity();
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $session = session_manager::get_or_create($vrsculpt, 0, (int)$user->id);
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
         $one = $this->generator()->snapshot_data('one', 3);
         $two = $this->generator()->snapshot_data('two', 7);
 
@@ -167,9 +167,9 @@ final class session_manager_test extends \advanced_testcase {
     public function test_save_snapshot_refuses_foreign_data(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt, , $context] = $this->make_activity();
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $session = session_manager::get_or_create($vrsculpt, 0, (int)$user->id);
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
 
         try {
             $bytes = '<html>not a sculpture</html>' . str_repeat(' ', 600);
@@ -178,7 +178,7 @@ final class session_manager_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('snapshotinvalid', $e->errorcode);
         }
-        $this->assertSame(0, $DB->count_records('vrsculpt_snapshots'));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots'));
     }
 
     /**
@@ -197,7 +197,7 @@ final class session_manager_test extends \advanced_testcase {
 
         $broken = substr_replace($data, $bytes, $offset, strlen($bytes));
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('snapshotinvalid', 'mod_vrsculpt'));
+        $this->expectExceptionMessage(get_string('snapshotinvalid', 'mod_vrmakerspace'));
         session_manager::validate_snapshot($broken);
     }
 
@@ -242,10 +242,10 @@ final class session_manager_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $data = $this->generator()->snapshot_data();
-        set_config('maxsnapshotsize', strlen($data) - 1, 'mod_vrsculpt');
-        [$course, $vrsculpt, , $context] = $this->make_activity();
+        set_config('maxsnapshotsize', strlen($data) - 1, 'mod_vrmakerspace');
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $session = session_manager::get_or_create($vrsculpt, 0, (int)$user->id);
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
 
         try {
             session_manager::save_snapshot($session, $context, (int)$user->id, $data);
@@ -253,11 +253,11 @@ final class session_manager_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('snapshottoolarge', $e->errorcode);
         }
-        $this->assertSame(0, $DB->count_records('vrsculpt_snapshots'));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots'));
         // Exactly at the limit is accepted.
-        set_config('maxsnapshotsize', strlen($data), 'mod_vrsculpt');
+        set_config('maxsnapshotsize', strlen($data), 'mod_vrmakerspace');
         session_manager::save_snapshot($session, $context, (int)$user->id, $data);
-        $this->assertSame(1, $DB->count_records('vrsculpt_snapshots'));
+        $this->assertSame(1, $DB->count_records('vrmakerspace_snapshots'));
     }
 
     /**
@@ -266,18 +266,18 @@ final class session_manager_test extends \advanced_testcase {
     public function test_set_status(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt] = $this->make_activity();
+        [$course, $vrmakerspace] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $session = session_manager::get_or_create($vrsculpt, 0, (int)$user->id);
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
 
         session_manager::set_status($session, session_manager::STATUS_CLOSED);
-        $status = (int)$DB->get_field('vrsculpt_sessions', 'status', ['id' => $session->id]);
+        $status = (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]);
         $this->assertSame(session_manager::STATUS_CLOSED, $status);
         session_manager::set_status($session, session_manager::STATUS_OPEN);
-        $this->assertSame(session_manager::STATUS_OPEN, (int)$DB->get_field('vrsculpt_sessions', 'status', ['id' => $session->id]));
+        $this->assertSame(session_manager::STATUS_OPEN, (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]));
 
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('invalidstatus', 'mod_vrsculpt'));
+        $this->expectExceptionMessage(get_string('invalidstatus', 'mod_vrmakerspace'));
         session_manager::set_status($session, 5);
     }
 
@@ -288,32 +288,32 @@ final class session_manager_test extends \advanced_testcase {
     public function test_manage_actions(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt, , $context] = $this->make_activity();
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
         $one = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $two = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $session = $this->generator()->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $one->id]);
-        $other = $this->generator()->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $two->id]);
+        $session = $this->generator()->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $one->id]);
+        $other = $this->generator()->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $two->id]);
         $this->generator()->create_snapshot($session, (int)$one->id, 'a');
         $this->generator()->create_snapshot($session, (int)$one->id, 'b');
         $kept = $this->generator()->create_snapshot($other, (int)$two->id, 'c');
         $this->generator()->create_contribution($session, (int)$one->id, 5, 10.0, 2.0);
 
         $this->assertSame('managedone_close', session_manager::manage($session, $context, 'close'));
-        $status = (int)$DB->get_field('vrsculpt_sessions', 'status', ['id' => $session->id]);
+        $status = (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]);
         $this->assertSame(session_manager::STATUS_CLOSED, $status);
         $this->assertSame('managedone_reopen', session_manager::manage($session, $context, 'reopen'));
-        $this->assertSame(session_manager::STATUS_OPEN, (int)$DB->get_field('vrsculpt_sessions', 'status', ['id' => $session->id]));
+        $this->assertSame(session_manager::STATUS_OPEN, (int)$DB->get_field('vrmakerspace_sessions', 'status', ['id' => $session->id]));
 
         $this->assertSame('managedone_reset', session_manager::manage($session, $context, 'reset'));
-        $this->assertTrue($DB->record_exists('vrsculpt_sessions', ['id' => $session->id]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $session->id]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_contrib', ['sessionid' => $session->id]));
+        $this->assertTrue($DB->record_exists('vrmakerspace_sessions', ['id' => $session->id]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $session->id]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_contrib', ['sessionid' => $session->id]));
         $fs = get_file_storage();
-        $files = $fs->get_area_files($context->id, 'mod_vrsculpt', session_manager::FILEAREA, false, 'itemid', false);
+        $files = $fs->get_area_files($context->id, 'mod_vrmakerspace', session_manager::FILEAREA, false, 'itemid', false);
         $this->assertSame([(int)$kept->id], array_values(array_map(fn($f) => (int)$f->get_itemid(), $files)));
 
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('invalidaction', 'mod_vrsculpt'));
+        $this->expectExceptionMessage(get_string('invalidaction', 'mod_vrmakerspace'));
         session_manager::manage($session, $context, 'explode');
     }
 
@@ -323,36 +323,36 @@ final class session_manager_test extends \advanced_testcase {
     public function test_delete_sessions(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt, , $context] = $this->make_activity();
-        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
         $one = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $two = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $s1 = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $one->id]);
-        $s2 = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $two->id]);
+        $s1 = $generator->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $one->id]);
+        $s2 = $generator->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $two->id]);
         $generator->create_snapshot($s1, (int)$one->id);
         $kept = $generator->create_snapshot($s2, (int)$two->id);
         $generator->create_contribution($s1, (int)$one->id, 1, 1.0, 0.0);
         $generator->create_contribution($s2, (int)$two->id, 1, 1.0, 0.0);
         foreach ([$s1, $s2] as $session) {
             $key = pair_manager::new_peerkey();
-            $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $session->id, 'userid' => $session->userid,
+            $DB->insert_record('vrmakerspace_peers', (object)['sessionid' => $session->id, 'userid' => $session->userid,
                 'peerkey' => $key, 'role' => 'host', 'lastseen' => time(), 'timecreated' => time()]);
-            $DB->insert_record('vrsculpt_signals', (object)['sessionid' => $session->id, 'frompeerkey' => $key,
+            $DB->insert_record('vrmakerspace_signals', (object)['sessionid' => $session->id, 'frompeerkey' => $key,
                 'topeerkey' => pair_manager::new_peerkey(), 'fromuserid' => $session->userid, 'payload' => '{}',
                 'timecreated' => time()]);
         }
 
         session_manager::delete_sessions([$s1], $context);
 
-        $this->assertFalse($DB->record_exists('vrsculpt_sessions', ['id' => $s1->id]));
-        $this->assertSame(0, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $s1->id]));
-        foreach (['vrsculpt_contrib', 'vrsculpt_peers', 'vrsculpt_signals'] as $table) {
+        $this->assertFalse($DB->record_exists('vrmakerspace_sessions', ['id' => $s1->id]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $s1->id]));
+        foreach (['vrmakerspace_contrib', 'vrmakerspace_peers', 'vrmakerspace_signals'] as $table) {
             $this->assertSame(0, $DB->count_records($table, ['sessionid' => $s1->id]), $table);
             $this->assertSame(1, $DB->count_records($table, ['sessionid' => $s2->id]), $table);
         }
         $files = get_file_storage()->get_area_files(
             $context->id,
-            'mod_vrsculpt',
+            'mod_vrmakerspace',
             session_manager::FILEAREA,
             false,
             'itemid',
@@ -379,10 +379,10 @@ final class session_manager_test extends \advanced_testcase {
     public function test_save_snapshot_skips_identical_data(): void {
         global $DB;
         $this->resetAfterTest();
-        [$course, $vrsculpt] = $this->make_activity();
+        [$course, $vrmakerspace] = $this->make_activity();
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
-        $session = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'userid' => $user->id]);
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $session = $generator->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'userid' => $user->id]);
 
         $first = $generator->create_snapshot($session, (int)$user->id, 'same', 5);
         $again = $generator->create_snapshot($session, (int)$user->id, 'same', 5);
@@ -390,6 +390,6 @@ final class session_manager_test extends \advanced_testcase {
 
         $this->assertEquals($first->id, $again->id);
         $this->assertSame(2, (int)$other->version);
-        $this->assertSame(2, $DB->count_records('vrsculpt_snapshots', ['sessionid' => $session->id]));
+        $this->assertSame(2, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $session->id]));
     }
 }

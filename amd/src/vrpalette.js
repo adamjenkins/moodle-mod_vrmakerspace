@@ -25,7 +25,7 @@
  * The canvas wrist board follows the wrist panel of vrroomruntime_builtin/xr (itself after
  * mod_gear's viewer).
  *
- * @module     mod_vrsculpt/vrpalette
+ * @module     mod_vrmakerspace/vrpalette
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -267,7 +267,7 @@ const wrapText = (ctx, text, box, size, colour) => {
 /**
  * Create the wrist palette.
  *
- * Options: strings (an object of the mod_vrsculpt strings by key: tool_grab … tool_cutshape,
+ * Options: strings (an object of the mod_vrmakerspace strings by key: tool_grab … tool_cutshape,
  * brushsize, brushstrength, undo, redo, mirror, exitvr, vrhelp), readonly (only Exit VR is shown).
  *
  * The board lies in the x/y plane of its object (facing +z), centred on the object's origin. The
@@ -297,7 +297,7 @@ export const createPalette = (THREE, options = {}) => {
     const boardheight = BOARD_WIDTH * plan.height / CANVAS_WIDTH;
 
     const group = new THREE.Group();
-    group.name = 'vrsculpt-palette';
+    group.name = 'vrmakerspace-palette';
     group.matrixAutoUpdate = false;
     group.visible = false;
 
@@ -309,7 +309,7 @@ export const createPalette = (THREE, options = {}) => {
     const geometry = new THREE.PlaneGeometry(BOARD_WIDTH, boardheight);
     const material = new THREE.MeshBasicMaterial({map: texture, transparent: true, depthTest: false});
     const board = new THREE.Mesh(geometry, material);
-    board.name = 'vrsculpt-palette-board';
+    board.name = 'vrmakerspace-palette-board';
     board.renderOrder = 30;
     board.raycast = noRaycast;
     group.add(board);

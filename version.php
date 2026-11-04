@@ -15,17 +15,17 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details for mod_vrsculpt.
+ * Version details for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'mod_vrsculpt';
-$plugin->version = 2026102703;
+$plugin->component = 'mod_vrmakerspace';
+$plugin->version = 2026110400;
 $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;
 // Moodle 5.2.0 (the v5.2.0 tag's public/version.php: 2026042000.00), as mod_vrroom.

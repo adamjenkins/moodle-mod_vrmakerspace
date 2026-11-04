@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\contribution_manager;
+use mod_vrmakerspace\local\contribution_manager;
 
 /**
  * Add to the caller's recorded share of a sculpture.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -64,10 +64,10 @@ class report_contribution extends external_api {
             'added' => $added,
             'removed' => $removed,
         ]);
-        [$vrsculpt, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
+        [$vrmakerspace, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
         helper::require_sculptor($session, $context, (int)$USER->id);
-        if (empty($vrsculpt->trackcontributions)) {
-            throw new \moodle_exception('contributionsnottracked', 'mod_vrsculpt');
+        if (empty($vrmakerspace->trackcontributions)) {
+            throw new \moodle_exception('contributionsnottracked', 'mod_vrmakerspace');
         }
         $accepted = contribution_manager::report(
             $session,

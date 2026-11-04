@@ -17,7 +17,7 @@
  * Pair transport: one direct WebRTC connection between the two people sculpting a group's
  * sculpture together, with no server of its own.
  *
- * Moodle relays the signalling (web services mod_vrsculpt_pair_join, _signal, _poll and _leave)
+ * Moodle relays the signalling (web services mod_vrmakerspace_pair_join, _signal, _poll and _leave)
  * and decides the roles: the host sequences the ops, the guest creates the offer. The poll is the
  * presence heartbeat too, so it never stops while the studio is open: every pollms while
  * connecting, every 5 s once the connection is up. When the host goes away, the poll tells the
@@ -43,7 +43,7 @@
  * so. Link handling (batched candidates, ICE restart, watchdogs, pagehide leave) follows the
  * built-in mesh transport of vrroomruntime_builtin, which adapts mod_gear's collaborative mode.
  *
- * @module     mod_vrsculpt/net/pairtransport
+ * @module     mod_vrmakerspace/net/pairtransport
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -52,7 +52,7 @@
 import Ajax from 'core/ajax';
 import Config from 'core/config';
 import Log from 'core/log';
-import {Emitter} from 'mod_vrsculpt/net/emitter';
+import {Emitter} from 'mod_vrmakerspace/net/emitter';
 
 /** Web-service request timeout in ms. */
 const REQUEST_TIMEOUT = 10000;
@@ -113,7 +113,7 @@ const CHANNELS = Object.freeze({
 });
 
 /** Prefix of debug log lines. */
-const LOGPREFIX = 'mod_vrsculpt/net/pairtransport: ';
+const LOGPREFIX = 'mod_vrmakerspace/net/pairtransport: ';
 
 /**
  * Turn a web-service rejection into an Error carrying an errorcode.
@@ -876,7 +876,7 @@ export class PairTransport extends Emitter {
          * @param {number} attempt Calls made so far.
          * @returns {Promise<Object>} The pair_join result.
          */
-        const attemptJoin = (attempt) => this.call('mod_vrsculpt_pair_join', {cmid: this.cmid, sessionid: this.sessionid},
+        const attemptJoin = (attempt) => this.call('mod_vrmakerspace_pair_join', {cmid: this.cmid, sessionid: this.sessionid},
             false).catch((exception) => {
             const error = toError(exception);
             if (error.errorcode !== 'pairbusy' || attempt >= JOIN_BUSY_RETRIES || this.stopped) {
@@ -962,7 +962,7 @@ export class PairTransport extends Emitter {
         this.polling = true;
         const peerkey = this.me.peerkey;
         const args = {cmid: this.cmid, sessionid: this.sessionid, peerkey: peerkey, afterid: this.afterid};
-        this.call('mod_vrsculpt_pair_poll', args, true).then((result) => {
+        this.call('mod_vrmakerspace_pair_poll', args, true).then((result) => {
             this.polling = false;
             if (this.stopped || !this.me || this.me.peerkey !== peerkey) {
                 return;
@@ -1041,7 +1041,7 @@ export class PairTransport extends Emitter {
      */
     rejoin() {
         this.dropLink();
-        this.call('mod_vrsculpt_pair_join', {cmid: this.cmid, sessionid: this.sessionid}, false).then((result) => {
+        this.call('mod_vrmakerspace_pair_join', {cmid: this.cmid, sessionid: this.sessionid}, false).then((result) => {
             if (this.stopped) {
                 return;
             }
@@ -1172,7 +1172,7 @@ export class PairTransport extends Emitter {
             if (this.stopped) {
                 return undefined;
             }
-            return this.call('mod_vrsculpt_pair_signal', args, true);
+            return this.call('mod_vrmakerspace_pair_signal', args, true);
         }).catch((exception) => Log.debug(exception));
     }
 
@@ -1293,7 +1293,7 @@ export class PairTransport extends Emitter {
             return Promise.resolve();
         }
         const args = {cmid: this.cmid, sessionid: this.sessionid, peerkey: me.peerkey};
-        return this.call('mod_vrsculpt_pair_leave', args, true).then(() => undefined, (exception) => {
+        return this.call('mod_vrmakerspace_pair_leave', args, true).then(() => undefined, (exception) => {
             Log.debug(exception);
         });
     }
@@ -1309,7 +1309,7 @@ export class PairTransport extends Emitter {
         if (!me || wasstopped) {
             return;
         }
-        const methodname = 'mod_vrsculpt_pair_leave';
+        const methodname = 'mod_vrmakerspace_pair_leave';
         const url = Config.wwwroot + '/lib/ajax/service.php?sesskey=' + encodeURIComponent(Config.sesskey)
             + '&info=' + methodname;
         const body = JSON.stringify([{index: 0, methodname: methodname,

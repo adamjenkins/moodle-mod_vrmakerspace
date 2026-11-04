@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_vrsculpt/grade
+    @template mod_vrmakerspace/grade
 
     The grading page: one section per sculpture with its latest version, the members' shares and a
     grade field for each person graded; a group's sculpture also has a field that gives every member
@@ -25,8 +25,8 @@
     * none
 
     Data attributes required for JS:
-    * data-action="mod_vrsculpt-quickview" with data-url (the version's file) and data-title: opens the
-      quick view (mod_vrsculpt/quickview)
+    * data-action="mod_vrmakerspace-quickview" with data-url (the version's file) and data-title: opens the
+      quick view (mod_vrmakerspace/quickview)
 
     Context variables required for this template:
     * cmid - course module id
@@ -61,11 +61,11 @@
                 "quickviewtitle": "Group A, version 4",
                 "hasmembers": true,
                 "members": [
-                    {"userid": 7, "name": "Sam Student", "inputid": "mod_vrsculpt-grade-3-7",
+                    {"userid": 7, "name": "Sam Student", "inputid": "mod_vrmakerspace-grade-3-7",
                      "label": "Grade for Sam Student", "value": "75.00", "haserror": false, "error": ""}
                 ],
                 "grouplabel": "Give every member of Group A this grade",
-                "groupinputid": "mod_vrsculpt-groupgrade-3",
+                "groupinputid": "mod_vrmakerspace-groupgrade-3",
                 "hascontributions": true,
                 "contributions": [
                     {"name": "Sam Student", "ops": 120, "share": "60.0%", "added": "12.5", "removed": "3.1"}
@@ -78,29 +78,29 @@
         ]
     }
 }}
-<div class="mod_vrsculpt-grade">
+<div class="mod_vrmakerspace-grade">
     {{#hassculptures}}
         <form method="post" action="{{actionurl}}">
             <input type="hidden" name="id" value="{{cmid}}">
             <input type="hidden" name="sesskey" value="{{sesskey}}">
-            <p>{{#str}} gradeintro, mod_vrsculpt, {{maxgrade}} {{/str}}</p>
+            <p>{{#str}} gradeintro, mod_vrmakerspace, {{maxgrade}} {{/str}}</p>
             {{#sculptures}}
-                <section class="card mb-3" aria-labelledby="mod_vrsculpt-gradehead-{{sessionid}}">
+                <section class="card mb-3" aria-labelledby="mod_vrmakerspace-gradehead-{{sessionid}}">
                     <div class="card-body">
-                        <h4 class="card-title" id="mod_vrsculpt-gradehead-{{sessionid}}">{{owner}}</h4>
+                        <h4 class="card-title" id="mod_vrmakerspace-gradehead-{{sessionid}}">{{owner}}</h4>
                         <p class="mb-2">
-                            {{#str}} status, mod_vrsculpt {{/str}}: {{status}}.
+                            {{#str}} status, mod_vrmakerspace {{/str}}: {{status}}.
                             {{#hasversion}}
-                                {{#str}} latestversion, mod_vrsculpt, {{version}} {{/str}} ({{lastsaved}}).
-                                <button type="button" class="btn btn-secondary btn-sm ms-1" data-action="mod_vrsculpt-quickview"
+                                {{#str}} latestversion, mod_vrmakerspace, {{version}} {{/str}} ({{lastsaved}}).
+                                <button type="button" class="btn btn-secondary btn-sm ms-1" data-action="mod_vrmakerspace-quickview"
                                     data-url="{{snapshoturl}}" data-title="{{quickviewtitle}}"
-                                    aria-label="{{#str}} quickview_label, mod_vrsculpt, {{quickviewtitle}} {{/str}}">
-                                    {{#str}} quickview, mod_vrsculpt {{/str}}
+                                    aria-label="{{#str}} quickview_label, mod_vrmakerspace, {{quickviewtitle}} {{/str}}">
+                                    {{#str}} quickview, mod_vrmakerspace {{/str}}
                                 </button>
-                                <a class="ms-1" href="{{viewurl}}">{{#str}} viewin3d, mod_vrsculpt {{/str}}</a>
+                                <a class="ms-1" href="{{viewurl}}">{{#str}} viewin3d, mod_vrmakerspace {{/str}}</a>
                             {{/hasversion}}
                             {{^hasversion}}
-                                {{#str}} noversions, mod_vrsculpt {{/str}}
+                                {{#str}} noversions, mod_vrmakerspace {{/str}}
                             {{/hasversion}}
                         </p>
                         {{#hasmanagelinks}}
@@ -112,14 +112,14 @@
                         {{/hasmanagelinks}}
                         {{#hascontributions}}
                             <table class="table table-sm generaltable">
-                                <caption>{{#str}} contributions, mod_vrsculpt {{/str}}</caption>
+                                <caption>{{#str}} contributions, mod_vrmakerspace {{/str}}</caption>
                                 <thead>
                                     <tr>
-                                        <th scope="col">{{#str}} owner, mod_vrsculpt {{/str}}</th>
-                                        <th scope="col">{{#str}} contributionshare, mod_vrsculpt {{/str}}</th>
-                                        <th scope="col">{{#str}} contributionops, mod_vrsculpt {{/str}}</th>
-                                        <th scope="col">{{#str}} contributionadded, mod_vrsculpt {{/str}}</th>
-                                        <th scope="col">{{#str}} contributionremoved, mod_vrsculpt {{/str}}</th>
+                                        <th scope="col">{{#str}} owner, mod_vrmakerspace {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionshare, mod_vrmakerspace {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionops, mod_vrmakerspace {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionadded, mod_vrmakerspace {{/str}}</th>
+                                        <th scope="col">{{#str}} contributionremoved, mod_vrmakerspace {{/str}}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -156,15 +156,15 @@
                             {{/members}}
                         {{/hasmembers}}
                         {{^hasmembers}}
-                            <p>{{#str}} nobodytograde, mod_vrsculpt {{/str}}</p>
+                            <p>{{#str}} nobodytograde, mod_vrmakerspace {{/str}}</p>
                         {{/hasmembers}}
                     </div>
                 </section>
             {{/sculptures}}
-            <button type="submit" class="btn btn-primary" name="savegrades" value="1">{{#str}} savegrades, mod_vrsculpt {{/str}}</button>
+            <button type="submit" class="btn btn-primary" name="savegrades" value="1">{{#str}} savegrades, mod_vrmakerspace {{/str}}</button>
         </form>
     {{/hassculptures}}
     {{^hassculptures}}
-        <p>{{#str}} nosculptures, mod_vrsculpt {{/str}}</p>
+        <p>{{#str}} nosculptures, mod_vrmakerspace {{/str}}</p>
     {{/hassculptures}}
 </div>

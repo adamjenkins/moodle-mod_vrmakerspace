@@ -15,23 +15,23 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Data generator for mod_vrsculpt.
+ * Data generator for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
- * Data generator for mod_vrsculpt: activities, sculptures and saved versions.
+ * Data generator for mod_vrmakerspace: activities, sculptures and saved versions.
  */
-class mod_vrsculpt_generator extends testing_module_generator {
+class mod_vrmakerspace_generator extends testing_module_generator {
     /**
      * Create an activity.
      *
-     * @param array|stdClass|null $record fields of the vrsculpt row
+     * @param array|stdClass|null $record fields of the vrmakerspace row
      * @param array|null $options general options for course module creation
      * @return stdClass the activity record with cmid
      */
@@ -50,13 +50,13 @@ class mod_vrsculpt_generator extends testing_module_generator {
     /**
      * Create (or find) a sculpture.
      *
-     * @param array $record vrsculptid, and groupid or userid
+     * @param array $record vrmakerspaceid, and groupid or userid
      * @return stdClass the session row
      */
     public function create_session(array $record): stdClass {
         global $DB;
-        $vrsculpt = $DB->get_record('vrsculpt', ['id' => $record['vrsculptid']], '*', MUST_EXIST);
-        return session_manager::get_or_create($vrsculpt, (int)($record['groupid'] ?? 0), (int)($record['userid'] ?? 0));
+        $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $record['vrmakerspaceid']], '*', MUST_EXIST);
+        return session_manager::get_or_create($vrmakerspace, (int)($record['groupid'] ?? 0), (int)($record['userid'] ?? 0));
     }
 
     /**
@@ -93,8 +93,8 @@ class mod_vrsculpt_generator extends testing_module_generator {
      */
     public function create_snapshot(stdClass $session, int $userid, string $tag = 'test', int $opcount = 1): stdClass {
         global $DB;
-        $vrsculpt = $DB->get_record('vrsculpt', ['id' => $session->vrsculptid], '*', MUST_EXIST);
-        $cm = get_coursemodule_from_instance('vrsculpt', $vrsculpt->id, $vrsculpt->course, false, MUST_EXIST);
+        $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $session->vrmakerspaceid], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('vrmakerspace', $vrmakerspace->id, $vrmakerspace->course, false, MUST_EXIST);
         return session_manager::save_snapshot(
             $session,
             context_module::instance($cm->id),
@@ -106,11 +106,11 @@ class mod_vrsculpt_generator extends testing_module_generator {
     /**
      * Save a version of a user's own sculpture (created when needed), for Behat's "versions" entity.
      *
-     * @param array $record vrsculptid and userid
+     * @param array $record vrmakerspaceid and userid
      * @return stdClass the snapshot row
      */
     public function create_version(array $record): stdClass {
-        $session = $this->create_session(['vrsculptid' => $record['vrsculptid'], 'userid' => $record['userid']]);
+        $session = $this->create_session(['vrmakerspaceid' => $record['vrmakerspaceid'], 'userid' => $record['userid']]);
         return $this->create_snapshot($session, (int)$record['userid']);
     }
 
@@ -122,7 +122,7 @@ class mod_vrsculpt_generator extends testing_module_generator {
      * @param int $ops operations
      * @param float $added clay added, mm³
      * @param float $removed clay removed, mm³
-     * @return stdClass the vrsculpt_contrib row
+     * @return stdClass the vrmakerspace_contrib row
      */
     public function create_contribution(stdClass $session, int $userid, int $ops, float $added, float $removed): stdClass {
         global $DB;
@@ -135,7 +135,7 @@ class mod_vrsculpt_generator extends testing_module_generator {
             'timemodified' => time(),
             'lastreport' => time(),
         ];
-        $record->id = $DB->insert_record('vrsculpt_contrib', $record);
+        $record->id = $DB->insert_record('vrmakerspace_contrib', $record);
         return $record;
     }
 }

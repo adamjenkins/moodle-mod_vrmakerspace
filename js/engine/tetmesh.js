@@ -26,7 +26,7 @@
  *
  * Dependency-free ES module (runs in the engine's Web Worker and in Node).
  *
- * @module     mod_vrsculpt/engine/tetmesh
+ * @module     mod_vrmakerspace/engine/tetmesh
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

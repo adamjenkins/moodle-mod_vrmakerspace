@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\task;
+namespace mod_vrmakerspace\task;
 
-use mod_vrsculpt\local\pair_manager;
+use mod_vrmakerspace\local\pair_manager;
 
 /**
  * Remove the leftovers of pair work: connection messages and connections nobody polled for an hour.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -32,7 +32,7 @@ class cleanup extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name() {
-        return get_string('taskcleanup', 'mod_vrsculpt');
+        return get_string('taskcleanup', 'mod_vrmakerspace');
     }
 
     /**
@@ -42,7 +42,7 @@ class cleanup extends \core\task\scheduled_task {
      */
     public function execute() {
         $counts = pair_manager::purge_expired();
-        mtrace('mod_vrsculpt: removed ' . $counts['peers'] . ' expired connections and ' . $counts['signals']
+        mtrace('mod_vrmakerspace: removed ' . $counts['peers'] . ' expired connections and ' . $counts['signals']
             . ' expired connection messages.');
     }
 }

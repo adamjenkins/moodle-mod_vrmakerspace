@@ -37,7 +37,7 @@
  * Messages are handled strictly in arrival order. serialize and export capture the state at the
  * moment they are handled; their compression and packing then run while later messages proceed.
  *
- * @module     mod_vrsculpt/engine/worker
+ * @module     mod_vrmakerspace/engine/worker
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

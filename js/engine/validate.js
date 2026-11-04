@@ -23,7 +23,7 @@
  * 1000 of the sculpture-local metres), the volume by the divergence theorem (sum of signed
  * tetrahedra against the bounding-box centre), which is positive for an outward-wound closed mesh.
  *
- * @module     mod_vrsculpt/engine/validate
+ * @module     mod_vrmakerspace/engine/validate
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

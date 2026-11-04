@@ -1,4 +1,4 @@
-@mod @mod_vrsculpt
+@mod @mod_vrmakerspace
 Feature: Open the sculpting studio
   In order to sculpt
   As a student
@@ -18,8 +18,8 @@ Feature: Open the sculpting studio
   Scenario: The studio page renders for a student's own sculpture
     Given the following "activities" exist:
       | activity | name         | course | idnumber |
-      | vrsculpt | Clay animals | SCULPT | sculpt1  |
-    When I am on the "Clay animals" "vrsculpt activity" page logged in as "student1"
+      | vrmakerspace | Clay animals | SCULPT | sculpt1  |
+    When I am on the "Clay animals" "vrmakerspace activity" page logged in as "student1"
     And I follow "Open the sculpting studio"
     Then I should see "Your sculpture"
     And I should see "Clay animals"
@@ -41,7 +41,7 @@ Feature: Open the sculpting studio
       | student1 | G1    |
     And the following "activities" exist:
       | activity | name        | course | idnumber | workmode |
-      | vrsculpt | Group whale | SCULPT | sculpt2  | 1        |
-    When I am on the "Group whale" "vrsculpt activity" page logged in as "student1"
+      | vrmakerspace | Group whale | SCULPT | sculpt2  | 1        |
+    When I am on the "Group whale" "vrmakerspace activity" page logged in as "student1"
     And I follow "Open the sculpting studio"
     Then I should see "Sculpture of Otters"

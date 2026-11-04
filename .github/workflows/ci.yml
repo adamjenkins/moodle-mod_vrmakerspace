@@ -73,7 +73,7 @@ jobs:
           sudo locale-gen en_AU.UTF-8
           echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
 
-      # mod_vrsculpt depends on vrroomruntime_builtin, which mod_vrroom bundles (its three.js, WebXR
+      # mod_vrmakerspace depends on vrroomruntime_builtin, which mod_vrroom bundles (its three.js, WebXR
       # and presence modules): install mod_vrroom first. The mod_vrroom repository is private for now:
       # set the repository secret MOD_VRROOM_TOKEN to a fine-grained token that can read it (Contents:
       # read-only). Without the secret the public URL is used, which works once mod_vrroom is public.
@@ -188,7 +188,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -o pipefail
-          moodle-plugin-ci behat --profile chrome --scss-deprecations --tags="@mod_vrsculpt" \
+          moodle-plugin-ci behat --profile chrome --scss-deprecations --tags="@mod_vrmakerspace" \
             2>&1 | tee "${{ runner.temp }}/behat-output.log"
 
       # Behat exits 0 when a step is pending (e.g. a generator entity it does not know) or undefined

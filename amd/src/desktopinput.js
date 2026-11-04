@@ -28,12 +28,12 @@
  * Keyboard shortcuts (the 'shortcuts' string) work while the focus is anywhere in the studio except
  * in a text field, so typing elsewhere on the page is never taken over.
  *
- * @module     mod_vrsculpt/desktopinput
+ * @module     mod_vrmakerspace/desktopinput
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {SHAPE_TOOLS, TOOLS} from 'mod_vrsculpt/tools';
+import {SHAPE_TOOLS, TOOLS} from 'mod_vrmakerspace/tools';
 
 /** Twist angle per pixel of sideways drag (rad). */
 const TWIST_PER_PIXEL = 0.01;
@@ -118,7 +118,7 @@ export const attach = (options) => {
         new THREE.MeshBasicMaterial({color: CURSOR_COLOURS.add, wireframe: true, transparent: true, opacity: 0.4,
             depthWrite: false})
     );
-    cursor.name = 'vrsculpt-cursor';
+    cursor.name = 'vrmakerspace-cursor';
     cursor.visible = false;
     cursor.renderOrder = 2;
     sculptureRoot.add(cursor);

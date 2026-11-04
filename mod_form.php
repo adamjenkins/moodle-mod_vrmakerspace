@@ -17,7 +17,7 @@
 /**
  * Settings form of a VR sculpting activity.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -25,15 +25,15 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
-require_once($CFG->dirroot . '/mod/vrsculpt/lib.php');
+require_once($CFG->dirroot . '/mod/vrmakerspace/lib.php');
 
-use mod_vrsculpt\local\companion_manager;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\companion_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * Settings form of a VR sculpting activity.
  */
-class mod_vrsculpt_mod_form extends moodleform_mod {
+class mod_vrmakerspace_mod_form extends moodleform_mod {
     /**
      * Define the form.
      *
@@ -49,42 +49,42 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
         $mform->addRule('name', get_string('maximumchars', '', 255), 'maxlength', 255, 'client');
         $this->standard_intro_elements();
 
-        $mform->addElement('header', 'sculptinghdr', get_string('sculptingsettings', 'vrsculpt'));
+        $mform->addElement('header', 'sculptinghdr', get_string('sculptingsettings', 'vrmakerspace'));
 
         $models = [];
         foreach (session_manager::START_MODELS as $model) {
-            $models[$model] = get_string('startmodel_' . $model, 'vrsculpt');
+            $models[$model] = get_string('startmodel_' . $model, 'vrmakerspace');
         }
-        $mform->addElement('select', 'startmodel', get_string('startmodel', 'vrsculpt'), $models);
-        $mform->addHelpButton('startmodel', 'startmodel', 'vrsculpt');
+        $mform->addElement('select', 'startmodel', get_string('startmodel', 'vrmakerspace'), $models);
+        $mform->addHelpButton('startmodel', 'startmodel', 'vrmakerspace');
         $mform->setDefault('startmodel', 'lump');
 
         $mform->addElement(
             'filemanager',
             'startmodelfile',
-            get_string('startmodelfile', 'vrsculpt'),
+            get_string('startmodelfile', 'vrmakerspace'),
             null,
             $this->start_model_file_options()
         );
-        $mform->addHelpButton('startmodelfile', 'startmodelfile', 'vrsculpt');
+        $mform->addHelpButton('startmodelfile', 'startmodelfile', 'vrmakerspace');
         $mform->hideIf('startmodelfile', 'startmodel', 'neq', session_manager::MODEL_UPLOAD);
 
-        $mform->addElement('select', 'workmode', get_string('workmode', 'vrsculpt'), [
-            session_manager::MODE_INDIVIDUAL => get_string('workmode_individual', 'vrsculpt'),
-            session_manager::MODE_GROUP => get_string('workmode_group', 'vrsculpt'),
+        $mform->addElement('select', 'workmode', get_string('workmode', 'vrmakerspace'), [
+            session_manager::MODE_INDIVIDUAL => get_string('workmode_individual', 'vrmakerspace'),
+            session_manager::MODE_GROUP => get_string('workmode_group', 'vrmakerspace'),
         ]);
-        $mform->addHelpButton('workmode', 'workmode', 'vrsculpt');
+        $mform->addHelpButton('workmode', 'workmode', 'vrmakerspace');
         $mform->setDefault('workmode', session_manager::MODE_INDIVIDUAL);
 
         // Pair work is built in and always offered; the companion service only when its plugin is
         // installed (or the activity already uses it), with a note while it is not configured.
-        $connections = [session_manager::CONNECTION_PAIR => get_string('connection_pair', 'vrsculpt')];
+        $connections = [session_manager::CONNECTION_PAIR => get_string('connection_pair', 'vrmakerspace')];
         $current = (string)($this->current->connectmode ?? '');
         if (companion_manager::is_installed() || $current === session_manager::CONNECTION_COMPANION) {
-            $connections[session_manager::CONNECTION_COMPANION] = get_string('connection_companion', 'vrsculpt', 8);
+            $connections[session_manager::CONNECTION_COMPANION] = get_string('connection_companion', 'vrmakerspace', 8);
         }
-        $mform->addElement('select', 'connectmode', get_string('connection', 'vrsculpt'), $connections);
-        $mform->addHelpButton('connectmode', 'connection', 'vrsculpt');
+        $mform->addElement('select', 'connectmode', get_string('connection', 'vrmakerspace'), $connections);
+        $mform->addHelpButton('connectmode', 'connection', 'vrmakerspace');
         $mform->setDefault('connectmode', session_manager::CONNECTION_PAIR);
         $mform->hideIf('connectmode', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
         if (isset($connections[session_manager::CONNECTION_COMPANION]) && !companion_manager::is_available()) {
@@ -92,20 +92,20 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
                 'static',
                 'companionnote',
                 '',
-                html_writer::div(get_string('connection_notconfigured', 'vrsculpt'), 'alert alert-warning mb-0')
+                html_writer::div(get_string('connection_notconfigured', 'vrmakerspace'), 'alert alert-warning mb-0')
             );
             $mform->hideIf('companionnote', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
             $mform->hideIf('companionnote', 'connectmode', 'eq', session_manager::CONNECTION_PAIR);
         }
 
-        $mform->addElement('select', 'maxusers', get_string('maxusers', 'vrsculpt'), array_combine(range(2, 8), range(2, 8)));
-        $mform->addHelpButton('maxusers', 'maxusers', 'vrsculpt');
+        $mform->addElement('select', 'maxusers', get_string('maxusers', 'vrmakerspace'), array_combine(range(2, 8), range(2, 8)));
+        $mform->addHelpButton('maxusers', 'maxusers', 'vrmakerspace');
         $mform->setDefault('maxusers', 8);
         $mform->hideIf('maxusers', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
         $mform->hideIf('maxusers', 'connectmode', 'eq', session_manager::CONNECTION_PAIR);
 
-        $mform->addElement('advcheckbox', 'trackcontributions', get_string('trackcontributions', 'vrsculpt'));
-        $mform->addHelpButton('trackcontributions', 'trackcontributions', 'vrsculpt');
+        $mform->addElement('advcheckbox', 'trackcontributions', get_string('trackcontributions', 'vrmakerspace'));
+        $mform->addHelpButton('trackcontributions', 'trackcontributions', 'vrmakerspace');
         $mform->hideIf('trackcontributions', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
 
         $this->standard_grading_coursemodule_elements();
@@ -120,7 +120,7 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
      */
     protected function start_model_file_options(): array {
         global $CFG;
-        $options = vrsculpt_start_model_file_options();
+        $options = vrmakerspace_start_model_file_options();
         $coursebytes = get_user_max_upload_file_size($this->context, $CFG->maxbytes, $this->get_course()->maxbytes);
         if ($coursebytes > 0) {
             $options['maxbytes'] = min($options['maxbytes'], $coursebytes);
@@ -139,10 +139,10 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
         file_prepare_draft_area(
             $draftitemid,
             $this->context ? $this->context->id : null,
-            'mod_vrsculpt',
+            'mod_vrmakerspace',
             session_manager::MODEL_FILEAREA,
             0,
-            vrsculpt_start_model_file_options()
+            vrmakerspace_start_model_file_options()
         );
         $defaultvalues['startmodelfile'] = $draftitemid;
     }
@@ -158,20 +158,20 @@ class mod_vrsculpt_mod_form extends moodleform_mod {
     public function validation($data, $files) {
         $errors = parent::validation($data, $files);
         if (isset($data['grade']) && (int)$data['grade'] < 0) {
-            $errors['grade'] = get_string('errornoscales', 'vrsculpt');
+            $errors['grade'] = get_string('errornoscales', 'vrmakerspace');
         }
         if (
             (int)($data['workmode'] ?? 0) === session_manager::MODE_GROUP
                 && ($data['connectmode'] ?? '') === session_manager::CONNECTION_COMPANION
                 && !companion_manager::is_installed()
         ) {
-            $errors['connectmode'] = get_string('connection_notinstalled', 'vrsculpt');
+            $errors['connectmode'] = get_string('connection_notinstalled', 'vrmakerspace');
         }
         if (($data['startmodel'] ?? '') === session_manager::MODEL_UPLOAD) {
             $files = file_get_drafarea_files((int)($data['startmodelfile'] ?? 0))->list;
             $models = array_filter($files, fn($file) => session_manager::start_model_format($file->filename) !== '');
             if (!$models) {
-                $errors['startmodelfile'] = get_string('startmodelfile_required', 'vrsculpt');
+                $errors['startmodelfile'] = get_string('startmodelfile_required', 'vrmakerspace');
             }
         }
         return $errors;

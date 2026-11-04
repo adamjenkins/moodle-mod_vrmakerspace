@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Web service functions of mod_vrsculpt.
+ * Web service functions of mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -25,67 +25,67 @@
 defined('MOODLE_INTERNAL') || die();
 
 $functions = [
-    'mod_vrsculpt_get_session_state' => [
-        'classname' => \mod_vrsculpt\external\get_session_state::class,
+    'mod_vrmakerspace_get_session_state' => [
+        'classname' => \mod_vrmakerspace\external\get_session_state::class,
         'description' => 'The state of a sculpting session: its starting model and latest saved version.',
         'type' => 'read',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:view',
+        'capabilities' => 'mod/vrmakerspace:view',
     ],
-    'mod_vrsculpt_save_snapshot' => [
-        'classname' => \mod_vrsculpt\external\save_snapshot::class,
+    'mod_vrmakerspace_save_snapshot' => [
+        'classname' => \mod_vrmakerspace\external\save_snapshot::class,
         'description' => 'Save the current sculpture of a session as a new version.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_pair_join' => [
-        'classname' => \mod_vrsculpt\external\pair_join::class,
+    'mod_vrmakerspace_pair_join' => [
+        'classname' => \mod_vrmakerspace\external\pair_join::class,
         'description' => 'Join a group sculpture to sculpt it with one partner, browser to browser.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_pair_signal' => [
-        'classname' => \mod_vrsculpt\external\pair_signal::class,
+    'mod_vrmakerspace_pair_signal' => [
+        'classname' => \mod_vrmakerspace\external\pair_signal::class,
         'description' => 'Send a connection message to the partner\'s browser.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_pair_poll' => [
-        'classname' => \mod_vrsculpt\external\pair_poll::class,
+    'mod_vrmakerspace_pair_poll' => [
+        'classname' => \mod_vrmakerspace\external\pair_poll::class,
         'description' => 'Stay connected to a group sculpture and fetch the partner\'s connection messages.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_pair_leave' => [
-        'classname' => \mod_vrsculpt\external\pair_leave::class,
+    'mod_vrmakerspace_pair_leave' => [
+        'classname' => \mod_vrmakerspace\external\pair_leave::class,
         'description' => 'Leave a group sculpture of pair work.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_companion_join' => [
-        'classname' => \mod_vrsculpt\external\companion_join::class,
+    'mod_vrmakerspace_companion_join' => [
+        'classname' => \mod_vrmakerspace\external\companion_join::class,
         'description' => 'A short-lived token to sculpt a group sculpture over the companion service.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_report_contribution' => [
-        'classname' => \mod_vrsculpt\external\report_contribution::class,
+    'mod_vrmakerspace_report_contribution' => [
+        'classname' => \mod_vrmakerspace\external\report_contribution::class,
         'description' => 'Add to the caller\'s recorded share of a group sculpture.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:sculpt',
+        'capabilities' => 'mod/vrmakerspace:make',
     ],
-    'mod_vrsculpt_set_session_status' => [
-        'classname' => \mod_vrsculpt\external\set_session_status::class,
+    'mod_vrmakerspace_set_session_status' => [
+        'classname' => \mod_vrmakerspace\external\set_session_status::class,
         'description' => 'Close or reopen a sculpture.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/vrsculpt:managesessions',
+        'capabilities' => 'mod/vrmakerspace:managesessions',
     ],
 ];

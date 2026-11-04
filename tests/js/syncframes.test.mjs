@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Tests of the vrroom-sync frames with the sculpting additions (mod_vrsculpt/net/syncframes).
+ * Tests of the vrroom-sync frames with the sculpting additions (mod_vrmakerspace/net/syncframes).
  *
  * Run from the repository root: node --test tests/js/syncframes.test.mjs
  *

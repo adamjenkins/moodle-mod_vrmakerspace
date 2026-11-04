@@ -18,26 +18,26 @@
  * The 3D sculpting studio: sculpt the user's own (or their group's) sculpture, or look at any sculpture
  * or saved version the user may see.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 require_once(__DIR__ . '/../../config.php');
 
-use mod_vrsculpt\local\studio_helper;
+use mod_vrmakerspace\local\studio_helper;
 
 $id = required_param('id', PARAM_INT);
 $sessionid = optional_param('session', 0, PARAM_INT);
 $version = optional_param('version', 0, PARAM_INT);
 $groupid = optional_param('group', 0, PARAM_INT);
-[$course, $cm] = get_course_and_cm_from_cmid($id, 'vrsculpt');
+[$course, $cm] = get_course_and_cm_from_cmid($id, 'vrmakerspace');
 
 require_login($course, true, $cm);
 $context = context_module::instance($cm->id);
-require_capability('mod/vrsculpt:view', $context);
+require_capability('mod/vrmakerspace:view', $context);
 
-$vrsculpt = $DB->get_record('vrsculpt', ['id' => $cm->instance], '*', MUST_EXIST);
+$vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $cm->instance], '*', MUST_EXIST);
 
 $urlparams = ['id' => $cm->id];
 if ($sessionid) {
@@ -49,24 +49,24 @@ if ($version) {
 if ($groupid) {
     $urlparams['group'] = $groupid;
 }
-$PAGE->set_url('/mod/vrsculpt/studio.php', $urlparams);
-$PAGE->set_title(format_string($vrsculpt->name, true, ['context' => $context]));
+$PAGE->set_url('/mod/vrmakerspace/studio.php', $urlparams);
+$PAGE->set_title(format_string($vrmakerspace->name, true, ['context' => $context]));
 $PAGE->set_heading(format_string($course->fullname, true, ['context' => context_course::instance($course->id)]));
-$PAGE->add_body_class('mod_vrsculpt-studiopage');
+$PAGE->add_body_class('mod_vrmakerspace-studiopage');
 
-$resolved = studio_helper::resolve($vrsculpt, $cm, $context, (int)$USER->id, $sessionid, $version, $groupid);
+$resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$USER->id, $sessionid, $version, $groupid);
 $title = studio_helper::title($resolved['session'], $context, (int)$USER->id, $version ? $resolved['snapshot'] : null);
-$config = studio_helper::config($vrsculpt, $context, $USER, $resolved);
+$config = studio_helper::config($vrmakerspace, $context, $USER, $resolved);
 
-$PAGE->requires->js_call_amd('mod_vrsculpt/studio', 'init', [$config]);
+$PAGE->requires->js_call_amd('mod_vrmakerspace/studio', 'init', [$config]);
 
 echo $OUTPUT->header();
 // Whose sculpture this is (and which version): plain text, escaped here because heading() does not.
 echo $OUTPUT->heading(s($title), 3);
-echo $OUTPUT->render_from_template('mod_vrsculpt/studio', [
+echo $OUTPUT->render_from_template('mod_vrmakerspace/studio', [
     'readonly' => $config['readonly'],
     // The activity name (the canvas label and the export file name), escaped once by the template.
-    'title' => format_string($vrsculpt->name, true, ['context' => $context, 'escape' => false]),
+    'title' => format_string($vrmakerspace->name, true, ['context' => $context, 'escape' => false]),
     'backurl' => $config['backurl'],
 ]);
 echo $OUTPUT->footer();

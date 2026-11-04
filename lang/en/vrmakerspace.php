@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * English strings for mod_vrsculpt.
+ * English strings for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -234,12 +234,12 @@ $string['versionhistory'] = 'Versions';
 $string['versions'] = 'Versions';
 $string['viewin3d'] = 'View in 3D';
 $string['vrhelp'] = 'In VR: the right trigger sculpts, the right stick changes size and strength, A and B change the tool, the left grip moves the sculpture, X undoes and Y redoes. With hands: pinch to sculpt.';
-$string['vrsculpt:addinstance'] = 'Add a new VR sculpting activity';
-$string['vrsculpt:grade'] = 'Grade sculptures';
-$string['vrsculpt:managesessions'] = 'Open, close and reset sculptures';
-$string['vrsculpt:sculpt'] = 'Sculpt';
-$string['vrsculpt:view'] = 'View a VR sculpting activity';
-$string['vrsculpt:viewallsubmissions'] = 'View everyone\'s sculptures';
+$string['vrmakerspace:addinstance'] = 'Add a new VR sculpting activity';
+$string['vrmakerspace:grade'] = 'Grade sculptures';
+$string['vrmakerspace:managesessions'] = 'Open, close and reset sculptures';
+$string['vrmakerspace:sculpt'] = 'Sculpt';
+$string['vrmakerspace:view'] = 'View a VR sculpting activity';
+$string['vrmakerspace:viewallsubmissions'] = 'View everyone\'s sculptures';
 $string['workmode'] = 'Work';
 $string['workmode_group'] = 'In groups: one shared sculpture per group';
 $string['workmode_help'] = 'Individually, each student sculpts their own model. In groups, the members of each group sculpt one shared model together; the groups come from the activity\'s grouping, or from the course when it has none.';

@@ -21,7 +21,7 @@
  * The WebGL check, the renderer set-up, the resize handling and the THREE.Timer frame loop follow
  * vrroomruntime_builtin/viewer.
  *
- * @module     mod_vrsculpt/studio
+ * @module     mod_vrmakerspace/studio
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -31,13 +31,13 @@ import * as THREE from 'vrroomruntime_builtin/three';
 import Log from 'core/log';
 import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
-import {createEngineClient} from 'mod_vrsculpt/engineclient';
-import {createTools} from 'mod_vrsculpt/tools';
-import {attach as attachDesktop} from 'mod_vrsculpt/desktopinput';
-import {createToolbar} from 'mod_vrsculpt/toolbar';
-import {createPresence} from 'mod_vrsculpt/presence';
-import {createXrSculpt} from 'mod_vrsculpt/xrsculpt';
-import {createSession} from 'mod_vrsculpt/net/session';
+import {createEngineClient} from 'mod_vrmakerspace/engineclient';
+import {createTools} from 'mod_vrmakerspace/tools';
+import {attach as attachDesktop} from 'mod_vrmakerspace/desktopinput';
+import {createToolbar} from 'mod_vrmakerspace/toolbar';
+import {createPresence} from 'mod_vrmakerspace/presence';
+import {createXrStudio} from 'mod_vrmakerspace/xrstudio';
+import {createSession} from 'mod_vrmakerspace/net/session';
 
 /** Every string of the studio and the modules it hands its strings to (contract §9). */
 const STRING_KEYS = [
@@ -173,7 +173,7 @@ const reportText = (strings, report) => {
 /**
  * Show the Enter VR button once the browser says whether VR is available.
  *
- * @param {Object} xr The XR controller (createXrSculpt).
+ * @param {Object} xr The XR controller (createXrStudio).
  * @param {Object} toolbar The toolbar.
  * @param {Function} isStopped Returns true once the studio has stopped.
  */
@@ -234,16 +234,16 @@ const buildView = (canvas) => {
     const floormaterial = new THREE.MeshStandardMaterial({color: 0x9aa0a6, roughness: 1, metalness: 0});
     const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), floormaterial);
     floor.rotation.x = -Math.PI / 2;
-    floor.name = 'vrsculpt-floor';
+    floor.name = 'vrmakerspace-floor';
     scene.add(floor);
     const pedestalmaterial = new THREE.MeshStandardMaterial({color: 0xe8e6e1, roughness: 0.7, metalness: 0});
     const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, PEDESTAL_TOP, 48), pedestalmaterial);
     pedestal.position.set(0, PEDESTAL_TOP / 2, 0);
-    pedestal.name = 'vrsculpt-pedestal';
+    pedestal.name = 'vrmakerspace-pedestal';
     scene.add(pedestal);
 
     const sculptureRoot = new THREE.Group();
-    sculptureRoot.name = 'vrsculpt-sculpture';
+    sculptureRoot.name = 'vrmakerspace-sculpture';
     sculptureRoot.position.set(0, SCULPTURE_HEIGHT, 0);
     scene.add(sculptureRoot);
     const material = new THREE.MeshStandardMaterial({color: 0xc08a64, roughness: 0.82, metalness: 0});
@@ -424,7 +424,7 @@ const run = (root, config, strings, extra) => {
     const toggleFullscreen = () => {
         if (fullwindow) {
             fullwindow = false;
-            root.classList.remove('mod_vrsculpt-fullscreen');
+            root.classList.remove('mod_vrmakerspace-fullscreen');
             toolbar.setFullscreen(false);
             return Promise.resolve(null);
         }
@@ -434,12 +434,12 @@ const run = (root, config, strings, extra) => {
         if (typeof root.requestFullscreen === 'function' && document.fullscreenEnabled !== false) {
             return Promise.resolve(root.requestFullscreen()).catch(() => {
                 fullwindow = true;
-                root.classList.add('mod_vrsculpt-fullscreen');
+                root.classList.add('mod_vrmakerspace-fullscreen');
                 toolbar.setFullscreen(true);
             });
         }
         fullwindow = true;
-        root.classList.add('mod_vrsculpt-fullscreen');
+        root.classList.add('mod_vrmakerspace-fullscreen');
         toolbar.setFullscreen(true);
         return Promise.resolve(null);
     };
@@ -633,7 +633,7 @@ const run = (root, config, strings, extra) => {
             presence.dispose();
             engine.dispose();
             view.dispose();
-            delete root.dataset.vrsculptReady;
+            delete root.dataset.vrmakerspaceReady;
             return null;
         });
     };
@@ -685,7 +685,7 @@ const run = (root, config, strings, extra) => {
             keyroot: root,
             target: [0, SCULPTURE_HEIGHT, 0],
         });
-        xr = createXrSculpt({
+        xr = createXrStudio({
             THREE: THREE,
             renderer: renderer,
             scene: scene,
@@ -705,7 +705,7 @@ const run = (root, config, strings, extra) => {
             },
         });
         watchVr(xr, toolbar, () => stopped);
-        root.dataset.vrsculptReady = readonly ? 'view' : String(config.mode || 'solo');
+        root.dataset.vrmakerspaceReady = readonly ? 'view' : String(config.mode || 'solo');
         canvas.focus({preventScroll: true});
         return {stop: stop};
     }).catch((error) => {
@@ -723,23 +723,23 @@ const run = (root, config, strings, extra) => {
  * @returns {Promise<Object|null>} {stop()} once running, or null.
  */
 export const init = (config) => {
-    const root = document.querySelector('[data-region="mod_vrsculpt-studioroot"]');
-    if (!root || root.dataset.vrsculptStarted === '1') {
+    const root = document.querySelector('[data-region="mod_vrmakerspace-studioroot"]');
+    if (!root || root.dataset.vrmakerspaceStarted === '1') {
         return Promise.resolve(null);
     }
-    root.dataset.vrsculptStarted = '1';
-    const pending = new Pending('mod_vrsculpt/studio:init');
+    root.dataset.vrmakerspaceStarted = '1';
+    const pending = new Pending('mod_vrmakerspace/studio:init');
     const strings = {};
     const extra = {};
     // A string that is not part of the contract list must never stop the studio.
-    const optional = Promise.resolve(getString('exportfailed', 'mod_vrsculpt')).then((value) => {
+    const optional = Promise.resolve(getString('exportfailed', 'mod_vrmakerspace')).then((value) => {
         // A missing string comes back as [[exportfailed]]: then the bare error is shown.
         if (value && String(value).indexOf('[[') !== 0) {
             extra.exportfailed = value;
         }
         return value;
     }).catch(() => null);
-    return getStrings(STRING_KEYS.map((key) => ({key: key, component: 'mod_vrsculpt'}))).then((values) => {
+    return getStrings(STRING_KEYS.map((key) => ({key: key, component: 'mod_vrmakerspace'}))).then((values) => {
         STRING_KEYS.forEach((key, index) => {
             strings[key] = values[index];
         });

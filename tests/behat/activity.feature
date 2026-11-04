@@ -1,4 +1,4 @@
-@mod @mod_vrsculpt
+@mod @mod_vrmakerspace
 Feature: Create a VR sculpting activity and see the sculptures
   In order to run a sculpting task
   As a teacher
@@ -22,10 +22,10 @@ Feature: Create a VR sculpting activity and see the sculptures
   @javascript
   Scenario: A teacher adds the activity through the form
     Given I log in as "teacher1"
-    And I add a vrsculpt activity to course "Sculpting" section "1" and I fill the form with:
+    And I add a vrmakerspace activity to course "Sculpting" section "1" and I fill the form with:
       | Name           | Clay animals |
       | Starting model | Sphere       |
-    When I am on the "Clay animals" "vrsculpt activity" page
+    When I am on the "Clay animals" "vrmakerspace activity" page
     Then I should see "Sphere"
     And I should see "Nobody has started a sculpture yet."
     And I should not see "Your sculpture"
@@ -33,11 +33,11 @@ Feature: Create a VR sculpting activity and see the sculptures
   @javascript @_file_upload
   Scenario: A teacher starts the sculptures from an uploaded model
     Given I log in as "teacher1"
-    And I add a vrsculpt activity to course "Sculpting" section "1" and I fill the form with:
+    And I add a vrmakerspace activity to course "Sculpting" section "1" and I fill the form with:
       | Name           | Clay owls      |
       | Starting model | Uploaded model |
     And I should see "Upload an STL, OBJ or glTF binary (.glb) file, or choose another starting model."
-    When I upload "mod/vrsculpt/tests/fixtures/tetrahedron.stl" file to "Model file" filemanager
+    When I upload "mod/vrmakerspace/tests/fixtures/tetrahedron.stl" file to "Model file" filemanager
     And I press "Save and display"
     Then I should see "Uploaded model"
     And I navigate to "Settings" in current page administration
@@ -47,13 +47,13 @@ Feature: Create a VR sculpting activity and see the sculptures
   Scenario: A student gets their own sculpture and the teacher sees it
     Given the following "activities" exist:
       | activity | name         | course | idnumber | startmodel |
-      | vrsculpt | Clay animals | SCULPT | sculpt1  | cube       |
-    When I am on the "Clay animals" "vrsculpt activity" page logged in as "student1"
+      | vrmakerspace | Clay animals | SCULPT | sculpt1  | cube       |
+    When I am on the "Clay animals" "vrmakerspace activity" page logged in as "student1"
     Then I should see "Your sculpture"
     And I should see "Cube"
     And I should see "Not saved yet."
     And I should not see "All sculptures"
-    And I am on the "Clay animals" "vrsculpt activity" page logged in as "teacher1"
+    And I am on the "Clay animals" "vrmakerspace activity" page logged in as "teacher1"
     And I should see "All sculptures"
     And "Sam Student" "table_row" should exist
     And "Sue Student" "table_row" should not exist
@@ -61,7 +61,7 @@ Feature: Create a VR sculpting activity and see the sculptures
   Scenario: A student in group work with no group is told so
     Given the following "activities" exist:
       | activity | name        | course | idnumber | workmode |
-      | vrsculpt | Group whale | SCULPT | sculpt2  | 1        |
-    When I am on the "Group whale" "vrsculpt activity" page logged in as "student1"
+      | vrmakerspace | Group whale | SCULPT | sculpt2  | 1        |
+    When I am on the "Group whale" "vrmakerspace activity" page logged in as "student1"
     Then I should see "you are not in a group for it"
     And I should not see "Your sculpture"

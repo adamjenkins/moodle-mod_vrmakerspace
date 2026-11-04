@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * The grading page: every sculpture a teacher may see, who is graded for it, and saving the grades.
@@ -24,7 +24,7 @@ namespace mod_vrsculpt\local;
  * A user listed under two sculptures (a member of two groups) gets one grade field, under the first.
  * Only the users the page lists can be graded: posted ids are checked against the same list.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -32,17 +32,17 @@ final class grading_helper {
     /**
      * Who is graded for each sculpture a teacher may see.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \cm_info|\stdClass $cm the course module
      * @param \context_module $context the activity context
      * @return array sessionid => ['session' => \stdClass, 'userids' => int[]] (a user under one sculpture only)
      */
-    public static function gradable(\stdClass $vrsculpt, $cm, \context_module $context): array {
+    public static function gradable(\stdClass $vrmakerspace, $cm, \context_module $context): array {
         $seen = [];
         $result = [];
-        foreach (view_helper::visible_sessions($vrsculpt, $cm, $context) as $session) {
+        foreach (view_helper::visible_sessions($vrmakerspace, $cm, $context) as $session) {
             if ((int)$session->groupid) {
-                $users = get_enrolled_users($context, 'mod/vrsculpt:sculpt', (int)$session->groupid, 'u.id', 'u.id ASC');
+                $users = get_enrolled_users($context, 'mod/vrmakerspace:make', (int)$session->groupid, 'u.id', 'u.id ASC');
                 $userids = array_map('intval', array_keys($users));
             } else {
                 $userids = [(int)$session->userid];
@@ -62,7 +62,7 @@ final class grading_helper {
      * A field left as it was is not saved again; an emptied field clears the grade. A group's
      * "give every member this grade" value, when filled, replaces the members' own fields.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param array $gradable what gradable() returned for the page
      * @param array $grades user id => the posted field text
      * @param array $groupgrades session id => the posted group field text
@@ -70,7 +70,7 @@ final class grading_helper {
      * @return array{saved: int, errors: array} errors: user id => message
      */
     public static function save(
-        \stdClass $vrsculpt,
+        \stdClass $vrmakerspace,
         array $gradable,
         array $grades,
         array $groupgrades,
@@ -91,7 +91,7 @@ final class grading_helper {
             }
         }
 
-        $current = $DB->get_records_menu('vrsculpt_grades', ['vrsculptid' => $vrsculpt->id], '', 'userid, grade');
+        $current = $DB->get_records_menu('vrmakerspace_grades', ['vrmakerspaceid' => $vrmakerspace->id], '', 'userid, grade');
         $saved = 0;
         $errors = [];
         foreach ($values as $userid => $text) {
@@ -100,7 +100,7 @@ final class grading_helper {
             } else {
                 $grade = unformat_float($text, true);
                 if ($grade === false || $grade === null) {
-                    $errors[$userid] = get_string('gradeinvalid', 'vrsculpt');
+                    $errors[$userid] = get_string('gradeinvalid', 'vrmakerspace');
                     continue;
                 }
             }
@@ -109,7 +109,7 @@ final class grading_helper {
                 continue;
             }
             try {
-                grader::save_grade($vrsculpt, (int)$userid, $grade, $graderid);
+                grader::save_grade($vrmakerspace, (int)$userid, $grade, $graderid);
                 $saved++;
             } catch (\moodle_exception $e) {
                 $errors[$userid] = $e->getMessage();
@@ -121,7 +121,7 @@ final class grading_helper {
     /**
      * The template data of the grading page.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \context_module $context the activity context
      * @param array $gradable what gradable() returned
      * @param array $errors user id => message, from save()
@@ -129,7 +129,7 @@ final class grading_helper {
      * @return array
      */
     public static function template_data(
-        \stdClass $vrsculpt,
+        \stdClass $vrmakerspace,
         \context_module $context,
         array $gradable,
         array $errors = [],
@@ -137,9 +137,9 @@ final class grading_helper {
     ): array {
         global $DB;
         $names = [];
-        $current = $DB->get_records_menu('vrsculpt_grades', ['vrsculptid' => $vrsculpt->id], '', 'userid, grade');
-        $tracked = !empty($vrsculpt->trackcontributions) && session_manager::is_group_work($vrsculpt);
-        $canmanage = has_capability('mod/vrsculpt:managesessions', $context);
+        $current = $DB->get_records_menu('vrmakerspace_grades', ['vrmakerspaceid' => $vrmakerspace->id], '', 'userid, grade');
+        $tracked = !empty($vrmakerspace->trackcontributions) && session_manager::is_group_work($vrmakerspace);
+        $canmanage = has_capability('mod/vrmakerspace:managesessions', $context);
 
         $sculptures = [];
         foreach ($gradable as $sessionid => $item) {
@@ -158,8 +158,8 @@ final class grading_helper {
                 $members[] = [
                     'userid' => $userid,
                     'name' => $name,
-                    'inputid' => 'mod_vrsculpt-grade-' . $sessionid . '-' . $userid,
-                    'label' => get_string('gradefor', 'vrsculpt', $name),
+                    'inputid' => 'mod_vrmakerspace-grade-' . $sessionid . '-' . $userid,
+                    'label' => get_string('gradefor', 'vrmakerspace', $name),
                     'value' => $value,
                     'error' => $errors[$userid] ?? '',
                     'haserror' => isset($errors[$userid]),
@@ -168,7 +168,7 @@ final class grading_helper {
             $contributions = $tracked ? view_helper::contribution_rows((int)$sessionid, $context, $names) : [];
             $owner = view_helper::owner_name($session, $context, $names);
             $managelinks = $canmanage ? view_helper::manage_links($session, $context, 'grade') : [];
-            $quickviewtitle = $latest ? get_string('quickviewtitle', 'vrsculpt', [
+            $quickviewtitle = $latest ? get_string('quickviewtitle', 'vrmakerspace', [
                 'owner' => $owner,
                 'version' => (int)$latest->version,
             ]) : '';
@@ -185,8 +185,8 @@ final class grading_helper {
                 'quickviewtitle' => $quickviewtitle,
                 'members' => $members,
                 'hasmembers' => !empty($members),
-                'grouplabel' => get_string('gradeallmembers', 'vrsculpt', $owner),
-                'groupinputid' => 'mod_vrsculpt-groupgrade-' . $sessionid,
+                'grouplabel' => get_string('gradeallmembers', 'vrmakerspace', $owner),
+                'groupinputid' => 'mod_vrmakerspace-groupgrade-' . $sessionid,
                 'contributions' => $contributions,
                 'hascontributions' => !empty($contributions),
                 'managelinks' => $managelinks,
@@ -196,8 +196,8 @@ final class grading_helper {
         return [
             'cmid' => (int)$context->instanceid,
             'sesskey' => sesskey(),
-            'actionurl' => (new \moodle_url('/mod/vrsculpt/grade.php'))->out(false),
-            'maxgrade' => format_float((float)$vrsculpt->grade, 2),
+            'actionurl' => (new \moodle_url('/mod/vrmakerspace/grade.php'))->out(false),
+            'maxgrade' => format_float((float)$vrmakerspace->grade, 2),
             'sculptures' => $sculptures,
             'hassculptures' => !empty($sculptures),
             'tracked' => $tracked,

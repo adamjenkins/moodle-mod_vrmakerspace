@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Template data for the activity, grading and studio pages.
  *
  * Every string returned for a template is plain text, escaped by Mustache; names are never marked up.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -29,7 +29,7 @@ class view_helper {
     /**
      * One version in the history table.
      *
-     * @param \stdClass $snapshot the vrsculpt_snapshots row
+     * @param \stdClass $snapshot the vrmakerspace_snapshots row
      * @param \context_module $context the activity context
      * @param array $authors user id => full name, filled as users are looked up
      * @return array
@@ -38,7 +38,7 @@ class view_helper {
         $userid = (int)$snapshot->userid;
         return [
             'version' => (int)$snapshot->version,
-            'savedby' => $userid ? self::user_name($userid, $context, $authors) : get_string('anonymised', 'vrsculpt'),
+            'savedby' => $userid ? self::user_name($userid, $context, $authors) : get_string('anonymised', 'vrmakerspace'),
             'timesaved' => userdate($snapshot->timecreated),
             'size' => display_size((int)$snapshot->filesize),
             'url' => session_manager::snapshot_url($snapshot, $context)->out(false),
@@ -108,21 +108,21 @@ class view_helper {
         if ($groupid) {
             $params['group'] = $groupid;
         }
-        return new \moodle_url('/mod/vrsculpt/studio.php', $params);
+        return new \moodle_url('/mod/vrmakerspace/studio.php', $params);
     }
 
     /**
      * Every sculpture of an activity a teacher may see: in separate groups without access to all
      * groups, only the work of the teacher's own groups and of their members.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \cm_info|\stdClass $cm the course module
      * @param \context_module $context the activity context
-     * @return \stdClass[] vrsculpt_sessions rows keyed by id, oldest first
+     * @return \stdClass[] vrmakerspace_sessions rows keyed by id, oldest first
      */
-    public static function visible_sessions(\stdClass $vrsculpt, $cm, \context_module $context): array {
+    public static function visible_sessions(\stdClass $vrmakerspace, $cm, \context_module $context): array {
         global $DB;
-        $sessions = $DB->get_records('vrsculpt_sessions', ['vrsculptid' => $vrsculpt->id], 'id ASC');
+        $sessions = $DB->get_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspace->id], 'id ASC');
         if (groups_get_activity_groupmode($cm) != SEPARATEGROUPS || has_capability('moodle/site:accessallgroups', $context)) {
             return $sessions;
         }
@@ -173,7 +173,7 @@ class view_helper {
      * @return string
      */
     public static function status_text(\stdClass $session): string {
-        return get_string((int)$session->status === session_manager::STATUS_OPEN ? 'statusopen' : 'statusclosed', 'vrsculpt');
+        return get_string((int)$session->status === session_manager::STATUS_OPEN ? 'statusopen' : 'statusclosed', 'vrmakerspace');
     }
 
     /**
@@ -190,8 +190,8 @@ class view_helper {
         foreach ($actions as $action) {
             $links[] = [
                 'action' => $action,
-                'label' => get_string('manage_' . $action, 'vrsculpt'),
-                'url' => (new \moodle_url('/mod/vrsculpt/manage.php', [
+                'label' => get_string('manage_' . $action, 'vrmakerspace'),
+                'url' => (new \moodle_url('/mod/vrmakerspace/manage.php', [
                     'id' => $context->instanceid,
                     'session' => (int)$session->id,
                     'action' => $action,

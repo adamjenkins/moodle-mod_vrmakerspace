@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * Close or reopen a sculpture.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -58,13 +58,13 @@ class set_session_status extends external_api {
             'sessionid' => $sessionid,
             'status' => $status,
         ]);
-        [$vrsculpt, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
-        require_capability('mod/vrsculpt:managesessions', $context);
+        [$vrmakerspace, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
+        require_capability('mod/vrmakerspace:managesessions', $context);
         if (!session_manager::can_view($session, $context, (int)$USER->id)) {
-            throw new \required_capability_exception($context, 'mod/vrsculpt:viewallsubmissions', 'nopermissions', '');
+            throw new \required_capability_exception($context, 'mod/vrmakerspace:viewallsubmissions', 'nopermissions', '');
         }
         session_manager::set_status($session, (int)$params['status']);
-        return helper::state($vrsculpt, $session, $context, (int)$USER->id);
+        return helper::state($vrmakerspace, $session, $context, (int)$USER->id);
     }
 
     /**

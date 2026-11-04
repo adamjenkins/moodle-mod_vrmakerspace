@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Capability definitions for mod_vrsculpt.
+ * Capability definitions for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
 
-    'mod/vrsculpt:addinstance' => [
+    'mod/vrmakerspace:addinstance' => [
         'riskbitmask' => RISK_XSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_COURSE,
@@ -37,7 +37,7 @@ $capabilities = [
         'clonepermissionsfrom' => 'moodle/course:manageactivities',
     ],
 
-    'mod/vrsculpt:view' => [
+    'mod/vrmakerspace:view' => [
         'captype' => 'read',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
@@ -51,7 +51,7 @@ $capabilities = [
 
     // Sculpting creates the user's own (or their group's) work, so it is separate from viewing:
     // a teacher looking at the activity must not get a sculpture of their own.
-    'mod/vrsculpt:sculpt' => [
+    'mod/vrmakerspace:make' => [
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
@@ -59,7 +59,7 @@ $capabilities = [
         ],
     ],
 
-    'mod/vrsculpt:viewallsubmissions' => [
+    'mod/vrmakerspace:viewallsubmissions' => [
         'riskbitmask' => RISK_PERSONAL,
         'captype' => 'read',
         'contextlevel' => CONTEXT_MODULE,
@@ -70,7 +70,7 @@ $capabilities = [
         ],
     ],
 
-    'mod/vrsculpt:grade' => [
+    'mod/vrmakerspace:grade' => [
         'riskbitmask' => RISK_PERSONAL,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
@@ -82,7 +82,7 @@ $capabilities = [
     ],
 
     // Open, close and reset sculpting sessions.
-    'mod/vrsculpt:managesessions' => [
+    'mod/vrmakerspace:managesessions' => [
         'riskbitmask' => RISK_DATALOSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,

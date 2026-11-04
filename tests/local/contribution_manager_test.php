@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Tests of contribution tracking: caps, the rate limit and the shares.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\local\contribution_manager::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\contribution_manager::class)]
 final class contribution_manager_test extends \advanced_testcase {
     /**
      * A group sculpture and two members.
@@ -33,14 +33,14 @@ final class contribution_manager_test extends \advanced_testcase {
     private function make_session(): array {
         $gen = $this->getDataGenerator();
         $course = $gen->create_course(['summary' => '']);
-        $vrsculpt = $gen->create_module('vrsculpt', ['course' => $course->id, 'workmode' => session_manager::MODE_GROUP,
+        $vrmakerspace = $gen->create_module('vrmakerspace', ['course' => $course->id, 'workmode' => session_manager::MODE_GROUP,
             'trackcontributions' => 1]);
         $group = $gen->create_group(['courseid' => $course->id]);
         $one = $gen->create_and_enrol($course, 'student');
         $two = $gen->create_and_enrol($course, 'student');
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $one->id]);
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $two->id]);
-        $session = $gen->get_plugin_generator('mod_vrsculpt')->create_session(['vrsculptid' => $vrsculpt->id,
+        $session = $gen->get_plugin_generator('mod_vrmakerspace')->create_session(['vrmakerspaceid' => $vrmakerspace->id,
             'groupid' => $group->id]);
         return [$session, $one, $two];
     }
@@ -58,7 +58,7 @@ final class contribution_manager_test extends \advanced_testcase {
         $this->assertFalse(contribution_manager::report($session, (int)$one->id, 10, 100.0, 5.0, $now + 9));
         $this->assertTrue(contribution_manager::report($session, (int)$one->id, 4, 50.0, 1.0, $now + 10));
 
-        $record = $DB->get_record('vrsculpt_contrib', ['sessionid' => $session->id, 'userid' => $one->id], '*', MUST_EXIST);
+        $record = $DB->get_record('vrmakerspace_contrib', ['sessionid' => $session->id, 'userid' => $one->id], '*', MUST_EXIST);
         $this->assertSame(14, (int)$record->ops);
         $this->assertEquals(150.0, (float)$record->added);
         $this->assertEquals(6.0, (float)$record->removed);
@@ -76,11 +76,11 @@ final class contribution_manager_test extends \advanced_testcase {
         contribution_manager::report($session, (int)$one->id, 1000000, 1e12, 1e12, 1800000000);
         contribution_manager::report($session, (int)$two->id, -5, -3.0, NAN, 1800000000);
 
-        $first = $DB->get_record('vrsculpt_contrib', ['sessionid' => $session->id, 'userid' => $one->id], '*', MUST_EXIST);
+        $first = $DB->get_record('vrmakerspace_contrib', ['sessionid' => $session->id, 'userid' => $one->id], '*', MUST_EXIST);
         $this->assertSame(contribution_manager::MAX_OPS, (int)$first->ops);
         $this->assertEquals(contribution_manager::MAX_VOLUME, (float)$first->added);
         $this->assertEquals(contribution_manager::MAX_VOLUME, (float)$first->removed);
-        $second = $DB->get_record('vrsculpt_contrib', ['sessionid' => $session->id, 'userid' => $two->id], '*', MUST_EXIST);
+        $second = $DB->get_record('vrmakerspace_contrib', ['sessionid' => $session->id, 'userid' => $two->id], '*', MUST_EXIST);
         $this->assertSame(0, (int)$second->ops);
         $this->assertEquals(0.0, (float)$second->added);
         $this->assertEquals(0.0, (float)$second->removed);

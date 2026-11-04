@@ -28,7 +28,7 @@
  *   the clay along with the tool tip;
  * - hands: an index-thumb pinch (below 1.5 cm) of the right hand sculpts at the index tip, a pinch
  *   of the left hand holds the sculpture, and the right index tip touches the palette;
- * - the wrist palette (mod_vrsculpt/vrpalette) above the left hand: point the right controller at
+ * - the wrist palette (mod_vrmakerspace/vrpalette) above the left hand: point the right controller at
  *   it and pull the trigger, or touch it with the right index tip.
  *
  * View only: no cursor and no tools; the sculpture can still be moved, and the palette offers
@@ -41,7 +41,7 @@
  * fetch models from a CDN; hands use XRHandModelFactory's 'spheres' profile, which is procedural.
  * The controller set-up follows vrroomruntime_builtin/xrinput (itself after mod_gear's viewer).
  *
- * @module     mod_vrsculpt/xrsculpt
+ * @module     mod_vrmakerspace/xrstudio
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -49,7 +49,7 @@
 
 import Log from 'core/log';
 import {createXr, detect} from 'vrroomruntime_builtin/xr';
-import {createPalette, TOOLS, SIZE_MIN, SIZE_MAX} from 'mod_vrsculpt/vrpalette';
+import {createPalette, TOOLS, SIZE_MIN, SIZE_MAX} from 'mod_vrmakerspace/vrpalette';
 
 /** Distance of the tool tip ahead of the grip (m). */
 const TIP = 0.06;
@@ -172,16 +172,16 @@ const buttonValue = (gamepad, index) => {
  *
  * Options: THREE (namespace with XRHandModelFactory), renderer (WebGLRenderer with xr.enabled),
  * scene (no transform of its own), camera, sculptureRoot (Group holding the sculpture),
- * tools (mod_vrsculpt/tools, ignored when readonly), readonly, strings (the mod_vrsculpt strings
+ * tools (mod_vrmakerspace/tools, ignored when readonly), readonly, strings (the mod_vrmakerspace strings
  * by key), onStart() and onEnd() (optional, when a VR session starts and ends).
  *
  * getPose() returns one reused object whose arrays change every frame; it is meant to be encoded
  * at once (session.sendPose()).
  *
  * @param {Object} options Options.
- * @returns {Object} XrSculpt {available: Promise<boolean>, enter(), exit(), active, update(dt, frame), getPose(), dispose()}
+ * @returns {Object} XrStudio {available: Promise<boolean>, enter(), exit(), active, update(dt, frame), getPose(), dispose()}
  */
-export const createXrSculpt = (options = {}) => {
+export const createXrStudio = (options = {}) => {
     const THREE = options.THREE;
     const renderer = options.renderer;
     const scene = options.scene;
@@ -238,7 +238,7 @@ export const createXrSculpt = (options = {}) => {
     const cursorgeometry = new THREE.SphereGeometry(1, 24, 16);
     const cursormaterial = new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false});
     const cursor = new THREE.Mesh(cursorgeometry, cursormaterial);
-    cursor.name = 'vrsculpt-xr-cursor';
+    cursor.name = 'vrmakerspace-xr-cursor';
     cursor.visible = false;
     cursor.renderOrder = 25;
     cursor.raycast = noRaycast;
@@ -281,13 +281,13 @@ export const createXrSculpt = (options = {}) => {
         const hand = renderer.xr.getHand(i);
 
         const line = new THREE.Line(linegeometry, new THREE.LineBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.7}));
-        line.name = 'vrsculpt-xr-ray';
+        line.name = 'vrmakerspace-xr-ray';
         line.visible = false;
         line.raycast = noRaycast;
         controller.add(line);
 
         const gripmesh = new THREE.Mesh(gripgeometry, new THREE.MeshStandardMaterial({color: 0x495057, roughness: 0.6}));
-        gripmesh.name = 'vrsculpt-xr-grip';
+        gripmesh.name = 'vrmakerspace-xr-grip';
         gripmesh.visible = false;
         gripmesh.raycast = noRaycast;
         grip.add(gripmesh);

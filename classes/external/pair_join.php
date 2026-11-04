@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\pair_manager;
+use mod_vrmakerspace\local\pair_manager;
 
 /**
  * Join a group sculpture to sculpt it with one partner, browser to browser.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -53,9 +53,9 @@ class pair_join extends external_api {
     public static function execute(int $cmid, int $sessionid): array {
         global $USER;
         $params = self::validate_parameters(self::execute_parameters(), ['cmid' => $cmid, 'sessionid' => $sessionid]);
-        [$vrsculpt, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
+        [$vrmakerspace, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
         helper::require_sculptor($session, $context, (int)$USER->id);
-        helper::require_pair_work($vrsculpt);
+        helper::require_pair_work($vrmakerspace);
 
         $joined = pair_manager::join($session, $context, (int)$USER->id);
         $peer = $joined['peer'];

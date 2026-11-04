@@ -14,22 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
-require_once($CFG->dirroot . '/mod/vrsculpt/lib.php');
+require_once($CFG->dirroot . '/mod/vrmakerspace/lib.php');
 
 /**
  * Tests of the uploaded starting model: saved from the form, handed to the studio, removed again.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\local\session_manager::class)]
-#[\PHPUnit\Framework\Attributes\CoversFunction('vrsculpt_save_start_model')]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\session_manager::class)]
+#[\PHPUnit\Framework\Attributes\CoversFunction('vrmakerspace_save_start_model')]
 final class start_model_test extends \advanced_testcase {
     /**
      * A draft area of the current user holding one file.
@@ -84,33 +84,33 @@ final class start_model_test extends \advanced_testcase {
         $this->setAdminUser();
         $gen = $this->getDataGenerator();
         $course = $gen->create_course(['summary' => '']);
-        $vrsculpt = $gen->create_module('vrsculpt', [
+        $vrmakerspace = $gen->create_module('vrmakerspace', [
             'course' => $course->id,
             'startmodel' => 'upload',
             'startmodelfile' => $this->draft_file('owl.stl', "solid owl\nendsolid owl\n"),
         ]);
-        $context = \context_module::instance($vrsculpt->cmid);
-        $cm = get_fast_modinfo($course)->get_cm($vrsculpt->cmid);
-        $this->assertSame('upload', $vrsculpt->startmodel);
+        $context = \context_module::instance($vrmakerspace->cmid);
+        $cm = get_fast_modinfo($course)->get_cm($vrmakerspace->cmid);
+        $this->assertSame('upload', $vrmakerspace->startmodel);
         $this->assertSame('owl.stl', $this->model_name($context));
 
         $student = $gen->create_and_enrol($course, 'student');
         $this->setUser($student);
-        $resolved = studio_helper::resolve($vrsculpt, $cm, $context, (int)$student->id, 0, 0);
+        $resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$student->id, 0, 0);
         $this->assertSame('upload', $resolved['session']->startmodel);
-        $config = studio_helper::config($vrsculpt, $context, $student, $resolved);
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
         $this->assertSame('upload', $config['model']);
         $this->assertSame('stl', $config['modelformat']);
-        $expected = '/pluginfile.php/' . $context->id . '/mod_vrsculpt/startmodel/0/owl.stl';
+        $expected = '/pluginfile.php/' . $context->id . '/mod_vrmakerspace/startmodel/0/owl.stl';
         $this->assertStringContainsString($expected, $config['modelurl']);
 
         // The teacher switches to the sphere: the file goes; the student's sculpture keeps 'upload'
         // and falls back to the lump.
         $this->setAdminUser();
-        vrsculpt_save_start_model((object)['startmodel' => 'sphere', 'startmodelfile' => file_get_unused_draft_itemid(),
-            'coursemodule' => $vrsculpt->cmid]);
+        vrmakerspace_save_start_model((object)['startmodel' => 'sphere', 'startmodelfile' => file_get_unused_draft_itemid(),
+            'coursemodule' => $vrmakerspace->cmid]);
         $this->assertNull($this->model_name($context));
-        $config = studio_helper::config($vrsculpt, $context, $student, $resolved);
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
         $this->assertSame('lump', $config['model']);
         $this->assertSame('', $config['modelurl']);
         $this->assertSame('', $config['modelformat']);
@@ -123,13 +123,13 @@ final class start_model_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
-        $vrsculpt = $this->getDataGenerator()->create_module('vrsculpt', [
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', [
             'course' => $course->id,
             'startmodel' => 'upload',
             'startmodelfile' => $this->draft_file('owl.obj', "v 0 0 0\n"),
         ]);
-        $context = \context_module::instance($vrsculpt->cmid);
-        vrsculpt_save_start_model((object)['startmodel' => 'cube', 'coursemodule' => $vrsculpt->cmid]);
+        $context = \context_module::instance($vrmakerspace->cmid);
+        vrmakerspace_save_start_model((object)['startmodel' => 'cube', 'coursemodule' => $vrmakerspace->cmid]);
         $this->assertSame('owl.obj', $this->model_name($context));
     }
 }

@@ -15,22 +15,22 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Backup structure step for mod_vrsculpt.
+ * Backup structure step for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 /**
- * Defines the structure of vrsculpt.xml.
+ * Defines the structure of vrmakerspace.xml.
  *
  * The activity always; with user data, the sculptures (sessions) with their versions (snapshots, and
  * their files) and their members' shares (contributions), and the grades. A grade is written as
  * usergrade so no element contains a child of its own name. Live connections of pair work (peers and
  * their messages) last minutes and are never backed up.
  */
-class backup_vrsculpt_activity_structure_step extends backup_activity_structure_step {
+class backup_vrmakerspace_activity_structure_step extends backup_activity_structure_step {
     /**
      * Build the element tree.
      *
@@ -39,7 +39,7 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
     protected function define_structure() {
         $userinfo = $this->get_setting_value('userinfo');
 
-        $vrsculpt = new backup_nested_element('vrsculpt', ['id'], [
+        $vrmakerspace = new backup_nested_element('vrmakerspace', ['id'], [
             'name', 'intro', 'introformat', 'startmodel', 'workmode', 'connectmode', 'maxusers', 'trackcontributions',
             'grade', 'timecreated', 'timemodified',
         ]);
@@ -64,21 +64,21 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
             'userid', 'grade', 'grader', 'timecreated', 'timemodified',
         ]);
 
-        $vrsculpt->add_child($sessions);
+        $vrmakerspace->add_child($sessions);
         $sessions->add_child($session);
         $session->add_child($snapshots);
         $snapshots->add_child($snapshot);
         $session->add_child($contributions);
         $contributions->add_child($contribution);
-        $vrsculpt->add_child($usergrades);
+        $vrmakerspace->add_child($usergrades);
         $usergrades->add_child($usergrade);
 
-        $vrsculpt->set_source_table('vrsculpt', ['id' => backup::VAR_ACTIVITYID]);
+        $vrmakerspace->set_source_table('vrmakerspace', ['id' => backup::VAR_ACTIVITYID]);
         if ($userinfo) {
-            $session->set_source_table('vrsculpt_sessions', ['vrsculptid' => backup::VAR_PARENTID], 'id ASC');
-            $snapshot->set_source_table('vrsculpt_snapshots', ['sessionid' => backup::VAR_PARENTID], 'version ASC');
-            $contribution->set_source_table('vrsculpt_contrib', ['sessionid' => backup::VAR_PARENTID], 'id ASC');
-            $usergrade->set_source_table('vrsculpt_grades', ['vrsculptid' => backup::VAR_PARENTID], 'id ASC');
+            $session->set_source_table('vrmakerspace_sessions', ['vrmakerspaceid' => backup::VAR_PARENTID], 'id ASC');
+            $snapshot->set_source_table('vrmakerspace_snapshots', ['sessionid' => backup::VAR_PARENTID], 'version ASC');
+            $contribution->set_source_table('vrmakerspace_contrib', ['sessionid' => backup::VAR_PARENTID], 'id ASC');
+            $usergrade->set_source_table('vrmakerspace_grades', ['vrmakerspaceid' => backup::VAR_PARENTID], 'id ASC');
         }
 
         $session->annotate_ids('group', 'groupid');
@@ -88,10 +88,10 @@ class backup_vrsculpt_activity_structure_step extends backup_activity_structure_
         $usergrade->annotate_ids('user', 'userid');
         $usergrade->annotate_ids('user', 'grader');
 
-        $vrsculpt->annotate_files('mod_vrsculpt', 'intro', null);
-        $vrsculpt->annotate_files('mod_vrsculpt', 'startmodel', null);
-        $snapshot->annotate_files('mod_vrsculpt', 'snapshots', 'id');
+        $vrmakerspace->annotate_files('mod_vrmakerspace', 'intro', null);
+        $vrmakerspace->annotate_files('mod_vrmakerspace', 'startmodel', null);
+        $snapshot->annotate_files('mod_vrmakerspace', 'snapshots', 'id');
 
-        return $this->prepare_activity_structure($vrsculpt);
+        return $this->prepare_activity_structure($vrmakerspace);
     }
 }

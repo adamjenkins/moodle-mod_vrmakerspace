@@ -14,34 +14,34 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
-use mod_vrsculpt\local\companion_manager;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\companion_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * Tests of the companion_join web service.
  *
  * The configured case needs the optional plugin vrroomruntime_companion and is skipped without it.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\external\companion_join::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrsculpt\local\companion_manager::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\external\companion_join::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrmakerspace\local\companion_manager::class)]
 final class companion_join_test extends \core_external\tests\externallib_testcase {
     /**
      * A group-work activity over the companion service with one group and its sculpture.
      *
      * @param string $connection the activity's connection
-     * @return array [\stdClass $vrsculpt, \stdClass $session, \stdClass $member, \stdClass $outsider]
+     * @return array [\stdClass $vrmakerspace, \stdClass $session, \stdClass $member, \stdClass $outsider]
      */
     private function setup_activity(string $connection = session_manager::CONNECTION_COMPANION): array {
         $gen = $this->getDataGenerator();
         $course = $gen->create_course(['summary' => '']);
-        $vrsculpt = $gen->create_module('vrsculpt', [
+        $vrmakerspace = $gen->create_module('vrmakerspace', [
             'course' => $course->id,
             'workmode' => session_manager::MODE_GROUP,
             'connectmode' => $connection,
@@ -51,9 +51,9 @@ final class companion_join_test extends \core_external\tests\externallib_testcas
         $outsider = $gen->create_and_enrol($course, 'student');
         $group = $gen->create_group(['courseid' => $course->id]);
         $gen->create_group_member(['groupid' => $group->id, 'userid' => $member->id]);
-        $session = $gen->get_plugin_generator('mod_vrsculpt')
-            ->create_session(['vrsculptid' => $vrsculpt->id, 'groupid' => $group->id]);
-        return [$vrsculpt, $session, $member, $outsider];
+        $session = $gen->get_plugin_generator('mod_vrmakerspace')
+            ->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $group->id]);
+        return [$vrmakerspace, $session, $member, $outsider];
     }
 
     /**
@@ -65,12 +65,12 @@ final class companion_join_test extends \core_external\tests\externallib_testcas
             set_config('url', '', 'vrroomruntime_companion');
             set_config('secret', '', 'vrroomruntime_companion');
         }
-        [$vrsculpt, $session, $member] = $this->setup_activity();
+        [$vrmakerspace, $session, $member] = $this->setup_activity();
         $this->setUser($member);
         $this->assertFalse(companion_manager::is_available());
 
         try {
-            companion_join::execute((int)$vrsculpt->cmid, (int)$session->id);
+            companion_join::execute((int)$vrmakerspace->cmid, (int)$session->id);
             $this->fail('A token was made without the companion service');
         } catch (\moodle_exception $e) {
             $this->assertSame('companionnotconfigured', $e->errorcode);
@@ -88,12 +88,12 @@ final class companion_join_test extends \core_external\tests\externallib_testcas
         }
         set_config('url', 'https://companion.example.org', 'vrroomruntime_companion');
         set_config('secret', str_repeat('k', 40), 'vrroomruntime_companion');
-        [$vrsculpt, $session, $member] = $this->setup_activity();
+        [$vrmakerspace, $session, $member] = $this->setup_activity();
         $this->setUser($member);
 
         $result = external_api::clean_returnvalue(
             companion_join::execute_returns(),
-            companion_join::execute((int)$vrsculpt->cmid, (int)$session->id)
+            companion_join::execute((int)$vrmakerspace->cmid, (int)$session->id)
         );
         $this->assertSame('wss://companion.example.org/sync', $result['url']);
         $this->assertNotEmpty($result['token']);
@@ -105,7 +105,7 @@ final class companion_join_test extends \core_external\tests\externallib_testcas
         $this->assertSame(fullname($member), $result['name']);
         $this->assertSame(5, $result['max']);
 
-        $again = companion_join::execute((int)$vrsculpt->cmid, (int)$session->id);
+        $again = companion_join::execute((int)$vrmakerspace->cmid, (int)$session->id);
         $this->assertSame($result['peerid'], $again['peerid']);
     }
 
@@ -114,17 +114,17 @@ final class companion_join_test extends \core_external\tests\externallib_testcas
      */
     public function test_refusals(): void {
         $this->resetAfterTest();
-        [$vrsculpt, $session, $member, $outsider] = $this->setup_activity();
+        [$vrmakerspace, $session, $member, $outsider] = $this->setup_activity();
 
         $this->setUser($outsider);
         try {
-            companion_join::execute((int)$vrsculpt->cmid, (int)$session->id);
+            companion_join::execute((int)$vrmakerspace->cmid, (int)$session->id);
             $this->fail('A non-member got a token');
         } catch (\moodle_exception $e) {
             $this->assertSame('cannotsculpt', $e->errorcode);
         }
 
-        $other = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $vrsculpt->course]);
+        $other = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $vrmakerspace->course]);
         $this->setUser($member);
         try {
             companion_join::execute((int)$other->cmid, (int)$session->id);

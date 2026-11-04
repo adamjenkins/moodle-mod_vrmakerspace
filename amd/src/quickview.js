@@ -18,9 +18,9 @@
  * (drag), zooms (wheel, pinch or buttons) and moves (right-drag, Shift+drag or the arrow keys).
  *
  * The version is meshed by the sculpting engine's worker, as in the studio; the renderer and lights
- * follow the studio's view (mod_vrsculpt/studio), the camera is three.js's OrbitControls.
+ * follow the studio's view (mod_vrmakerspace/studio), the camera is three.js's OrbitControls.
  *
- * @module     mod_vrsculpt/quickview
+ * @module     mod_vrmakerspace/quickview
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,7 +33,7 @@ import ModalEvents from 'core/modal_events';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString} from 'core/str';
-import {createEngineClient} from 'mod_vrsculpt/engineclient';
+import {createEngineClient} from 'mod_vrmakerspace/engineclient';
 
 /** Vertical field of view (degrees). */
 const FOV = 40;
@@ -90,7 +90,7 @@ const show = (body, workerurl, url) => {
         Log.debug(error);
         loading.classList.add('d-none');
         const text = error && error.message ? error.message : String(error || '');
-        getString(key, 'mod_vrsculpt', text).then((s) => {
+        getString(key, 'mod_vrmakerspace', text).then((s) => {
             message.textContent = s;
             message.classList.remove('d-none');
             return s;
@@ -201,7 +201,7 @@ const show = (body, workerurl, url) => {
     };
     body.addEventListener('click', onClick);
 
-    const pending = new Pending('mod_vrsculpt/quickview:load');
+    const pending = new Pending('mod_vrmakerspace/quickview:load');
     fetchVersion(url)
         .then((buffer) => engine.init({snapshot: buffer}))
         .catch((error) => fail('quickview_failed', error))
@@ -229,7 +229,7 @@ const show = (body, workerurl, url) => {
 const open = async(workerurl, url, title) => {
     const modal = await Modal.create({
         title: escapeHtml(title),
-        body: Templates.render('mod_vrsculpt/quickview', {uniqid: Math.random().toString(36).slice(2), title: title}),
+        body: Templates.render('mod_vrmakerspace/quickview', {uniqid: Math.random().toString(36).slice(2), title: title}),
         large: true,
         removeOnClose: true,
     });
@@ -257,7 +257,7 @@ const open = async(workerurl, url, title) => {
  */
 export const init = (workerurl) => {
     document.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-action="mod_vrsculpt-quickview"]');
+        const button = event.target.closest('[data-action="mod_vrmakerspace-quickview"]');
         if (!button || !button.dataset.url) {
             return;
         }

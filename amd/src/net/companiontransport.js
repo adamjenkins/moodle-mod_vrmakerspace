@@ -17,11 +17,11 @@
  * Companion transport: one WebSocket to the site's vrroom-sync service (protocol 'vrroom-sync.1'
  * with the sculpting frames op, ops, replay, replayed and gap).
  *
- * Moodle (web service mod_vrsculpt_companion_join) runs the access checks and hands out a
+ * Moodle (web service mod_vrmakerspace_companion_join) runs the access checks and hands out a
  * short-lived token, sent in the first frame (never in the URL) and refreshed through Moodle
  * before it expires. Peer ids and names come from vrroom-sync, which takes them from the verified
  * token only. The server sequences every op; this transport only carries frames, the session
- * (mod_vrsculpt/net/session) applies them in order.
+ * (mod_vrmakerspace/net/session) applies them in order.
  *
  * Events (detail objects):
  * - state     {state, reason}: state 'joined', 'reconnecting', 'left' or 'failed'
@@ -40,7 +40,7 @@
  *
  * Nothing about tokens or names is logged; core/log receives close codes and states only.
  *
- * @module     mod_vrsculpt/net/companiontransport
+ * @module     mod_vrmakerspace/net/companiontransport
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -48,11 +48,11 @@
 
 import Ajax from 'core/ajax';
 import Log from 'core/log';
-import {Emitter} from 'mod_vrsculpt/net/emitter';
-import * as Frames from 'mod_vrsculpt/net/syncframes';
+import {Emitter} from 'mod_vrmakerspace/net/emitter';
+import * as Frames from 'mod_vrmakerspace/net/syncframes';
 
 /** Web service that runs the access checks and returns the token. */
-const JOIN_METHOD = 'mod_vrsculpt_companion_join';
+const JOIN_METHOD = 'mod_vrmakerspace_companion_join';
 
 /** Timeout of a join service call (ms). */
 const REQUEST_TIMEOUT = 10000;
@@ -79,7 +79,7 @@ const OPEN = 1;
 const MAX_PING = 2147483647;
 
 /** Prefix of debug log lines. */
-const LOGPREFIX = 'mod_vrsculpt/net/companiontransport: ';
+const LOGPREFIX = 'mod_vrmakerspace/net/companiontransport: ';
 
 /**
  * Turn a web-service rejection into an Error carrying an errorcode.

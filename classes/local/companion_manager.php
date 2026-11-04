@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\local;
+namespace mod_vrmakerspace\local;
 
 /**
  * Group sculpting over VR room's companion service (vrroom-sync), when it is installed.
  *
  * A soft dependency: the plugin vrroomruntime_companion is optional, so every use of its classes is
- * behind is_installed(). Sculpting peers and rooms get pseudonyms of their own ("vrsculpt|..."), so they
+ * behind is_installed(). Sculpting peers and rooms get pseudonyms of their own ("vrmakerspace|..."), so they
  * never collide with VR room's.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -65,7 +65,7 @@ final class companion_manager {
      */
     public static function peer_id(int $userid, int $sessionid): string {
         $config = self::CONFIG;
-        return $config::pseudonym("vrsculpt|peer|{$userid}|{$sessionid}");
+        return $config::pseudonym("vrmakerspace|peer|{$userid}|{$sessionid}");
     }
 
     /**
@@ -76,28 +76,28 @@ final class companion_manager {
      */
     public static function room_id(int $sessionid): string {
         $config = self::CONFIG;
-        return 'r' . $config::pseudonym("vrsculpt|room|{$sessionid}");
+        return 'r' . $config::pseudonym("vrmakerspace|room|{$sessionid}");
     }
 
     /**
      * What the studio needs to join a sculpture's room on the companion service.
      *
-     * @param \stdClass $vrsculpt the vrsculpt row
+     * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \stdClass $session the session row
      * @param \stdClass $user the user joining (never from the client)
      * @return array{url: string, token: string, expires: int, room: string, peerid: string, name: string, max: int}
      * @throws \moodle_exception companionnotconfigured
      */
-    public static function join(\stdClass $vrsculpt, \stdClass $session, \stdClass $user): array {
+    public static function join(\stdClass $vrmakerspace, \stdClass $session, \stdClass $user): array {
         if (!self::is_available()) {
-            throw new \moodle_exception('companionnotconfigured', 'mod_vrsculpt');
+            throw new \moodle_exception('companionnotconfigured', 'mod_vrmakerspace');
         }
         $config = self::CONFIG;
         $tokens = self::TOKENS;
         $peerid = self::peer_id((int)$user->id, (int)$session->id);
         $room = self::room_id((int)$session->id);
         $name = (string)$tokens::display_name($user);
-        $max = min(max(2, (int)$vrsculpt->maxusers), (int)$config::max_users());
+        $max = min(max(2, (int)$vrmakerspace->maxusers), (int)$config::max_users());
         $token = $tokens::sync_token($peerid, $room, $name, 'attempt', $max);
         return [
             'url' => (string)$config::sync_url(),

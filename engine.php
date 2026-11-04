@@ -17,11 +17,11 @@
 /**
  * Serves the sculpting engine's JavaScript modules (js/engine) to the studio's Web Worker.
  *
- * URL: /mod/vrsculpt/engine.php/<plugin version>/<file>.js. The version is part of the path, so the
+ * URL: /mod/vrmakerspace/engine.php/<plugin version>/<file>.js. The version is part of the path, so the
  * modules' relative imports ('./grid.js') carry it too: an upgrade changes every URL, and the files can
  * be cached for a long time. The files are static program code with no user data, so no login is needed.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

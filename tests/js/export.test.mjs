@@ -257,7 +257,7 @@ test('GLB: header, JSON chunk, binary chunk, lengths and alignment', () => {
     assert.equal(dv.getUint32(16, true), 0x4E4F534A);
     const gltf = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + jsonLen)));
     assert.equal(gltf.asset.version, '2.0');
-    assert.equal(gltf.asset.generator, 'mod_vrsculpt');
+    assert.equal(gltf.asset.generator, 'mod_vrmakerspace');
     const binAt = 20 + jsonLen;
     const binLen = dv.getUint32(binAt, true);
     assert.equal(binLen % 4, 0);
@@ -296,7 +296,7 @@ test('GLB: header, JSON chunk, binary chunk, lengths and alignment', () => {
     const edv = new DataView(empty.buffer);
     assert.equal(edv.getUint32(8, true), empty.length);
     assert.equal(empty.length, 20 + edv.getUint32(12, true));
-    assert.equal(JSON.parse(new TextDecoder().decode(empty.subarray(20)).trim()).asset.generator, 'mod_vrsculpt');
+    assert.equal(JSON.parse(new TextDecoder().decode(empty.subarray(20)).trim()).asset.generator, 'mod_vrmakerspace');
 });
 
 test('3MF: zip structure, CRCs and a parsable millimetre model', () => {

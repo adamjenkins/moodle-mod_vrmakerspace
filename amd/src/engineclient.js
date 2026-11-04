@@ -23,7 +23,7 @@
  * nothing on the main thread. The bounding sphere of a chunk is fixed by its place in the grid,
  * so it is never recomputed.
  *
- * @module     mod_vrsculpt/engineclient
+ * @module     mod_vrmakerspace/engineclient
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -225,8 +225,8 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
             const geometry = makeGeometry(Math.max(MIN_VERTICES, Math.ceil(vertices * GROWTH)),
                 Math.max(MIN_VERTICES * 6, Math.ceil(indices.length * GROWTH)), chunkSphere(key));
             mesh = new THREE.Mesh(geometry, material);
-            mesh.name = 'vrsculpt-chunk-' + key;
-            mesh.userData.vrsculptChunk = key;
+            mesh.name = 'vrmakerspace-chunk-' + key;
+            mesh.userData.vrmakerspaceChunk = key;
             mesh.matrixAutoUpdate = false;
             mesh.updateMatrix();
             chunks.set(key, mesh);
@@ -357,7 +357,7 @@ export const createEngineClient = (workerurl, THREE, parent, material) => {
         } else if (data.type === 'error') {
             onError(data, pending);
         } else {
-            Log.debug('mod_vrsculpt: unknown engine message ' + data.type);
+            Log.debug('mod_vrmakerspace: unknown engine message ' + data.type);
         }
     });
     worker.addEventListener('error', (event) => {

@@ -23,13 +23,13 @@
  * - STL (binary): millimetres, Z up. Print (x, y, z) = (x, −z, y) × 1000, a proper rotation, so the
  *   winding stays outward. Facet normals are recomputed from each printed triangle.
  * - glTF 2.0 binary (.glb): metres, Y up, one mesh with POSITION (with min/max), NORMAL and
- *   UNSIGNED_INT indices and a clay-coloured PBR material; asset.generator "mod_vrsculpt".
+ *   UNSIGNED_INT indices and a clay-coloured PBR material; asset.generator "mod_vrmakerspace".
  * - 3MF: an OPC zip ([Content_Types].xml, _rels/.rels, 3D/3dmodel.model), core 2015/02 model,
  *   unit millimeter, Z up, same orientation as the STL.
  *
  * Dependency-free apart from the sibling zip writer; runs in a Web Worker and in Node.
  *
- * @module     mod_vrsculpt/engine/export
+ * @module     mod_vrmakerspace/engine/export
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -124,7 +124,7 @@ export function toSTL(mesh) {
     const out = new Uint8Array(84 + 50 * m.triangles);
     const dv = new DataView(out.buffer);
     // The header must not start with "solid", or some readers take the file for ASCII STL.
-    const header = 'mod_vrsculpt binary STL; units: millimetres; Z up';
+    const header = 'mod_vrmakerspace binary STL; units: millimetres; Z up';
     for (let n = 0; n < header.length && n < 80; n++) {
         out[n] = header.charCodeAt(n) & 0x7F;
     }
@@ -187,7 +187,7 @@ export function toGLB(mesh, options = {}) {
     const m = prepare(mesh);
     const name = typeof options.name === 'string' && options.name !== '' ? options.name : 'sculpture';
     const gltf = {
-        asset: {version: '2.0', generator: 'mod_vrsculpt'},
+        asset: {version: '2.0', generator: 'mod_vrmakerspace'},
         scene: 0,
         scenes: [{name, nodes: []}],
         nodes: [],
@@ -317,7 +317,7 @@ export function to3MF(mesh, options = {}) {
     const parts = [];
     parts.push('<?xml version="1.0" encoding="UTF-8"?>\n');
     parts.push('<model unit="millimeter" xml:lang="en-US" xmlns="' + NS_3MF + '">\n');
-    parts.push(' <metadata name="Application">mod_vrsculpt</metadata>\n');
+    parts.push(' <metadata name="Application">mod_vrmakerspace</metadata>\n');
     parts.push(' <metadata name="Title">' + xmlAttr(name) + '</metadata>\n');
     parts.push(' <resources>\n');
     const hasMesh = m.vertices > 0 && m.triangles > 0;

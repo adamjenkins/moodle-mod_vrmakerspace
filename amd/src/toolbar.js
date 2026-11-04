@@ -22,7 +22,7 @@
  * The toolbar only binds to the markup the template rendered; every label comes from the template
  * or from the strings the studio loaded.
  *
- * @module     mod_vrsculpt/toolbar
+ * @module     mod_vrmakerspace/toolbar
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * Save the current sculpture of a session as a new version.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -66,20 +66,20 @@ class save_snapshot extends external_api {
             'data' => $data,
             'opcount' => $opcount,
         ]);
-        [$vrsculpt, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
+        [$vrmakerspace, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
         helper::require_sculptor($session, $context, (int)$USER->id);
 
         // Base64 is a third larger than the data: refuse oversize input before decoding it.
         if (strlen($params['data']) > intdiv(session_manager::max_snapshot_size() * 4, 3) + 4) {
-            throw new \moodle_exception('snapshottoolarge', 'mod_vrsculpt', '', display_size(session_manager::max_snapshot_size()));
+            throw new \moodle_exception('snapshottoolarge', 'mod_vrmakerspace', '', display_size(session_manager::max_snapshot_size()));
         }
         $bytes = base64_decode($params['data'], true);
         if ($bytes === false) {
-            throw new \moodle_exception('snapshotinvalid', 'mod_vrsculpt');
+            throw new \moodle_exception('snapshotinvalid', 'mod_vrmakerspace');
         }
         // The version's operation count is the sequence number in the data's own header.
         session_manager::save_snapshot($session, $context, (int)$USER->id, $bytes);
-        return helper::state($vrsculpt, $session, $context, (int)$USER->id);
+        return helper::state($vrmakerspace, $session, $context, (int)$USER->id);
     }
 
     /**

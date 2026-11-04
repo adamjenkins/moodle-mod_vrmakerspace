@@ -15,16 +15,16 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_vrsculpt/studio
+    @template mod_vrmakerspace/studio
 
     The sculpting studio: toolbar, the 3D canvas, the status line and the keyboard help. The
-    mod_vrsculpt/studio module binds to it and starts the 3D view.
+    mod_vrmakerspace/studio module binds to it and starts the 3D view.
 
     Classes required for JS:
     * d-none - hides the parts the studio shows once it knows what the device can do
 
     Data attributes required for JS:
-    * data-region="mod_vrsculpt-studioroot" data-title: the studio root and the activity name
+    * data-region="mod_vrmakerspace-studioroot" data-title: the studio root and the activity name
     * data-region toolbar, size, strength, shapeoptions, shape, textfield, text, stage, canvas, loading, nowebgl,
       failed, statustext, message, vrhelp
     * data-action tool (with data-tool), mirror, undo, redo, save, export (with data-format), vr, fullscreen
@@ -38,111 +38,111 @@
     {
         "readonly": false,
         "title": "Sculpt a head",
-        "backurl": "https://example.com/mod/vrsculpt/view.php?id=2"
+        "backurl": "https://example.com/mod/vrmakerspace/view.php?id=2"
     }
 }}
-<div class="mod_vrsculpt-studio" data-region="mod_vrsculpt-studioroot" data-title="{{title}}"{{#readonly}} data-readonly="1"{{/readonly}}>
-    <div class="mod_vrsculpt-header d-flex flex-wrap align-items-center gap-2 mb-2">
+<div class="mod_vrmakerspace-studio" data-region="mod_vrmakerspace-studioroot" data-title="{{title}}"{{#readonly}} data-readonly="1"{{/readonly}}>
+    <div class="mod_vrmakerspace-header d-flex flex-wrap align-items-center gap-2 mb-2">
         {{#readonly}}
-            <span class="badge bg-secondary">{{#str}} studio_readonly, mod_vrsculpt {{/str}}</span>
+            <span class="badge bg-secondary">{{#str}} studio_readonly, mod_vrmakerspace {{/str}}</span>
         {{/readonly}}
-        <a class="ms-auto" href="{{backurl}}">{{#str}} back, mod_vrsculpt {{/str}}</a>
+        <a class="ms-auto" href="{{backurl}}">{{#str}} back, mod_vrmakerspace {{/str}}</a>
     </div>
 
-    <div class="mod_vrsculpt-toolbar btn-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar"
-            aria-label="{{#str}} tools, mod_vrsculpt {{/str}}" data-region="toolbar">
+    <div class="mod_vrmakerspace-toolbar btn-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar"
+            aria-label="{{#str}} tools, mod_vrmakerspace {{/str}}" data-region="toolbar">
         {{^readonly}}
-            <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} tools, mod_vrsculpt {{/str}}">
+            <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} tools, mod_vrmakerspace {{/str}}">
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="grab"
-                        aria-pressed="false">{{#str}} tool_grab, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_grab, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="twist"
-                        aria-pressed="false">{{#str}} tool_twist, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_twist, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary active" data-action="tool" data-tool="add"
-                        aria-pressed="true">{{#str}} tool_add, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="true">{{#str}} tool_add, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="carve"
-                        aria-pressed="false">{{#str}} tool_carve, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_carve, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="smooth"
-                        aria-pressed="false">{{#str}} tool_smooth, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_smooth, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="inflate"
-                        aria-pressed="false">{{#str}} tool_inflate, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_inflate, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="pinch"
-                        aria-pressed="false">{{#str}} tool_pinch, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_pinch, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="flatten"
-                        aria-pressed="false">{{#str}} tool_flatten, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_flatten, mod_vrmakerspace {{/str}}</button>
             </div>
-            <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} modellingtools, mod_vrsculpt {{/str}}">
+            <div class="btn-group flex-wrap" role="group" aria-label="{{#str}} modellingtools, mod_vrmakerspace {{/str}}">
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="shape"
-                        aria-pressed="false">{{#str}} tool_shape, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_shape, mod_vrmakerspace {{/str}}</button>
                 <button type="button" class="btn btn-outline-primary" data-action="tool" data-tool="cutshape"
-                        aria-pressed="false">{{#str}} tool_cutshape, mod_vrsculpt {{/str}}</button>
+                        aria-pressed="false">{{#str}} tool_cutshape, mod_vrmakerspace {{/str}}</button>
             </div>
             <div class="d-none d-flex flex-wrap align-items-center gap-2" data-region="shapeoptions">
-                <label class="mb-0" for="{{uniqid}}-shape">{{#str}} shape, mod_vrsculpt {{/str}}</label>
+                <label class="mb-0" for="{{uniqid}}-shape">{{#str}} shape, mod_vrmakerspace {{/str}}</label>
                 <select class="form-select w-auto" id="{{uniqid}}-shape" data-region="shape">
-                    <option value="sphere">{{#str}} shape_sphere, mod_vrsculpt {{/str}}</option>
-                    <option value="cube">{{#str}} shape_cube, mod_vrsculpt {{/str}}</option>
-                    <option value="cylinder">{{#str}} shape_cylinder, mod_vrsculpt {{/str}}</option>
-                    <option value="cone">{{#str}} shape_cone, mod_vrsculpt {{/str}}</option>
-                    <option value="torus">{{#str}} shape_torus, mod_vrsculpt {{/str}}</option>
-                    <option value="text">{{#str}} shape_text, mod_vrsculpt {{/str}}</option>
+                    <option value="sphere">{{#str}} shape_sphere, mod_vrmakerspace {{/str}}</option>
+                    <option value="cube">{{#str}} shape_cube, mod_vrmakerspace {{/str}}</option>
+                    <option value="cylinder">{{#str}} shape_cylinder, mod_vrmakerspace {{/str}}</option>
+                    <option value="cone">{{#str}} shape_cone, mod_vrmakerspace {{/str}}</option>
+                    <option value="torus">{{#str}} shape_torus, mod_vrmakerspace {{/str}}</option>
+                    <option value="text">{{#str}} shape_text, mod_vrmakerspace {{/str}}</option>
                 </select>
                 <span class="d-none d-flex align-items-center gap-2" data-region="textfield">
-                    <label class="mb-0" for="{{uniqid}}-text">{{#str}} shapetext, mod_vrsculpt {{/str}}</label>
+                    <label class="mb-0" for="{{uniqid}}-text">{{#str}} shapetext, mod_vrmakerspace {{/str}}</label>
                     <input type="text" class="form-control w-auto" id="{{uniqid}}-text" data-region="text" maxlength="16"
                             size="12" value="ABC" autocomplete="off" spellcheck="false">
                 </span>
             </div>
-            <button type="button" class="btn btn-outline-secondary" data-action="mirror" aria-pressed="false">{{#str}} mirror, mod_vrsculpt {{/str}}</button>
-            <div class="mod_vrsculpt-slider d-flex align-items-center gap-2">
-                <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrsculpt {{/str}}</label>
+            <button type="button" class="btn btn-outline-secondary" data-action="mirror" aria-pressed="false">{{#str}} mirror, mod_vrmakerspace {{/str}}</button>
+            <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
+                <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrmakerspace {{/str}}</label>
                 <input type="range" class="form-range" id="{{uniqid}}-size" data-region="size" min="4" max="80" step="1"
                         value="20">
             </div>
-            <div class="mod_vrsculpt-slider d-flex align-items-center gap-2">
-                <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrsculpt {{/str}}</label>
+            <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
+                <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrmakerspace {{/str}}</label>
                 <input type="range" class="form-range" id="{{uniqid}}-strength" data-region="strength" min="5" max="100"
                         step="5" value="50">
             </div>
             <div class="btn-group" role="group">
-                <button type="button" class="btn btn-secondary" data-action="undo" disabled>{{#str}} undo, mod_vrsculpt {{/str}}</button>
-                <button type="button" class="btn btn-secondary" data-action="redo" disabled>{{#str}} redo, mod_vrsculpt {{/str}}</button>
+                <button type="button" class="btn btn-secondary" data-action="undo" disabled>{{#str}} undo, mod_vrmakerspace {{/str}}</button>
+                <button type="button" class="btn btn-secondary" data-action="redo" disabled>{{#str}} redo, mod_vrmakerspace {{/str}}</button>
             </div>
-            <button type="button" class="btn btn-secondary" data-action="save">{{#str}} savenow, mod_vrsculpt {{/str}}</button>
+            <button type="button" class="btn btn-secondary" data-action="save">{{#str}} savenow, mod_vrmakerspace {{/str}}</button>
         {{/readonly}}
         <div class="dropdown">
             <button type="button" class="btn btn-secondary dropdown-toggle" id="{{uniqid}}-export" data-bs-toggle="dropdown"
-                    aria-haspopup="true" aria-expanded="false">{{#str}} export, mod_vrsculpt {{/str}}</button>
+                    aria-haspopup="true" aria-expanded="false">{{#str}} export, mod_vrmakerspace {{/str}}</button>
             <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-export">
-                <li><button type="button" class="dropdown-item" data-action="export" data-format="stl">{{#str}} export_stl, mod_vrsculpt {{/str}}</button></li>
-                <li><button type="button" class="dropdown-item" data-action="export" data-format="glb">{{#str}} export_glb, mod_vrsculpt {{/str}}</button></li>
-                <li><button type="button" class="dropdown-item" data-action="export" data-format="3mf">{{#str}} export_3mf, mod_vrsculpt {{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="export" data-format="stl">{{#str}} export_stl, mod_vrmakerspace {{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="export" data-format="glb">{{#str}} export_glb, mod_vrmakerspace {{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="export" data-format="3mf">{{#str}} export_3mf, mod_vrmakerspace {{/str}}</button></li>
             </ul>
         </div>
-        <button type="button" class="btn btn-primary d-none" data-action="vr" aria-pressed="false">{{#str}} entervr, mod_vrsculpt {{/str}}</button>
-        <button type="button" class="btn btn-outline-secondary" data-action="fullscreen" aria-pressed="false">{{#str}} fullscreen, mod_vrsculpt {{/str}}</button>
+        <button type="button" class="btn btn-primary d-none" data-action="vr" aria-pressed="false">{{#str}} entervr, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary" data-action="fullscreen" aria-pressed="false">{{#str}} fullscreen, mod_vrmakerspace {{/str}}</button>
     </div>
 
-    <div class="alert alert-warning d-none" data-region="nowebgl">{{#str}} studio_nowebgl, mod_vrsculpt {{/str}}</div>
+    <div class="alert alert-warning d-none" data-region="nowebgl">{{#str}} studio_nowebgl, mod_vrmakerspace {{/str}}</div>
     <div class="alert alert-danger d-none" data-region="failed" role="alert"></div>
 
-    <div class="mod_vrsculpt-stage" data-region="stage">
-        <canvas class="mod_vrsculpt-canvas" data-region="canvas" tabindex="0" role="application" aria-label="{{title}}"
+    <div class="mod_vrmakerspace-stage" data-region="stage">
+        <canvas class="mod_vrmakerspace-canvas" data-region="canvas" tabindex="0" role="application" aria-label="{{title}}"
                 aria-describedby="{{uniqid}}-help"></canvas>
-        <div class="mod_vrsculpt-loading" data-region="loading">
+        <div class="mod_vrmakerspace-loading" data-region="loading">
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            <span>{{#str}} studio_loading, mod_vrsculpt {{/str}}</span>
+            <span>{{#str}} studio_loading, mod_vrmakerspace {{/str}}</span>
         </div>
     </div>
 
-    <div class="mod_vrsculpt-status small mt-2" role="status" aria-live="polite">
+    <div class="mod_vrmakerspace-status small mt-2" role="status" aria-live="polite">
         <span data-region="statustext"></span>
         <span data-region="message"></span>
     </div>
 
-    <div class="mod_vrsculpt-help small text-muted mt-2" id="{{uniqid}}-help">
+    <div class="mod_vrmakerspace-help small text-muted mt-2" id="{{uniqid}}-help">
         {{^readonly}}
-            <p class="mb-1">{{#str}} shortcuts, mod_vrsculpt {{/str}}</p>
-            <p class="mb-1 d-none" data-region="vrhelp">{{#str}} vrhelp, mod_vrsculpt {{/str}}</p>
+            <p class="mb-1">{{#str}} shortcuts, mod_vrmakerspace {{/str}}</p>
+            <p class="mb-1 d-none" data-region="vrhelp">{{#str}} vrhelp, mod_vrmakerspace {{/str}}</p>
         {{/readonly}}
     </div>
 </div>

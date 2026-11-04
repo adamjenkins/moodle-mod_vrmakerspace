@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/vrsculpt/db" VERSION="20261027" COMMENT="XMLDB file for Moodle mod/vrsculpt"
+<XMLDB PATH="mod/vrmakerspace/db" VERSION="20261027" COMMENT="XMLDB file for Moodle mod/vrmakerspace"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="vrsculpt" COMMENT="One VR sculpting activity">
+    <TABLE NAME="vrmakerspace" COMMENT="One VR sculpting activity">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="course" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
@@ -27,10 +27,10 @@
         <INDEX NAME="course" UNIQUE="false" FIELDS="course"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrsculpt_sessions" COMMENT="One sculpture: a user's own (groupid 0) or a group's (userid 0)">
+    <TABLE NAME="vrmakerspace_sessions" COMMENT="One sculpture: a user's own (groupid 0) or a group's (userid 0)">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="vrsculptid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="vrmakerspaceid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="groupid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="startmodel" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="lump" SEQUENCE="false" COMMENT="The activity's starting primitive when the session was created"/>
@@ -40,14 +40,14 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="vrsculptid" TYPE="foreign" FIELDS="vrsculptid" REFTABLE="vrsculpt" REFFIELDS="id"/>
+        <KEY NAME="vrmakerspaceid" TYPE="foreign" FIELDS="vrmakerspaceid" REFTABLE="vrmakerspace" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="owner" UNIQUE="true" FIELDS="vrsculptid, groupid, userid"/>
+        <INDEX NAME="owner" UNIQUE="true" FIELDS="vrmakerspaceid, groupid, userid"/>
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrsculpt_snapshots" COMMENT="Saved versions of a sculpture; the data is in the snapshots file area, item id = this id">
+    <TABLE NAME="vrmakerspace_snapshots" COMMENT="Saved versions of a sculpture; the data is in the snapshots file area, item id = this id">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -59,17 +59,17 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrmakerspace_sessions" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="sessionversion" UNIQUE="true" FIELDS="sessionid, version"/>
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrsculpt_grades" COMMENT="The grade each user was given; pushed to the gradebook">
+    <TABLE NAME="vrmakerspace_grades" COMMENT="The grade each user was given; pushed to the gradebook">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="vrsculptid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="vrmakerspaceid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="grade" TYPE="number" LENGTH="10" NOTNULL="false" SEQUENCE="false" DECIMALS="5"/>
         <FIELD NAME="grader" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
@@ -78,13 +78,13 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="vrsculptid" TYPE="foreign" FIELDS="vrsculptid" REFTABLE="vrsculpt" REFFIELDS="id"/>
+        <KEY NAME="vrmakerspaceid" TYPE="foreign" FIELDS="vrmakerspaceid" REFTABLE="vrmakerspace" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="vrsculptuser" UNIQUE="true" FIELDS="vrsculptid, userid"/>
+        <INDEX NAME="vrmakerspaceuser" UNIQUE="true" FIELDS="vrmakerspaceid, userid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrsculpt_peers" COMMENT="People connected to a group sculpture in pair work, refreshed while their studio polls">
+    <TABLE NAME="vrmakerspace_peers" COMMENT="People connected to a group sculpture in pair work, refreshed while their studio polls">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -96,7 +96,7 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrmakerspace_sessions" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="sessionuser" UNIQUE="true" FIELDS="sessionid, userid"/>
@@ -104,7 +104,7 @@
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrsculpt_signals" COMMENT="Connection messages between the two browsers of pair work, deleted once delivered">
+    <TABLE NAME="vrmakerspace_signals" COMMENT="Connection messages between the two browsers of pair work, deleted once delivered">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -116,7 +116,7 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrmakerspace_sessions" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="sessionto" UNIQUE="false" FIELDS="sessionid, topeerkey"/>
@@ -124,7 +124,7 @@
         <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="vrsculpt_contrib" COMMENT="How much of a group sculpture each member made, when the activity tracks contributions">
+    <TABLE NAME="vrmakerspace_contrib" COMMENT="How much of a group sculpture each member made, when the activity tracks contributions">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -137,7 +137,7 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrsculpt_sessions" REFFIELDS="id"/>
+        <KEY NAME="sessionid" TYPE="foreign" FIELDS="sessionid" REFTABLE="vrmakerspace_sessions" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="sessionuser" UNIQUE="true" FIELDS="sessionid, userid"/>

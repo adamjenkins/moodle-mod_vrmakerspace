@@ -1,4 +1,4 @@
-@mod @mod_vrsculpt
+@mod @mod_vrmakerspace
 Feature: Grade sculptures
   In order to assess my students' sculptures
   As a teacher
@@ -22,10 +22,10 @@ Feature: Grade sculptures
   Scenario: A teacher grades a student's sculpture
     Given the following "activities" exist:
       | activity | name         | course | idnumber | grade |
-      | vrsculpt | Clay animals | SCULPT | sculpt1  | 100   |
-    And I am on the "Clay animals" "vrsculpt activity" page logged in as "student1"
+      | vrmakerspace | Clay animals | SCULPT | sculpt1  | 100   |
+    And I am on the "Clay animals" "vrmakerspace activity" page logged in as "student1"
     And I log out
-    When I am on the "Clay animals" "vrsculpt activity" page logged in as "teacher1"
+    When I am on the "Clay animals" "vrmakerspace activity" page logged in as "teacher1"
     And I follow "Grade sculptures"
     Then I should see "Grades are out of 100.00."
     And I should see "Not saved yet."
@@ -48,11 +48,11 @@ Feature: Grade sculptures
       | student2 | G1    |
     And the following "activities" exist:
       | activity | name        | course | idnumber | workmode | grade |
-      | vrsculpt | Group whale | SCULPT | sculpt2  | 1        | 50    |
-    And I am on the "Group whale" "vrsculpt activity" page logged in as "student1"
+      | vrmakerspace | Group whale | SCULPT | sculpt2  | 1        | 50    |
+    And I am on the "Group whale" "vrmakerspace activity" page logged in as "student1"
     And I should see "Sculpture of Otters"
     And I log out
-    When I am on the "Group whale" "vrsculpt activity" page logged in as "teacher1"
+    When I am on the "Group whale" "vrmakerspace activity" page logged in as "teacher1"
     And I follow "Grade sculptures"
     And I set the field "Give every member of Otters this grade" to "40"
     And I press "Save grades"
@@ -64,11 +64,11 @@ Feature: Grade sculptures
   Scenario: A teacher looks at a saved version in the quick view
     Given the following "activities" exist:
       | activity | name         | course | idnumber | grade |
-      | vrsculpt | Clay animals | SCULPT | sculpt1  | 100   |
-    And the following "mod_vrsculpt > versions" exist:
+      | vrmakerspace | Clay animals | SCULPT | sculpt1  | 100   |
+    And the following "mod_vrmakerspace > versions" exist:
       | activity | user     |
       | sculpt1  | student1 |
-    When I am on the "Clay animals" "vrsculpt activity" page logged in as "teacher1"
+    When I am on the "Clay animals" "vrmakerspace activity" page logged in as "teacher1"
     And I follow "Grade sculptures"
     And I click on "Quick view of Sam Student, version 1" "button"
     Then I should see "Sam Student, version 1" in the ".modal-title" "css_element"

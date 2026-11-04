@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\external;
+namespace mod_vrmakerspace\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_vrsculpt\local\companion_manager;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\companion_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
  * A short-lived token to sculpt a group sculpture over the companion service (vrroom-sync).
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -53,15 +53,15 @@ class companion_join extends external_api {
     public static function execute(int $cmid, int $sessionid): array {
         global $USER;
         $params = self::validate_parameters(self::execute_parameters(), ['cmid' => $cmid, 'sessionid' => $sessionid]);
-        [$vrsculpt, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
+        [$vrmakerspace, , $context, $session] = helper::load($params['cmid'], $params['sessionid']);
         helper::require_sculptor($session, $context, (int)$USER->id);
         if (
-            !session_manager::is_group_work($vrsculpt)
-                || session_manager::connection($vrsculpt) !== session_manager::CONNECTION_COMPANION
+            !session_manager::is_group_work($vrmakerspace)
+                || session_manager::connection($vrmakerspace) !== session_manager::CONNECTION_COMPANION
         ) {
-            throw new \moodle_exception('notcompanionwork', 'mod_vrsculpt');
+            throw new \moodle_exception('notcompanionwork', 'mod_vrmakerspace');
         }
-        return companion_manager::join($vrsculpt, $session, $USER);
+        return companion_manager::join($vrmakerspace, $session, $USER);
     }
 
     /**

@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_vrsculpt\backup;
+namespace mod_vrmakerspace\backup;
 
-use mod_vrsculpt\local\grader;
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\grader;
+use mod_vrmakerspace\local\session_manager;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -28,12 +28,12 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 /**
  * Backup and restore of an activity with its sculptures, versions, files and grades.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\backup_vrsculpt_activity_structure_step::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\restore_vrsculpt_activity_structure_step::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\backup_vrmakerspace_activity_structure_step::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\restore_vrmakerspace_activity_structure_step::class)]
 final class backup_restore_test extends \advanced_testcase {
     /**
      * Back up a course with user data and restore it as a new course.
@@ -55,7 +55,7 @@ final class backup_restore_test extends \advanced_testcase {
         $bc->get_plan()->get_setting('users')->set_value(true);
         $bc->execute_plan();
         // A general backup is a .mbz file: unpack it for the restore controller, as core's tests do.
-        $backupid = 'vrsculpt-restore-' . $course->id;
+        $backupid = 'vrmakerspace-restore-' . $course->id;
         $bc->get_results()['backup_destination']->extract_to_pathname(
             get_file_packer('application/vnd.moodle.backup'),
             $CFG->tempdir . '/backup/' . $backupid
@@ -92,61 +92,61 @@ final class backup_restore_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
-        $vrsculpt = $this->getDataGenerator()->create_module('vrsculpt', ['course' => $course->id, 'startmodel' => 'cube',
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'startmodel' => 'cube',
             'workmode' => session_manager::MODE_GROUP, 'connectmode' => 'companion', 'maxusers' => 4,
             'trackcontributions' => 1]);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $group = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Otters']);
         $this->getDataGenerator()->create_group_member(['groupid' => $group->id, 'userid' => $student->id]);
-        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrsculpt');
-        $session = $generator->create_session(['vrsculptid' => $vrsculpt->id, 'groupid' => $group->id]);
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $session = $generator->create_session(['vrmakerspaceid' => $vrmakerspace->id, 'groupid' => $group->id]);
         $generator->create_snapshot($session, (int)$student->id, 'first', 2);
         $generator->create_snapshot($session, (int)$student->id, 'second', 5);
         $generator->create_contribution($session, (int)$student->id, 17, 1234.5, 67.25);
         // Live connections are never backed up.
-        $DB->insert_record('vrsculpt_peers', (object)['sessionid' => $session->id, 'userid' => $student->id,
+        $DB->insert_record('vrmakerspace_peers', (object)['sessionid' => $session->id, 'userid' => $student->id,
             'peerkey' => str_repeat('a', 32), 'role' => 'host', 'lastseen' => time(), 'timecreated' => time()]);
-        grader::save_grade($vrsculpt, (int)$student->id, 75.0, 2);
+        grader::save_grade($vrmakerspace, (int)$student->id, 75.0, 2);
         // A second activity starts from an uploaded model.
         $draftid = file_get_unused_draft_itemid();
         get_file_storage()->create_file_from_string(['contextid' => \context_user::instance($USER->id)->id,
             'component' => 'user', 'filearea' => 'draft', 'itemid' => $draftid, 'filepath' => '/',
             'filename' => 'owl.obj'], "v 0 0 0\n");
-        $this->getDataGenerator()->create_module('vrsculpt', ['course' => $course->id, 'name' => 'Owl',
+        $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'name' => 'Owl',
             'startmodel' => 'upload', 'startmodelfile' => $draftid]);
 
         $newcourseid = $this->backup_and_restore($course);
 
-        $owl = $DB->get_record('vrsculpt', ['course' => $newcourseid, 'name' => 'Owl'], '*', MUST_EXIST);
+        $owl = $DB->get_record('vrmakerspace', ['course' => $newcourseid, 'name' => 'Owl'], '*', MUST_EXIST);
         $this->assertSame('upload', $owl->startmodel);
-        $owlcm = get_coursemodule_from_instance('vrsculpt', $owl->id, $newcourseid, false, MUST_EXIST);
+        $owlcm = get_coursemodule_from_instance('vrmakerspace', $owl->id, $newcourseid, false, MUST_EXIST);
         $owlfile = session_manager::start_model_file(\context_module::instance($owlcm->id));
         $this->assertSame("v 0 0 0\n", $owlfile->get_content());
 
-        $restored = $DB->get_record('vrsculpt', ['course' => $newcourseid, 'startmodel' => 'cube'], '*', MUST_EXIST);
+        $restored = $DB->get_record('vrmakerspace', ['course' => $newcourseid, 'startmodel' => 'cube'], '*', MUST_EXIST);
         $this->assertSame('cube', $restored->startmodel);
         $this->assertSame('companion', $restored->connectmode);
         $this->assertSame(4, (int)$restored->maxusers);
-        $newsession = $DB->get_record('vrsculpt_sessions', ['vrsculptid' => $restored->id], '*', MUST_EXIST);
+        $newsession = $DB->get_record('vrmakerspace_sessions', ['vrmakerspaceid' => $restored->id], '*', MUST_EXIST);
         $newgroup = $DB->get_record('groups', ['id' => $newsession->groupid], '*', MUST_EXIST);
         $this->assertSame((int)$newcourseid, (int)$newgroup->courseid);
         $this->assertSame('Otters', $newgroup->name);
-        $contrib = $DB->get_record('vrsculpt_contrib', ['sessionid' => $newsession->id], '*', MUST_EXIST);
+        $contrib = $DB->get_record('vrmakerspace_contrib', ['sessionid' => $newsession->id], '*', MUST_EXIST);
         $this->assertSame((int)$student->id, (int)$contrib->userid);
         $this->assertSame(17, (int)$contrib->ops);
         $this->assertEquals(1234.5, (float)$contrib->added);
         $this->assertEquals(67.25, (float)$contrib->removed);
-        $this->assertSame(0, $DB->count_records('vrsculpt_peers', ['sessionid' => $newsession->id]));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_peers', ['sessionid' => $newsession->id]));
         $snapshots = array_values(session_manager::get_snapshots((int)$newsession->id));
         $this->assertSame([1, 2], array_map(fn($s) => (int)$s->version, $snapshots));
-        $cm = get_coursemodule_from_instance('vrsculpt', $restored->id, $newcourseid, false, MUST_EXIST);
+        $cm = get_coursemodule_from_instance('vrmakerspace', $restored->id, $newcourseid, false, MUST_EXIST);
         $context = \context_module::instance($cm->id);
         $second = session_manager::get_snapshot_file($snapshots[1], $context)->get_content();
         $this->assertSame($generator->snapshot_data('second', 5), $second);
         $first = session_manager::get_snapshot_file($snapshots[0], $context)->get_content();
         $this->assertSame($generator->snapshot_data('first', 2), $first);
         $this->assertSame([2, 5], array_map(fn($s) => (int)$s->opcount, $snapshots));
-        $grade = $DB->get_record('vrsculpt_grades', ['vrsculptid' => $restored->id], '*', MUST_EXIST);
+        $grade = $DB->get_record('vrmakerspace_grades', ['vrmakerspaceid' => $restored->id], '*', MUST_EXIST);
         $this->assertEquals(75.0, (float)$grade->grade);
     }
 }

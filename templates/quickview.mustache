@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_vrsculpt/quickview
+    @template mod_vrmakerspace/quickview
 
     The body of the grading page's quick view popup: a 3D view of one saved version that turns and
     zooms, with zoom and reset buttons.
@@ -37,18 +37,18 @@
         "title": "Sam Student, version 3"
     }
 }}
-<div class="mod_vrsculpt-quickview">
-    <p class="small text-muted mb-2" id="mod_vrsculpt-quickview-help-{{uniqid}}">{{#str}} quickview_help, mod_vrsculpt {{/str}}</p>
-    <div class="mod_vrsculpt-quickview-stage position-relative" data-region="stage">
-        <canvas class="mod_vrsculpt-quickview-canvas" data-region="canvas" tabindex="0" role="application"
-            aria-label="{{title}}" aria-describedby="mod_vrsculpt-quickview-help-{{uniqid}}"></canvas>
-        <div class="mod_vrsculpt-quickview-loading position-absolute top-50 start-50 translate-middle" data-region="loading"
-            role="status">{{#str}} studio_loading, mod_vrsculpt {{/str}}</div>
+<div class="mod_vrmakerspace-quickview">
+    <p class="small text-muted mb-2" id="mod_vrmakerspace-quickview-help-{{uniqid}}">{{#str}} quickview_help, mod_vrmakerspace {{/str}}</p>
+    <div class="mod_vrmakerspace-quickview-stage position-relative" data-region="stage">
+        <canvas class="mod_vrmakerspace-quickview-canvas" data-region="canvas" tabindex="0" role="application"
+            aria-label="{{title}}" aria-describedby="mod_vrmakerspace-quickview-help-{{uniqid}}"></canvas>
+        <div class="mod_vrmakerspace-quickview-loading position-absolute top-50 start-50 translate-middle" data-region="loading"
+            role="status">{{#str}} studio_loading, mod_vrmakerspace {{/str}}</div>
     </div>
     <div class="alert alert-warning d-none mt-2 mb-0" data-region="message" role="alert"></div>
     <div class="mt-2">
-        <button type="button" class="btn btn-secondary btn-sm" data-action="zoomin">{{#str}} zoomin, mod_vrsculpt {{/str}}</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-action="zoomout">{{#str}} zoomout, mod_vrsculpt {{/str}}</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-action="reset">{{#str}} resetview, mod_vrsculpt {{/str}}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="zoomin">{{#str}} zoomin, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="zoomout">{{#str}} zoomout, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="reset">{{#str}} resetview, mod_vrmakerspace {{/str}}</button>
     </div>
 </div>

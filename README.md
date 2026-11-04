@@ -27,7 +27,7 @@ Nothing else: individual work and pair work need no server besides Moodle.
 ## Installation
 
 1. Install `mod_vrroom` first (it brings `vrroomruntime_builtin`).
-2. Copy this repository to `public/mod/vrsculpt` in your Moodle code.
+2. Copy this repository to `public/mod/vrmakerspace` in your Moodle code.
 3. Visit *Site administration > Notifications* to install it.
 4. Optionally set the largest saved sculpture in *Site administration > Plugins > Activity modules >
    VR sculpting* (16 MB by default).
@@ -52,7 +52,7 @@ Nothing else: individual work and pair work need no server besides Moodle.
 ### With one partner (built in, no extra server)
 
 Two members of a group sculpt their group's sculpture at the same time. Their browsers find each
-other through Moodle (the web services `mod_vrsculpt_pair_join`, `_pair_poll`, `_pair_signal` and
+other through Moodle (the web services `mod_vrmakerspace_pair_join`, `_pair_poll`, `_pair_signal` and
 `_pair_leave`, polled about once a second) and then connect directly with WebRTC; the edits and the
 positions of heads and hands go browser to browser. One browser, the host, puts every edit in order,
 so both sculptures stay identical; if the host leaves, the other browser takes over. A member who
@@ -67,7 +67,7 @@ without them, pair work may only connect browsers on the same network.
 ### With up to 8 people (companion service)
 
 Up to the chosen number of members sculpt together over VR room's companion service (`vrroom-sync`).
-Moodle gives each studio a short-lived token (`mod_vrsculpt_companion_join`); the service puts the
+Moodle gives each studio a short-lived token (`mod_vrmakerspace_companion_join`); the service puts the
 edits of everyone in one order and replays them to latecomers, from the last saved version. Set it up
 as described in `vrroomruntime_companion` (its server runs in a container, for example with Podman).
 When the service is not set up, an activity that chose it falls back to working with one partner and
@@ -124,7 +124,7 @@ checked by Moodle before they are stored.
   a grade field per student; a group's sculpture also has "Give every member of the group this grade".
   Grades go to the gradebook. **Quick view** opens the latest version in a popup: drag to turn it,
   scroll or pinch (or the Zoom buttons) to zoom, right-drag, Shift+drag or the arrow keys to move it.
-- Users with *Open, close and reset sculptures* (`mod/vrsculpt:managesessions`) close a sculpture (it
+- Users with *Open, close and reset sculptures* (`mod/vrmakerspace:managesessions`) close a sculpture (it
   can be viewed and graded, not changed), reopen it, or reset it (every version and the recorded
   contributions are deleted), each after a confirmation.
 - Contributions, when tracked: each studio reports its own user's operations and clay added and
@@ -135,16 +135,16 @@ checked by Moodle before they are stored.
 
 | Capability | Default roles | What it allows |
 |---|---|---|
-| `mod/vrsculpt:addinstance` | editing teacher, manager | Add the activity |
-| `mod/vrsculpt:view` | guest, student, teachers, manager | Open the activity |
-| `mod/vrsculpt:sculpt` | student | Have a sculpture (or share the group's), sculpt it and save versions |
-| `mod/vrsculpt:viewallsubmissions` | teachers, manager | See everyone's sculptures |
-| `mod/vrsculpt:grade` | teachers, manager | Grade sculptures |
-| `mod/vrsculpt:managesessions` | editing teacher, manager | Open, close and reset sculptures |
+| `mod/vrmakerspace:addinstance` | editing teacher, manager | Add the activity |
+| `mod/vrmakerspace:view` | guest, student, teachers, manager | Open the activity |
+| `mod/vrmakerspace:make` | student | Have a sculpture (or share the group's), sculpt it and save versions |
+| `mod/vrmakerspace:viewallsubmissions` | teachers, manager | See everyone's sculptures |
+| `mod/vrmakerspace:grade` | teachers, manager | Grade sculptures |
+| `mod/vrmakerspace:managesessions` | editing teacher, manager | Open, close and reset sculptures |
 
 ## Scheduled task
 
-*Remove expired live sculpting connections* (`\mod_vrsculpt\task\cleanup`, every 15 minutes) deletes
+*Remove expired live sculpting connections* (`\mod_vrmakerspace\task\cleanup`, every 15 minutes) deletes
 the connections and connection messages of pair work nobody used for an hour.
 
 ## Privacy

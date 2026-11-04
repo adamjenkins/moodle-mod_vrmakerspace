@@ -21,7 +21,7 @@
  * bit 11). No Zip64: an archive is limited to 65 535 entries and 4 GiB, which a 3MF of one sculpture
  * never reaches. Dependency-free; runs in a Web Worker and in Node.
  *
- * @module     mod_vrsculpt/engine/zip
+ * @module     mod_vrmakerspace/engine/zip
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

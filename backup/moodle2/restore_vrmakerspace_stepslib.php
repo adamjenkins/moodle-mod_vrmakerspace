@@ -15,38 +15,38 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Restore structure step for mod_vrsculpt.
+ * Restore structure step for mod_vrmakerspace.
  *
- * @package    mod_vrsculpt
+ * @package    mod_vrmakerspace
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use mod_vrsculpt\local\session_manager;
+use mod_vrmakerspace\local\session_manager;
 
 /**
- * Restores vrsculpt.xml.
+ * Restores vrmakerspace.xml.
  *
  * Restore input is untrusted: the activity's settings are normalised as the form's are, a sculpture
  * whose owner (user or group) was not restored is skipped with its versions and shares, and a grade
  * or share of a user who was not restored is skipped.
  */
-class restore_vrsculpt_activity_structure_step extends restore_activity_structure_step {
+class restore_vrmakerspace_activity_structure_step extends restore_activity_structure_step {
     /**
      * The paths of the XML.
      *
      * @return restore_path_element[]
      */
     protected function define_structure() {
-        $paths = [new restore_path_element('vrsculpt', '/activity/vrsculpt')];
+        $paths = [new restore_path_element('vrmakerspace', '/activity/vrmakerspace')];
         if ($this->get_setting_value('userinfo')) {
-            $paths[] = new restore_path_element('vrsculpt_session', '/activity/vrsculpt/sessions/session');
-            $paths[] = new restore_path_element('vrsculpt_snapshot', '/activity/vrsculpt/sessions/session/snapshots/snapshot');
+            $paths[] = new restore_path_element('vrmakerspace_session', '/activity/vrmakerspace/sessions/session');
+            $paths[] = new restore_path_element('vrmakerspace_snapshot', '/activity/vrmakerspace/sessions/session/snapshots/snapshot');
             $paths[] = new restore_path_element(
-                'vrsculpt_contribution',
-                '/activity/vrsculpt/sessions/session/contributions/contribution'
+                'vrmakerspace_contribution',
+                '/activity/vrmakerspace/sessions/session/contributions/contribution'
             );
-            $paths[] = new restore_path_element('vrsculpt_usergrade', '/activity/vrsculpt/usergrades/usergrade');
+            $paths[] = new restore_path_element('vrmakerspace_usergrade', '/activity/vrmakerspace/usergrades/usergrade');
         }
         return $this->prepare_activity_structure($paths);
     }
@@ -57,13 +57,13 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
      * @param array $data the element's data
      * @return void
      */
-    protected function process_vrsculpt($data) {
+    protected function process_vrmakerspace($data) {
         global $DB, $CFG;
-        require_once($CFG->dirroot . '/mod/vrsculpt/lib.php');
+        require_once($CFG->dirroot . '/mod/vrmakerspace/lib.php');
 
-        $data = vrsculpt_clean_instance_data((object)$data);
+        $data = vrmakerspace_clean_instance_data((object)$data);
         $data->course = $this->get_courseid();
-        $newid = $DB->insert_record('vrsculpt', $data);
+        $newid = $DB->insert_record('vrmakerspace', $data);
         $this->apply_activity_instance($newid);
     }
 
@@ -73,12 +73,12 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
      * @param array $data the element's data
      * @return void
      */
-    protected function process_vrsculpt_session($data) {
+    protected function process_vrmakerspace_session($data) {
         global $DB;
 
         $data = (object)$data;
         $oldid = $data->id;
-        $data->vrsculptid = $this->get_new_parentid('vrsculpt');
+        $data->vrmakerspaceid = $this->get_new_parentid('vrmakerspace');
         $groupid = (int)$data->groupid;
         $userid = (int)$data->userid;
         if (($groupid > 0) === ($userid > 0)) {
@@ -97,12 +97,12 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
         $data->startmodel = session_manager::clean_start_model((string)$data->startmodel);
         $data->status = (int)$data->status === session_manager::STATUS_CLOSED
             ? session_manager::STATUS_CLOSED : session_manager::STATUS_OPEN;
-        $conditions = ['vrsculptid' => $data->vrsculptid, 'groupid' => $data->groupid, 'userid' => $data->userid];
-        if ($DB->record_exists('vrsculpt_sessions', $conditions)) {
+        $conditions = ['vrmakerspaceid' => $data->vrmakerspaceid, 'groupid' => $data->groupid, 'userid' => $data->userid];
+        if ($DB->record_exists('vrmakerspace_sessions', $conditions)) {
             return;
         }
-        $newid = $DB->insert_record('vrsculpt_sessions', $data);
-        $this->set_mapping('vrsculpt_session', $oldid, $newid);
+        $newid = $DB->insert_record('vrmakerspace_sessions', $data);
+        $this->set_mapping('vrmakerspace_session', $oldid, $newid);
     }
 
     /**
@@ -111,23 +111,23 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
      * @param array $data the element's data
      * @return void
      */
-    protected function process_vrsculpt_snapshot($data) {
+    protected function process_vrmakerspace_snapshot($data) {
         global $DB;
 
         $data = (object)$data;
         $oldid = $data->id;
-        $data->sessionid = $this->get_new_parentid('vrsculpt_session');
+        $data->sessionid = $this->get_new_parentid('vrmakerspace_session');
         if (!$data->sessionid) {
             return;
         }
         $data->userid = (int)$data->userid ? (int)$this->get_mappingid('user', $data->userid) : 0;
         $data->version = max(1, (int)$data->version);
         $data->opcount = max(0, (int)$data->opcount);
-        if ($DB->record_exists('vrsculpt_snapshots', ['sessionid' => $data->sessionid, 'version' => $data->version])) {
+        if ($DB->record_exists('vrmakerspace_snapshots', ['sessionid' => $data->sessionid, 'version' => $data->version])) {
             return;
         }
-        $newid = $DB->insert_record('vrsculpt_snapshots', $data);
-        $this->set_mapping('vrsculpt_snapshot', $oldid, $newid, true);
+        $newid = $DB->insert_record('vrmakerspace_snapshots', $data);
+        $this->set_mapping('vrmakerspace_snapshot', $oldid, $newid, true);
     }
 
     /**
@@ -136,16 +136,16 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
      * @param array $data the element's data
      * @return void
      */
-    protected function process_vrsculpt_contribution($data) {
+    protected function process_vrmakerspace_contribution($data) {
         global $DB;
 
         $data = (object)$data;
-        $data->sessionid = $this->get_new_parentid('vrsculpt_session');
+        $data->sessionid = $this->get_new_parentid('vrmakerspace_session');
         $data->userid = (int)$this->get_mappingid('user', $data->userid);
         if (!$data->sessionid || !$data->userid) {
             return;
         }
-        if ($DB->record_exists('vrsculpt_contrib', ['sessionid' => $data->sessionid, 'userid' => $data->userid])) {
+        if ($DB->record_exists('vrmakerspace_contrib', ['sessionid' => $data->sessionid, 'userid' => $data->userid])) {
             return;
         }
         $data->ops = max(0, (int)$data->ops);
@@ -153,7 +153,7 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
         $data->removed = max(0.0, (float)$data->removed);
         $data->timemodified = (int)$data->timemodified;
         $data->lastreport = (int)$data->lastreport;
-        $DB->insert_record('vrsculpt_contrib', $data);
+        $DB->insert_record('vrmakerspace_contrib', $data);
     }
 
     /**
@@ -162,20 +162,20 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
      * @param array $data the element's data
      * @return void
      */
-    protected function process_vrsculpt_usergrade($data) {
+    protected function process_vrmakerspace_usergrade($data) {
         global $DB;
 
         $data = (object)$data;
-        $data->vrsculptid = $this->get_new_parentid('vrsculpt');
+        $data->vrmakerspaceid = $this->get_new_parentid('vrmakerspace');
         $data->userid = $this->get_mappingid('user', $data->userid);
         if (!$data->userid) {
             return;
         }
-        if ($DB->record_exists('vrsculpt_grades', ['vrsculptid' => $data->vrsculptid, 'userid' => $data->userid])) {
+        if ($DB->record_exists('vrmakerspace_grades', ['vrmakerspaceid' => $data->vrmakerspaceid, 'userid' => $data->userid])) {
             return;
         }
         $data->grader = (int)$data->grader ? (int)$this->get_mappingid('user', $data->grader) : 0;
-        $DB->insert_record('vrsculpt_grades', $data);
+        $DB->insert_record('vrmakerspace_grades', $data);
     }
 
     /**
@@ -184,8 +184,8 @@ class restore_vrsculpt_activity_structure_step extends restore_activity_structur
      * @return void
      */
     protected function after_execute() {
-        $this->add_related_files('mod_vrsculpt', 'intro', null);
-        $this->add_related_files('mod_vrsculpt', 'startmodel', null);
-        $this->add_related_files('mod_vrsculpt', 'snapshots', 'vrsculpt_snapshot');
+        $this->add_related_files('mod_vrmakerspace', 'intro', null);
+        $this->add_related_files('mod_vrmakerspace', 'startmodel', null);
+        $this->add_related_files('mod_vrmakerspace', 'snapshots', 'vrmakerspace_snapshot');
     }
 }
