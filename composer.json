@@ -1,0 +1,11 @@
+{
+    "name": "adamjenkins/moodle-mod_vrmakerspace",
+    "description": "A Moodle activity in which students sculpt and model 3D pieces, alone or with their group, in a VR headset or a desktop browser, and export them for 3D printing",
+    "type": "moodle-mod",
+    "require": {
+        "moodle/moodle": ">=5.2 <5.4",
+        "moodle/composer-installer": "^1.0",
+        "adamjenkins/moodle-mod_vrroom": "^0.1"
+    },
+    "license": "GPL-3.0-or-later"
+}
