@@ -3,10 +3,13 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.1.1] - 2026-11-15
+
+The first tagged release.
 
 ### Added
 
+- `composer.json` (package `adamjenkins/moodle-mod_vrmakerspace`, type `moodle-mod`, requiring `moodle/moodle` `>=5.2 <5.4` and `moodle/composer-installer` `^1.0`, plus `adamjenkins/moodle-mod_vrroom` `^0.1`) for installing from Packagist.
 - Activity skeleton (milestone 1): settings form, `vrmakerspace`, `vrmakerspace_sessions`,
   `vrmakerspace_snapshots` and `vrmakerspace_grades` tables, the `snapshots` file area, capabilities,
   web services `mod_vrmakerspace_save_snapshot` and `mod_vrmakerspace_get_session_state`, grade callbacks,

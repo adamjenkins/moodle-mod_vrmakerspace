@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'mod_vrmakerspace';
-$plugin->version = 2026110400;
-$plugin->release = '0.1.0';
+$plugin->version = 2026111500;
+$plugin->release = '0.1.1';
 $plugin->maturity = MATURITY_ALPHA;
 // Moodle 5.2.0 (the v5.2.0 tag's public/version.php: 2026042000.00), as mod_vrroom.
 $plugin->requires = 2026042000;

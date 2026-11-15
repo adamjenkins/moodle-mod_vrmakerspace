@@ -1,6 +1,10 @@
 # Changes
 
-## 0.1.0 (unreleased) — ALPHA
+## 0.1.1 (2026-11-15) — ALPHA
+
+The first tagged release.
+
+- The plugin can now be installed with Composer from Packagist: `composer require adamjenkins/moodle-mod_vrmakerspace`, which also brings in VR room. No change to the plugin itself.
 
 The first version: make a 3D piece alone or together, in VR or in the browser, by sculpting clay,
 modelling a polygon mesh, or both.
