@@ -166,4 +166,44 @@ final class backup_restore_test extends \advanced_testcase {
         $grade = $DB->get_record('vrmakerspace_grades', ['vrmakerspaceid' => $restored->id], '*', MUST_EXIST);
         $this->assertEquals(75.0, (float)$grade->grade);
     }
+
+    /**
+     * A tutorial-mode activity keeps its settings, and each student's progress comes back with the user
+     * mapped and the step keys cleaned.
+     */
+    public function test_backup_restore_tutorial(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course(['summary' => '', 'enablecompletion' => 1]);
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'name' => 'Tour',
+            'methods' => 'sculpt', 'tutorial' => 1, 'tutorai' => 1, 'completion' => COMPLETION_TRACKING_AUTOMATIC,
+            'completiontutorial' => 1, 'tutorlisten' => 1, 'tutorspeak' => 1]);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $progress = $generator->create_tutorial_progress(
+            $vrmakerspace,
+            (int)$student->id,
+            ['welcome', 'orbit'],
+            ['zoom'],
+            1800000000,
+            'pan'
+        );
+        // Keys from a tampered backup or an older step list are dropped on restore.
+        $DB->set_field('vrmakerspace_tutorial', 'stepsdone', 'welcome,orbit,extrude,nonsense', ['id' => $progress->id]);
+        $DB->set_field('vrmakerspace_tutorial', 'stepsskipped', 'zoom,welcome', ['id' => $progress->id]);
+
+        $newcourseid = $this->backup_and_restore($course);
+
+        $restored = $DB->get_record('vrmakerspace', ['course' => $newcourseid, 'name' => 'Tour'], '*', MUST_EXIST);
+        $this->assertSame([1, 1, 1], [(int)$restored->tutorial, (int)$restored->tutorai, (int)$restored->completiontutorial]);
+        $this->assertSame([1, 1], [(int)$restored->tutorlisten, (int)$restored->tutorspeak]);
+        $this->assertSame(session_manager::MODE_INDIVIDUAL, (int)$restored->workmode);
+        $row = $DB->get_record('vrmakerspace_tutorial', ['vrmakerspaceid' => $restored->id], '*', MUST_EXIST);
+        $this->assertSame((int)$student->id, (int)$row->userid);
+        $this->assertSame('welcome,orbit', $row->stepsdone);
+        $this->assertSame('zoom', $row->stepsskipped);
+        $this->assertSame('pan', $row->laststep);
+        $this->assertSame(1800000000, (int)$row->timecompleted);
+    }
 }

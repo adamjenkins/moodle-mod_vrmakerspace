@@ -27,10 +27,10 @@
     * data-region="mod_vrmakerspace-studioroot" data-title: the studio root and the activity name
     * data-region toolbar, methodswitch, sculptpanel, modelpanel, size, strength, shapeoptions, shape, textfield, text,
       segments, stage, canvas, loading, nowebgl, failed, bakeconfirm, statustext, message, openedges, sculpthelp, modelhelp,
-      vrhelp, vrmodelhelp
+      vrhelp, vrmodelhelp; exportmenu, addshapemenu, selectmodes, axislock (what the tutorial's steps point at)
     * data-action tool (with data-tool), mirror, undo, redo, save, export (with data-format), vr, fullscreen,
       method (with data-method), selectmode (with data-mode), select (with data-select), addshape (with data-shape),
-      modelaction (with data-tool), axis (with data-axis), oneshot (with data-oneshot), bakeconfirm, bakecancel
+      modelaction (with data-tool), axis (with data-axis), oneshot (with data-oneshot), bakeconfirm, bakecancel, tutorial
 
     Context variables required for this template:
     * readonly - true when the piece can only be looked at
@@ -41,6 +41,7 @@
     * canmodel - true when the activity has the Model method: without it, the Model controls are not rendered
     * showmethodswitch - true when there is a choice of method
     * modelfirst - true when the studio opens in the Model method
+    * tutorial - true in tutorial mode for someone who can work on the piece: the Tutorial button shows
 
     Example context (json):
     {
@@ -51,7 +52,8 @@
         "cansculpt": true,
         "canmodel": true,
         "showmethodswitch": true,
-        "modelfirst": false
+        "modelfirst": false,
+        "tutorial": true
     }
 }}
 <div class="mod_vrmakerspace-studio" data-region="mod_vrmakerspace-studioroot" data-title="{{title}}"{{#readonly}} data-readonly="1"{{/readonly}}>
@@ -86,7 +88,7 @@
         {{/readonly}}
         <div class="dropdown">
             <button type="button" class="btn btn-secondary dropdown-toggle" id="{{uniqid}}-export" data-bs-toggle="dropdown"
-                    aria-haspopup="true" aria-expanded="false">{{#str}} export, mod_vrmakerspace {{/str}}</button>
+                    data-region="exportmenu" aria-haspopup="true" aria-expanded="false">{{#str}} export, mod_vrmakerspace {{/str}}</button>
             <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-export">
                 <li><button type="button" class="dropdown-item" data-action="export" data-format="stl">{{#str}} export_stl, mod_vrmakerspace {{/str}}</button></li>
                 <li><button type="button" class="dropdown-item" data-action="export" data-format="glb">{{#str}} export_glb, mod_vrmakerspace {{/str}}</button></li>
@@ -95,6 +97,11 @@
         </div>
         <button type="button" class="btn btn-primary d-none" data-action="vr" aria-pressed="false">{{#str}} entervr, mod_vrmakerspace {{/str}}</button>
         <button type="button" class="btn btn-outline-secondary" data-action="fullscreen" aria-pressed="false">{{#str}} fullscreen, mod_vrmakerspace {{/str}}</button>
+        {{^readonly}}
+            {{#tutorial}}
+            <button type="button" class="btn btn-outline-info" data-action="tutorial" aria-pressed="false">{{#str}} tutorial_button, mod_vrmakerspace {{/str}}</button>
+            {{/tutorial}}
+        {{/readonly}}
         {{^readonly}}
             {{#cansculpt}}
             <div class="mod_vrmakerspace-panel{{#modelfirst}} d-none{{/modelfirst}} d-flex flex-wrap align-items-center gap-2" data-region="sculptpanel">
@@ -154,7 +161,7 @@
             {{#canmodel}}
             <div class="mod_vrmakerspace-panel mod_vrmakerspace-modelpanel{{^modelfirst}} d-none{{/modelfirst}} d-flex align-items-center gap-2"
                     role="group" aria-label="{{#str}} method_model, mod_vrmakerspace {{/str}}" data-region="modelpanel">
-                <div class="btn-group" role="group" aria-label="{{#str}} selectmode, mod_vrmakerspace {{/str}}">
+                <div class="btn-group" role="group" aria-label="{{#str}} selectmode, mod_vrmakerspace {{/str}}" data-region="selectmodes">
                     <button type="button" class="btn btn-sm btn-outline-primary" data-action="selectmode" data-mode="v" aria-pressed="false"
                             title="{{#str}} select_vertex, mod_vrmakerspace {{/str}} (1)" aria-keyshortcuts="1">{{#str}} select_vertex, mod_vrmakerspace {{/str}}</button>
                     <button type="button" class="btn btn-sm btn-outline-primary" data-action="selectmode" data-mode="e" aria-pressed="false"
@@ -175,7 +182,7 @@
                 <div class="dropdown">
                     <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" id="{{uniqid}}-addshape"
                             data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-haspopup="true"
-                            aria-expanded="false">{{#str}} addshape, mod_vrmakerspace {{/str}}</button>
+                            data-region="addshapemenu" aria-expanded="false">{{#str}} addshape, mod_vrmakerspace {{/str}}</button>
                     <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-addshape">
                         <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="cube">{{#str}} mshape_cube, mod_vrmakerspace {{/str}}</button></li>
                         <li><button type="button" class="dropdown-item" data-action="addshape" data-shape="plane">{{#str}} mshape_plane, mod_vrmakerspace {{/str}}</button></li>
@@ -203,7 +210,7 @@
                     <button type="button" class="btn btn-sm btn-outline-primary" data-action="modelaction" data-tool="loopcut" aria-pressed="false"
                             title="{{#str}} action_loopcut, mod_vrmakerspace {{/str}} (Ctrl+R)" aria-keyshortcuts="Control+R">{{#str}} action_loopcut, mod_vrmakerspace {{/str}}</button>
                 </div>
-                <div class="btn-group" role="group" aria-label="{{#str}} axislock, mod_vrmakerspace {{/str}}">
+                <div class="btn-group" role="group" aria-label="{{#str}} axislock, mod_vrmakerspace {{/str}}" data-region="axislock">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-action="axis" data-axis="free" aria-pressed="true"
                             title="{{#str}} axis_free, mod_vrmakerspace {{/str}}">{{#str}} axis_free, mod_vrmakerspace {{/str}}</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-action="axis" data-axis="x" aria-pressed="false"

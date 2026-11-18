@@ -35,6 +35,7 @@ require_once($CFG->dirroot . '/mod/vrmakerspace/lib.php');
 #[\PHPUnit\Framework\Attributes\CoversFunction('vrmakerspace_delete_instance')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('vrmakerspace_reset_userdata')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('vrmakerspace_clean_instance_data')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('vrmakerspace_reset_course_form_defaults')]
 final class lib_test extends \advanced_testcase {
     /**
      * Out-of-range settings are normalised on save.
@@ -187,5 +188,75 @@ final class lib_test extends \advanced_testcase {
 
         $this->assertSame([], vrmakerspace_reset_userdata((object)['courseid' => $course->id, 'reset_vrmakerspace_sessions' => 0]));
         $this->assertSame(1, $DB->count_records('vrmakerspace_sessions'));
+    }
+
+    /**
+     * Tutorial mode forces individual work; the tutor, its voice and the completion rule are saved only in
+     * tutorial mode.
+     */
+    public function test_tutorial_settings_normalised(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $tutorial = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'tutorial' => 1,
+            'tutorai' => 1, 'completiontutorial' => 1, 'workmode' => session_manager::MODE_GROUP, 'connectmode' => 'companion',
+            'trackcontributions' => 1, 'tutorlisten' => 1, 'tutorspeak' => 1]);
+        $record = $DB->get_record('vrmakerspace', ['id' => $tutorial->id]);
+        $this->assertSame([1, 1, 1], [(int)$record->tutorial, (int)$record->tutorai, (int)$record->completiontutorial]);
+        $this->assertSame([1, 1], [(int)$record->tutorlisten, (int)$record->tutorspeak]);
+        $this->assertSame(session_manager::MODE_INDIVIDUAL, (int)$record->workmode);
+        $this->assertSame('pair', $record->connectmode);
+        $this->assertFalse(session_manager::is_group_work($record));
+        // A row changed behind the form's back is still individual work.
+        $record->workmode = session_manager::MODE_GROUP;
+        $this->assertFalse(session_manager::is_group_work($record));
+
+        $plain = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'tutorial' => 0,
+            'tutorai' => 1, 'completiontutorial' => 1, 'tutorlisten' => 1, 'tutorspeak' => 1]);
+        $record = $DB->get_record('vrmakerspace', ['id' => $plain->id]);
+        $this->assertSame([0, 0, 0], [(int)$record->tutorial, (int)$record->tutorai, (int)$record->completiontutorial]);
+        $this->assertSame([0, 0], [(int)$record->tutorlisten, (int)$record->tutorspeak]);
+    }
+
+    /**
+     * Deleting the activity deletes its tutorial progress, and only its own.
+     */
+    public function test_delete_instance_removes_tutorial_progress(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'tutorial' => 1]);
+        $other = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'tutorial' => 1]);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $generator->create_tutorial_progress($vrmakerspace, (int)$student->id, ['welcome']);
+        $generator->create_tutorial_progress($other, (int)$student->id, ['welcome']);
+
+        $this->assertTrue(vrmakerspace_delete_instance((int)$vrmakerspace->id));
+        $this->assertSame(0, $DB->count_records('vrmakerspace_tutorial', ['vrmakerspaceid' => $vrmakerspace->id]));
+        $this->assertSame(1, $DB->count_records('vrmakerspace_tutorial', ['vrmakerspaceid' => $other->id]));
+    }
+
+    /**
+     * Course reset deletes the tutorial progress of the course's activities when its box is ticked.
+     */
+    public function test_reset_tutorial_progress(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $othercourse = $this->getDataGenerator()->create_course(['summary' => '']);
+        $vrmakerspace = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $course->id, 'tutorial' => 1]);
+        $kept = $this->getDataGenerator()->create_module('vrmakerspace', ['course' => $othercourse->id, 'tutorial' => 1]);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $generator->create_tutorial_progress($vrmakerspace, (int)$student->id, ['welcome']);
+        $generator->create_tutorial_progress($kept, (int)$student->id, ['welcome']);
+
+        $this->assertSame(1, vrmakerspace_reset_course_form_defaults($course)['reset_vrmakerspace_tutorial']);
+        $status = vrmakerspace_reset_userdata((object)['courseid' => $course->id, 'reset_vrmakerspace_tutorial' => 1]);
+        $this->assertCount(1, $status);
+        $this->assertSame(get_string('tutorialreset', 'vrmakerspace'), $status[0]['item']);
+        $this->assertSame(0, $DB->count_records('vrmakerspace_tutorial', ['vrmakerspaceid' => $vrmakerspace->id]));
+        $this->assertSame(1, $DB->count_records('vrmakerspace_tutorial', ['vrmakerspaceid' => $kept->id]));
     }
 }

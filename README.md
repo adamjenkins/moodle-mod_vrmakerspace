@@ -33,7 +33,7 @@ Nothing else: individual work and pair work need no server besides Moodle.
 2. Copy this repository to `public/mod/vrmakerspace` in your Moodle code.
 3. Visit *Site administration > Notifications* to install it.
 4. Optionally set the largest saved piece in *Site administration > Plugins > Activity modules >
-   VR Makerspace* (16 MB by default).
+   VR Makerspace* (16 MB by default), and, for tutorial mode, the tutor's speech services on the same page.
 
 ## Settings of an activity
 
@@ -54,6 +54,41 @@ Nothing else: individual work and pair work need no server besides Moodle.
 - **Track each person's contribution** (group work, on by default). A share is the mean of a member's part of all
   the edits and of all the clay added and removed; turning a mesh into clay and undoing are not counted as new work.
 - **Grade**: points only.
+- **Tutorial mode** (section *Tutorial*): the studio becomes a guided tour of itself (see "Tutorial mode" below).
+  Tutorial mode is always individual work. With it on, three more switches appear when the site can do them:
+  **Students can ask the tutor (AI)**, **Students can speak to the tutor** and **The tutor speaks**, and the
+  completion condition **Students must finish the tutorial**.
+
+## Tutorial mode
+
+Make a tutorial-mode activity the first VR Makerspace activity of a course: students learn the studio there, and
+later activities can be restricted until it is finished. The teacher only ticks *Tutorial mode*; the tour comes with
+the plugin.
+
+- **The tour**: up to 40 steps in five chapters (moving round the 3D view; every sculpting tool; switching to
+  Model; every modelling tool, including turning the mesh into clay; saving, versions, export, VR and working
+  together). The chapters follow the activity's ways of making: 40 steps with both, 25 with sculpting only, 23 with
+  modelling only. Each step highlights the control it is about. Steps that ask for an action end by themselves when
+  the student does it; *Skip step* moves on. Students can close the tour and reopen it with the *Tutorial* button,
+  and it continues where they left off. In VR the step text shows on the VR message panel.
+- **The tutor**: Tinker, a small floating robot beside the piece. It points at where to act, and *Show me* makes it
+  fly to the practice piece and do the action itself (a real stroke or mesh operation, undoable).
+- **Asking the tutor**: students can type (or, with *Students can speak to the tutor*, say) a question such as
+  "how do I make it stick out?". With the AI on, the answer comes from the site's AI provider (Site administration >
+  AI), given the tour's own texts, and when a demonstration fits, the tutor does it on the piece while it answers.
+  Students must accept the site's AI policy first; there are at most 20 questions an hour each. With the AI off,
+  the question is matched in the browser to the tools' names and a list of everyday words for each, and the tutor
+  shows that step and its demonstration, or offers the demonstrations it knows. Nothing needs an AI.
+- **Voice**: with *The tutor speaks*, the tutor reads its answers and the steps aloud, and its face moves with the
+  speech; in VR the voice comes from where it stands. With *Students can speak to the tutor*, students hold the *Talk*
+  button (in VR: press and hold either thumbstick). The site administrator chooses who speaks and who listens in the
+  plugin's settings: up to three choices each, from the browser's own speech, Ollama with an audio model (such as
+  lfm3-audio, which uses the site's Ollama AI provider with no extra setup), any OpenAI-style audio server, ElevenLabs
+  or Google Cloud; *None* everywhere turns speech off. A choice that fails hands over to the next. A microphone needs
+  HTTPS.
+- **Progress and completion**: steps done and skipped are saved per student. The activity page shows *Start* or
+  *Continue the tutorial*, and teachers see each student's progress. *Students must finish the tutorial* is met when
+  every step has been done or skipped.
 
 ## Working together
 

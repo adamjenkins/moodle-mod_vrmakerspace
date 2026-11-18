@@ -23,13 +23,15 @@
  */
 
 use mod_vrmakerspace\local\session_manager;
+use mod_vrmakerspace\local\tutorial;
 
 /**
  * Restores vrmakerspace.xml.
  *
  * Restore input is untrusted: the activity's settings are normalised as the form's are, a piece
  * whose owner (user or group) was not restored is skipped with its versions and shares, and a grade
- * or share of a user who was not restored is skipped.
+ * or share of a user who was not restored is skipped, and so is their tutorial progress, whose step
+ * keys are kept only when they are steps of the restored activity.
  */
 class restore_vrmakerspace_activity_structure_step extends restore_activity_structure_step {
     /**
@@ -50,6 +52,10 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
                 '/activity/vrmakerspace/sessions/session/contributions/contribution'
             );
             $paths[] = new restore_path_element('vrmakerspace_usergrade', '/activity/vrmakerspace/usergrades/usergrade');
+            $paths[] = new restore_path_element(
+                'vrmakerspace_tutorial',
+                '/activity/vrmakerspace/tutorialprogress/progress'
+            );
         }
         return $this->prepare_activity_structure($paths);
     }
@@ -179,6 +185,46 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
         }
         $data->grader = (int)$data->grader ? (int)$this->get_mappingid('user', $data->grader) : 0;
         $DB->insert_record('vrmakerspace_grades', $data);
+    }
+
+    /**
+     * One student's tutorial progress.
+     *
+     * @param array $data the element's data
+     * @return void
+     */
+    protected function process_vrmakerspace_tutorial($data) {
+        global $DB;
+
+        $data = (object)$data;
+        $oldid = $data->id;
+        $data->vrmakerspaceid = $this->get_new_parentid('vrmakerspace');
+        $data->userid = (int)$this->get_mappingid('user', $data->userid);
+        if (!$data->vrmakerspaceid || !$data->userid) {
+            return;
+        }
+        if ($DB->record_exists(tutorial::TABLE, ['vrmakerspaceid' => $data->vrmakerspaceid, 'userid' => $data->userid])) {
+            return;
+        }
+        $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $data->vrmakerspaceid], 'id, methods', MUST_EXIST);
+        $steps = tutorial::applicable_steps((string)$vrmakerspace->methods);
+        $done = tutorial::clean_keys(tutorial::split_keys((string)($data->stepsdone ?? '')), $steps);
+        $skipped = array_values(array_diff(
+            tutorial::clean_keys(tutorial::split_keys((string)($data->stepsskipped ?? '')), $steps),
+            $done
+        ));
+        $laststep = (string)($data->laststep ?? '');
+        $record = (object)[
+            'vrmakerspaceid' => $data->vrmakerspaceid,
+            'userid' => $data->userid,
+            'laststep' => in_array($laststep, $steps, true) ? $laststep : '',
+            'stepsdone' => implode(',', $done),
+            'stepsskipped' => implode(',', $skipped),
+            'timecompleted' => max(0, (int)($data->timecompleted ?? 0)),
+            'timemodified' => max(0, (int)($data->timemodified ?? 0)),
+        ];
+        $newid = $DB->insert_record(tutorial::TABLE, $record);
+        $this->set_mapping('vrmakerspace_tutorial', $oldid, $newid);
     }
 
     /**

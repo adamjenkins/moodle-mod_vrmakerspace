@@ -121,7 +121,9 @@ final class provider_test extends provider_testcase {
         $names = array_map(fn($item) => $item->get_name(), $collection->get_collection());
         $this->assertEqualsCanonicalizing(
             ['vrmakerspace_sessions', 'vrmakerspace_snapshots', 'vrmakerspace_grades', 'vrmakerspace_contrib', 'vrmakerspace_peers',
-                'vrmakerspace_signals', 'core_files', 'pairpartner', 'vrroomsync'],
+                'vrmakerspace_signals', 'vrmakerspace_tutorial', 'core_files', 'core_ai', 'pairpartner', 'vrroomsync',
+                'speech_ollama', 'speech_openai', 'speech_elevenlabs', 'speech_google', 'browserspeech',
+                'mod_vrmakerspace_speechconsent'],
             $names
         );
     }
@@ -275,6 +277,74 @@ final class provider_test extends provider_testcase {
             get_file_storage()->get_area_files($solo->id, 'mod_vrmakerspace', 'snapshots', false, 'id', false)
         );
         $this->assertCount(1, $itemids);
+    }
+
+    /**
+     * Tutorial progress: found, exported and deleted by each delete path (one user, a list of users, everyone).
+     */
+    public function test_tutorial_progress(): void {
+        global $DB;
+        $maker = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $carol = $this->getDataGenerator()->create_and_enrol($this->course, 'student');
+        $dave = $this->getDataGenerator()->create_and_enrol($this->course, 'student');
+        $solo = \context_module::instance($this->solo->cmid);
+        $team = \context_module::instance($this->team->cmid);
+        $maker->create_tutorial_progress($this->solo, (int)$carol->id, ['welcome', 'orbit'], ['zoom'], 1800000000, 'pan');
+        $maker->create_tutorial_progress($this->solo, (int)$dave->id, ['welcome']);
+        $maker->create_tutorial_progress($this->team, (int)$carol->id, ['welcome']);
+
+        // Found by user and by context.
+        $this->assertEqualsCanonicalizing(
+            [$solo->id, $team->id],
+            array_map('intval', provider::get_contexts_for_userid((int)$carol->id)->get_contextids())
+        );
+        $userlist = new userlist($solo, 'mod_vrmakerspace');
+        provider::get_users_in_context($userlist);
+        $this->assertContains((int)$carol->id, array_map('intval', $userlist->get_userids()));
+        $this->assertContains((int)$dave->id, array_map('intval', $userlist->get_userids()));
+
+        // Exported.
+        $this->export_context_data_for_user((int)$carol->id, $solo, 'mod_vrmakerspace');
+        $data = writer::with_context($solo)->get_data();
+        $this->assertSame(['welcome', 'orbit'], $data->tutorial->stepsdone);
+        $this->assertSame(['zoom'], $data->tutorial->stepsskipped);
+        $this->assertSame('pan', $data->tutorial->laststep);
+        $this->assertNotNull($data->tutorial->timecompleted);
+
+        // One user in one context.
+        provider::delete_data_for_user(new approved_contextlist($carol, 'mod_vrmakerspace', [$solo->id]));
+        $this->assertNull(\mod_vrmakerspace\local\tutorial::get_progress((int)$this->solo->id, (int)$carol->id));
+        $this->assertNotNull(\mod_vrmakerspace\local\tutorial::get_progress((int)$this->team->id, (int)$carol->id));
+        $this->assertTrue($DB->record_exists('vrmakerspace_tutorial', ['userid' => $dave->id]));
+
+        // A list of users.
+        provider::delete_data_for_users(new approved_userlist($team, 'mod_vrmakerspace', [(int)$carol->id]));
+        $this->assertFalse($DB->record_exists('vrmakerspace_tutorial', ['userid' => $carol->id]));
+
+        // Everyone in a context.
+        provider::delete_data_for_all_users_in_context($solo);
+        $this->assertSame(0, $DB->count_records('vrmakerspace_tutorial'));
+    }
+
+    /**
+     * The answer to the cloud speech recognition question is exported when set, and nothing when it is not.
+     */
+    public function test_export_speech_consent(): void {
+        $carol = $this->getDataGenerator()->create_user();
+        set_user_preference(\mod_vrmakerspace\local\tutorial::CONSENT_PREFERENCE, 1, $carol);
+        provider::export_user_preferences((int)$carol->id);
+        $prefs = writer::with_context(\context_system::instance())->get_user_preferences('mod_vrmakerspace');
+        $this->assertSame(get_string('yes'), $prefs->mod_vrmakerspace_speechconsent->value);
+        $this->assertSame(
+            get_string('privacy:preference:speechconsent', 'vrmakerspace'),
+            $prefs->mod_vrmakerspace_speechconsent->description
+        );
+
+        writer::reset();
+        $dave = $this->getDataGenerator()->create_user();
+        provider::export_user_preferences((int)$dave->id);
+        $prefs = writer::with_context(\context_system::instance())->get_user_preferences('mod_vrmakerspace');
+        $this->assertObjectNotHasProperty('mod_vrmakerspace_speechconsent', $prefs);
     }
 
     /**

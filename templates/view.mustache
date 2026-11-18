@@ -35,9 +35,13 @@
     * cangrade, gradeurl - the grading page link
     * hassculpture, sculpture - the user's piece: sessionid, owner, status, isclosed, studiourl,
       hasversions, versions (version, savedby, timesaved, size, url, viewurl), hascontribution, contribution
+      hastutorial, tutorial (label, status, finished) - tutorial mode: the button that opens the tour and
+      the student's progress
     * nogroup - group work but the user is in no group
+    * istutorial - the activity is in tutorial mode
     * canviewall, canmanage, tracked, hasallsculptures, allsculptures - every piece (teachers):
-      owner, versions, lastsaved, status, url, viewurl, contributions, managelinks (action, label, url)
+      owner, versions, lastsaved, status, url, viewurl, contributions, tutorial (progress text, tutorial
+      mode), managelinks (action, label, url)
 
     Example context (json):
     {
@@ -62,8 +66,11 @@
                  "size": "120.5 KB", "url": "#", "viewurl": "#"}
             ],
             "hascontribution": false,
-            "contribution": ""
+            "contribution": "",
+            "hastutorial": true,
+            "tutorial": {"label": "Continue the tutorial", "status": "12 steps done and 2 skipped, of 40", "finished": false}
         },
+        "istutorial": true,
         "nogroup": false,
         "canviewall": true,
         "canmanage": true,
@@ -72,6 +79,7 @@
         "allsculptures": [
             {"owner": "Sam Student", "versions": 2, "lastsaved": "Tuesday, 27 October 2026, 10:00 AM",
              "status": "Open", "url": "#", "viewurl": "#", "contributions": "",
+             "tutorial": "12 steps done and 2 skipped, of 40",
              "managelinks": [{"action": "close", "label": "Close", "url": "#"}]}
         ]
     }
@@ -88,6 +96,10 @@
             <dt class="col-sm-3">{{#str}} connection, mod_vrmakerspace {{/str}}</dt>
             <dd class="col-sm-9">{{connection}}</dd>
         {{/hasconnection}}
+        {{#istutorial}}
+            <dt class="col-sm-3">{{#str}} tutorial, mod_vrmakerspace {{/str}}</dt>
+            <dd class="col-sm-9">{{#str}} yes {{/str}}</dd>
+        {{/istutorial}}
     </dl>
 
     {{#cangrade}}
@@ -108,7 +120,15 @@
                 {{#isclosed}}
                     <div class="alert alert-info">{{#str}} sculptureclosed, mod_vrmakerspace {{/str}}</div>
                 {{/isclosed}}
-                <p><a class="btn btn-primary" href="{{studiourl}}">{{#isclosed}}{{#str}} viewpiece, mod_vrmakerspace {{/str}}{{/isclosed}}{{^isclosed}}{{#str}} openstudio, mod_vrmakerspace {{/str}}{{/isclosed}}</a></p>
+                {{#hastutorial}}
+                    {{#tutorial}}
+                        <p class="mod_vrmakerspace-tutorialstatus">{{status}}</p>
+                        <p><a class="btn btn-primary" href="{{studiourl}}">{{label}}</a></p>
+                    {{/tutorial}}
+                {{/hastutorial}}
+                {{^hastutorial}}
+                    <p><a class="btn btn-primary" href="{{studiourl}}">{{#isclosed}}{{#str}} viewpiece, mod_vrmakerspace {{/str}}{{/isclosed}}{{^isclosed}}{{#str}} openstudio, mod_vrmakerspace {{/str}}{{/isclosed}}</a></p>
+                {{/hastutorial}}
                 {{#hascontribution}}
                     <p>{{contribution}}</p>
                 {{/hascontribution}}
@@ -162,6 +182,9 @@
                             {{#tracked}}
                                 <th scope="col">{{#str}} contributions, mod_vrmakerspace {{/str}}</th>
                             {{/tracked}}
+                            {{#istutorial}}
+                                <th scope="col">{{#str}} tutorialcolumn, mod_vrmakerspace {{/str}}</th>
+                            {{/istutorial}}
                             <th scope="col">{{#str}} actions {{/str}}</th>
                         </tr>
                     </thead>
@@ -175,6 +198,9 @@
                                 {{#tracked}}
                                     <td>{{contributions}}</td>
                                 {{/tracked}}
+                                {{#istutorial}}
+                                    <td>{{tutorial}}</td>
+                                {{/istutorial}}
                                 <td>
                                     {{#viewurl}}
                                         <a class="me-2" href="{{viewurl}}">{{#str}} viewin3d, mod_vrmakerspace {{/str}}</a>

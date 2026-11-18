@@ -149,4 +149,37 @@ class mod_vrmakerspace_generator extends testing_module_generator {
         $record->id = $DB->insert_record('vrmakerspace_contrib', $record);
         return $record;
     }
+
+    /**
+     * Record a student's tutorial progress directly.
+     *
+     * @param stdClass $vrmakerspace the vrmakerspace row
+     * @param int $userid the student
+     * @param string[] $done steps done
+     * @param string[] $skipped steps skipped
+     * @param int $timecompleted when the tutorial was finished, 0 for not yet
+     * @param string $laststep the step the student is on
+     * @return stdClass the vrmakerspace_tutorial row
+     */
+    public function create_tutorial_progress(
+        stdClass $vrmakerspace,
+        int $userid,
+        array $done,
+        array $skipped = [],
+        int $timecompleted = 0,
+        string $laststep = ''
+    ): stdClass {
+        global $DB;
+        $record = (object)[
+            'vrmakerspaceid' => $vrmakerspace->id,
+            'userid' => $userid,
+            'laststep' => $laststep,
+            'stepsdone' => implode(',', $done),
+            'stepsskipped' => implode(',', $skipped),
+            'timecompleted' => $timecompleted,
+            'timemodified' => time(),
+        ];
+        $record->id = $DB->insert_record('vrmakerspace_tutorial', $record);
+        return $record;
+    }
 }

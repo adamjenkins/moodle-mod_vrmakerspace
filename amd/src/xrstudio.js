@@ -45,6 +45,10 @@
  * - hands: a pinch is the trigger;
  * - a shape from the palette appears at the hand.
  *
+ * Talking to the tutor (tutorial mode, only when the onTalk option is given): pressing either thumbstick in
+ * (button 3, which nothing else uses: A, B, X and Y are taken) and holding it is push to talk; onTalk(true) when
+ * the first is pressed, onTalk(false) when the last is let go or VR ends. Tracked hands have no buttons for it.
+ *
  * View only: no cursor and no tools; the sculpture can still be moved, and the palette offers
  * Exit VR.
  *
@@ -109,6 +113,7 @@ const TWIST_MAX = 0.5;
 /** Gamepad button indices (xr-standard mapping). */
 const BUTTON_TRIGGER = 0;
 const BUTTON_SQUEEZE = 1;
+const BUTTON_STICK = 3;
 const BUTTON_LOWER = 4;
 const BUTTON_UPPER = 5;
 
@@ -628,6 +633,9 @@ const xrMethods = (options) => {
  * 'model'), method ('sculpt' or 'model', the person's method now), onMethod(name) (the person chose a
  * method on the palette). Without model only sculpting exists, and everything works as it always did.
  *
+ * For the tutor, optional: onTalk(pressed) (push to talk: true when a thumbstick is pressed in, false when let go;
+ * edge-triggered, either controller).
+ *
  * getPose() returns one reused object whose arrays change every frame; it is meant to be encoded
  * at once (session.sendPose()).
  *
@@ -756,6 +764,8 @@ export const createXrStudio = (options = {}) => {
     let bakeclock = 0;
     let message = '';
     let messageclock = 0;
+    // Push to talk: whether a thumbstick is held in.
+    let talking = false;
     let methodclock = 0;
     let shownmethod = '';
     let shownaction = '';
@@ -1980,9 +1990,45 @@ export const createXrStudio = (options = {}) => {
     };
 
     /**
+     * Tell the tutor that push to talk changed (only on a change).
+     *
+     * @param {boolean} pressed Whether it is held now.
+     */
+    const setTalking = (pressed) => {
+        if (pressed === talking || typeof options.onTalk !== 'function') {
+            return;
+        }
+        talking = pressed;
+        if (disposed) {
+            return;
+        }
+        try {
+            options.onTalk(pressed);
+        } catch (e) {
+            Log.debug(e);
+        }
+    };
+
+    /**
+     * Read push to talk: a thumbstick held in on either controller.
+     */
+    const readTalk = () => {
+        if (typeof options.onTalk !== 'function') {
+            return;
+        }
+        let pressed = false;
+        for (let i = 0; i < entries.length && !pressed; i++) {
+            const source = entries[i].source;
+            pressed = !!source && !source.hand && buttonPressed(source.gamepad || null, BUTTON_STICK);
+        }
+        setTalking(pressed);
+    };
+
+    /**
      * Hide the XR visuals and let go of everything.
      */
     const reset = () => {
+        setTalking(false);
         stopStroke();
         stopModel();
         setCandidate(null, null, false, null);
@@ -2155,6 +2201,7 @@ export const createXrStudio = (options = {}) => {
                 palette.setModelState(modelstate);
             }
             updateRight(step);
+            readTalk();
         },
 
         /**

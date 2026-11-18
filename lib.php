@@ -28,6 +28,7 @@
 
 use mod_vrmakerspace\local\grader;
 use mod_vrmakerspace\local\session_manager;
+use mod_vrmakerspace\local\tutorial;
 
 /**
  * Whether the module supports a feature.
@@ -40,6 +41,7 @@ function vrmakerspace_supports(string $feature) {
         FEATURE_MOD_INTRO => true,
         FEATURE_BACKUP_MOODLE2 => true,
         FEATURE_COMPLETION_TRACKS_VIEWS => true,
+        FEATURE_COMPLETION_HAS_RULES => true,
         FEATURE_GRADE_HAS_GRADE => true,
         FEATURE_SHOW_DESCRIPTION => true,
         FEATURE_MOD_PURPOSE => MOD_PURPOSE_COLLABORATION,
@@ -62,7 +64,14 @@ function vrmakerspace_clean_instance_data(stdClass $data): stdClass {
         $data->methods,
         session_manager::clean_start_model((string)($data->startmodel ?? ''))
     );
-    $data->workmode = (int)($data->workmode ?? 0) === session_manager::MODE_GROUP
+    // Tutorial mode: a guided tour for each student, so the work is always individual.
+    $data->tutorial = empty($data->tutorial) ? 0 : 1;
+    $data->tutorai = $data->tutorial && !empty($data->tutorai) ? 1 : 0;
+    $data->completiontutorial = $data->tutorial && !empty($data->completiontutorial) ? 1 : 0;
+    // The tutor's voice: students speak to it, it speaks. Independent of the AI; only in tutorial mode.
+    $data->tutorlisten = $data->tutorial && !empty($data->tutorlisten) ? 1 : 0;
+    $data->tutorspeak = $data->tutorial && !empty($data->tutorspeak) ? 1 : 0;
+    $data->workmode = !$data->tutorial && (int)($data->workmode ?? 0) === session_manager::MODE_GROUP
         ? session_manager::MODE_GROUP : session_manager::MODE_INDIVIDUAL;
     // Group work only: pair (built in, two people at once) or companion (up to maxusers). Individual
     // work keeps the default, so switching to group work later starts with pair work.
@@ -166,7 +175,8 @@ function vrmakerspace_update_instance(stdClass $data, ?mod_vrmakerspace_mod_form
 }
 
 /**
- * Delete an activity with its sessions, versions, files, live connections, contributions and grades.
+ * Delete an activity with its sessions, versions, files, live connections, contributions, tutorial
+ * progress and grades.
  *
  * @param int $id The vrmakerspace id.
  * @return bool
@@ -185,21 +195,27 @@ function vrmakerspace_delete_instance(int $id): bool {
         session_manager::delete_rows($id);
     }
     $DB->delete_records('vrmakerspace_grades', ['vrmakerspaceid' => $id]);
+    tutorial::delete_for_activity($id);
     grader::grade_item_delete($vrmakerspace);
     $DB->delete_records('vrmakerspace', ['id' => $id]);
     return true;
 }
 
 /**
- * Information about the activity for course listings, cached in modinfo.
+ * Information about the activity for course listings, cached in modinfo, with the custom completion
+ * rule (finish the tutorial) when completion is automatic.
  *
- * @param stdClass $coursemodule The course_modules row (with showdescription).
+ * @param stdClass $coursemodule The course_modules row (with showdescription and completion).
  * @return cached_cm_info|false
  */
 function vrmakerspace_get_coursemodule_info(stdClass $coursemodule) {
     global $DB;
 
-    $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $coursemodule->instance], 'id, name, intro, introformat');
+    $vrmakerspace = $DB->get_record(
+        'vrmakerspace',
+        ['id' => $coursemodule->instance],
+        'id, name, intro, introformat, tutorial, completiontutorial'
+    );
     if (!$vrmakerspace) {
         return false;
     }
@@ -209,7 +225,30 @@ function vrmakerspace_get_coursemodule_info(stdClass $coursemodule) {
         // Filters run at display time, so the cached copy is not filtered.
         $result->content = format_module_intro('vrmakerspace', $vrmakerspace, $coursemodule->id, false);
     }
+    if (($coursemodule->completion ?? COMPLETION_TRACKING_NONE) == COMPLETION_TRACKING_AUTOMATIC) {
+        $result->customdata['customcompletionrules']['completiontutorial'] =
+            !empty($vrmakerspace->tutorial) && !empty($vrmakerspace->completiontutorial) ? 1 : 0;
+    }
     return $result;
+}
+
+/**
+ * The descriptions of the activity's active custom completion rules, for the course page.
+ *
+ * @param cm_info|stdClass $cm the course module with its customdata
+ * @return string[]
+ */
+function mod_vrmakerspace_get_completion_active_rule_descriptions($cm): array {
+    if (empty($cm->customdata['customcompletionrules']) || $cm->completion != COMPLETION_TRACKING_AUTOMATIC) {
+        return [];
+    }
+    $descriptions = [];
+    foreach ($cm->customdata['customcompletionrules'] as $key => $value) {
+        if ($key === 'completiontutorial' && !empty($value)) {
+            $descriptions[] = get_string('completiontutorial_desc', 'vrmakerspace');
+        }
+    }
+    return $descriptions;
 }
 
 /**
@@ -311,6 +350,7 @@ function vrmakerspace_scale_used_anywhere(int $scaleid): bool {
 function vrmakerspace_reset_course_form_definition(&$mform): void {
     $mform->addElement('header', 'vrmakerspaceheader', get_string('modulenameplural', 'vrmakerspace'));
     $mform->addElement('advcheckbox', 'reset_vrmakerspace_sessions', get_string('resetsessions', 'vrmakerspace'));
+    $mform->addElement('advcheckbox', 'reset_vrmakerspace_tutorial', get_string('tutorialreset', 'vrmakerspace'));
 }
 
 /**
@@ -320,7 +360,7 @@ function vrmakerspace_reset_course_form_definition(&$mform): void {
  * @return array
  */
 function vrmakerspace_reset_course_form_defaults(stdClass $course): array {
-    return ['reset_vrmakerspace_sessions' => 1];
+    return ['reset_vrmakerspace_sessions' => 1, 'reset_vrmakerspace_tutorial' => 1];
 }
 
 /**
@@ -339,7 +379,7 @@ function vrmakerspace_reset_gradebook(int $courseid, string $type = ''): void {
 
 /**
  * Course reset: delete pieces with their versions, live connections and contributions, and the
- * grades, when asked.
+ * grades, when asked; and, when asked, every student's tutorial progress.
  *
  * @param stdClass $data the reset form data
  * @return array status items
@@ -361,6 +401,12 @@ function vrmakerspace_reset_userdata(stdClass $data): array {
             vrmakerspace_reset_gradebook((int)$data->courseid);
         }
         $status[] = ['component' => $component, 'item' => get_string('resetsessions', 'vrmakerspace'), 'error' => false];
+    }
+    if (!empty($data->reset_vrmakerspace_tutorial)) {
+        foreach ($DB->get_records('vrmakerspace', ['course' => $data->courseid], '', 'id') as $vrmakerspace) {
+            tutorial::delete_for_activity((int)$vrmakerspace->id);
+        }
+        $status[] = ['component' => $component, 'item' => get_string('tutorialreset', 'vrmakerspace'), 'error' => false];
     }
     return $status;
 }
@@ -422,4 +468,22 @@ function vrmakerspace_pluginfile($course, $cm, $context, $filearea, $args, $forc
         return false;
     }
     send_stored_file($file, 0, 0, true, $options);
+}
+
+/**
+ * The user preferences this plugin sets from JavaScript: the answer to the question whether the
+ * browser's cloud speech recognition may hear the user's voice (as mod_talkwithai's, same author).
+ *
+ * @return array
+ */
+function mod_vrmakerspace_user_preferences(): array {
+    return [
+        'mod_vrmakerspace_speechconsent' => [
+            'type' => PARAM_INT,
+            'null' => NULL_NOT_ALLOWED,
+            'default' => 0,
+            'choices' => [0, 1],
+            'permissioncallback' => [core_user::class, 'is_current_user'],
+        ],
+    ];
 }

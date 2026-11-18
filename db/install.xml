@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/vrmakerspace/db" VERSION="20261104" COMMENT="XMLDB file for Moodle mod/vrmakerspace"
+<XMLDB PATH="mod/vrmakerspace/db" VERSION="20261118" COMMENT="XMLDB file for Moodle mod/vrmakerspace"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -18,6 +18,11 @@
         <FIELD NAME="maxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="8" SEQUENCE="false" COMMENT="Most people working on one group piece at once"/>
         <FIELD NAME="trackcontributions" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Record each user's share of the edits"/>
         <FIELD NAME="grade" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="100" SEQUENCE="false" COMMENT="Maximum grade, 0 = not graded"/>
+        <FIELD NAME="tutorial" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Tutorial mode: a guided tour of the studio; work is individual"/>
+        <FIELD NAME="tutorai" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Tutorial mode: students can ask the tutor (AI subsystem, text generation)"/>
+        <FIELD NAME="completiontutorial" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion rule: finish the tutorial"/>
+        <FIELD NAME="tutorlisten" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Tutorial mode: students can speak to the tutor (the site's speech services)"/>
+        <FIELD NAME="tutorspeak" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Tutorial mode: the tutor speaks its answers and steps (the site's speech services)"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
@@ -142,6 +147,26 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="sessionuser" UNIQUE="true" FIELDS="sessionid, userid"/>
+        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="vrmakerspace_tutorial" COMMENT="Each student's progress through the tutorial of a tutorial-mode activity">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="vrmakerspaceid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="laststep" TYPE="char" LENGTH="40" NOTNULL="true" SEQUENCE="false" COMMENT="The step the student was on"/>
+        <FIELD NAME="stepsdone" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Comma-separated keys of the steps done"/>
+        <FIELD NAME="stepsskipped" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Comma-separated keys of the steps skipped"/>
+        <FIELD NAME="timecompleted" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When every step was first done or skipped, 0 until then"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="vrmakerspaceid" TYPE="foreign" FIELDS="vrmakerspaceid" REFTABLE="vrmakerspace" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="vrmakerspaceuser" UNIQUE="true" FIELDS="vrmakerspaceid, userid"/>
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>

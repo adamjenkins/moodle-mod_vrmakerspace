@@ -115,7 +115,8 @@ final class studio_helper {
     }
 
     /**
-     * The configuration passed to mod_vrmakerspace/studio init().
+     * The configuration passed to mod_vrmakerspace/studio init(); in tutorial mode, when the piece can be
+     * worked on, with 'tutorial' (tutorial::studio_config()).
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \context_module $context the activity context
@@ -158,7 +159,7 @@ final class studio_helper {
 
         $workerurl = self::worker_url();
 
-        return [
+        $config = [
             'cmid' => (int)$context->instanceid,
             'sessionid' => (int)$session->id,
             'mode' => $mode,
@@ -179,6 +180,17 @@ final class studio_helper {
             'contributionms' => self::CONTRIBUTION_MS,
             'backurl' => (new \moodle_url('/mod/vrmakerspace/view.php', ['id' => $context->instanceid]))->out(false),
         ];
+        // Tutorial mode, working on the piece: the guided tour's steps and the user's progress.
+        $tutorial = tutorial::studio_config($vrmakerspace, $context, (int)$user->id, $readonly);
+        if ($tutorial !== null) {
+            // The tutor's voice (TUTORIAL-VOICE-CONTRACT.md §7): the order the browser tries to listen and to
+            // speak in, as registry::client_order() gives it, empty when the activity's switch is off. The
+            // Ask box always shows in tutorial mode: without the AI the browser answers from the tour.
+            $tutorial['voice'] = tutorial::voice_config($vrmakerspace, (int)$user->id);
+            $tutorial['canask'] = true;
+            $config['tutorial'] = $tutorial;
+        }
+        return $config;
     }
 
     /**

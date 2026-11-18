@@ -16,7 +16,9 @@
 /**
  * The studio page (studio.php, templates/studio.mustache): puts together the 3D view, the engine, the
  * session (on one's own, with a partner or over the companion service), the sculpting and modelling
- * tools, mouse and keyboard input, VR, the presence of the others and the toolbar.
+ * tools, mouse and keyboard input, VR, the presence of the others and the toolbar; in tutorial mode also the
+ * guided tour (mod_vrmakerspace/tutorial) and the tutor beside the piece (mod_vrmakerspace/tutor), with the state
+ * of the studio the tour's steps are checked against.
  *
  * The method (Sculpt or Model) is per person: it chooses which tools act, the activity's `methods`
  * setting limits the choice, and both layers of the piece always show.
@@ -43,6 +45,9 @@ import {createToolbar} from 'mod_vrmakerspace/toolbar';
 import {createPresence} from 'mod_vrmakerspace/presence';
 import {createXrStudio} from 'mod_vrmakerspace/xrstudio';
 import {createSession} from 'mod_vrmakerspace/net/session';
+import {createTutor} from 'mod_vrmakerspace/tutor';
+import {createTutorial} from 'mod_vrmakerspace/tutorial';
+import {stringKeys as tutorialStringKeys} from 'mod_vrmakerspace/tutorialsteps';
 
 /** Every string of the studio and the modules it hands its strings to (contract §9). */
 const STRING_KEYS = [
@@ -91,6 +96,15 @@ const LEAVE_SAVE_WAIT = 10000;
 
 /** How long passing messages (someone joined, a region is locked) stay (ms). */
 const MESSAGE_TIME = 5000;
+
+/** Ops that are not counted for the tutorial: stroke bookkeeping, undo and redo (counted on their own), selections. */
+const UNCOUNTED_OPS = new Set(['end', 'lock', 'unlock', 'undo', 'redo', 'save', 'hz', 'msel']);
+
+/** How many stroke ids the tutorial's op count remembers (so a stroke of many ops counts once). */
+const COUNTED_STROKES = 2000;
+
+/** A save counts as the student's (the Save now button) when the version comes within this long of the click (ms). */
+const MANUAL_SAVE_WINDOW = 30000;
 
 /** File types of the exports. */
 const EXPORTS = {
@@ -357,12 +371,153 @@ const cameraPose = (camera, sculptureRoot, work, out) => {
 };
 
 /**
+ * What kind of transform an mxf op is: move (d), rotate (x and g) or scale (sc).
+ *
+ * @param {Object} op The op.
+ * @param {string} fallback The modelling action in use, for an op that says nothing.
+ * @returns {string} 'move', 'rotate' or 'scale'.
+ */
+const transformKind = (op, fallback) => {
+    if (op.sc !== undefined) {
+        return 'scale';
+    }
+    if (op.g !== undefined) {
+        return 'rotate';
+    }
+    if (op.d !== undefined) {
+        return 'move';
+    }
+    return fallback || 'move';
+};
+
+/**
+ * The tutorial's count of the student's own ops: by op kind (a stroke counts once, by its first op), by transform
+ * kind (mxf_move, mxf_rotate, mxf_scale) and the mirrored strokes, plus saves, exports, undos and redos.
+ *
+ * @returns {Object} {ops, saves, exports, undos, redos, count(op, action)}
+ */
+export const createOpCounter = () => {
+    const seen = new Set();
+    const counter = {
+        ops: {},
+        saves: 0,
+        exports: 0,
+        undos: 0,
+        redos: 0,
+
+        /**
+         * Count an op that was taken.
+         *
+         * @param {Object} op The op.
+         * @param {string} action The modelling action in use.
+         */
+        count: (op, action) => {
+            if (!op || typeof op.k !== 'string' || UNCOUNTED_OPS.has(op.k)) {
+                return;
+            }
+            const kinds = [op.k];
+            if (op.k === 'mxf') {
+                kinds.push('mxf_' + transformKind(op, action));
+            }
+            if (op.m) {
+                kinds.push('mirrored');
+            }
+            const stroke = op.s !== undefined && op.s !== null ? String(op.s) : '';
+            kinds.forEach((kind) => {
+                if (stroke) {
+                    const id = kind + ':' + stroke;
+                    if (seen.has(id)) {
+                        return;
+                    }
+                    seen.add(id);
+                    if (seen.size > COUNTED_STROKES) {
+                        seen.delete(seen.values().next().value);
+                    }
+                }
+                counter.ops[kind] = (counter.ops[kind] || 0) + 1;
+            });
+        },
+    };
+    return counter;
+};
+
+/**
+ * Where the desktop camera is about the centre of the view, for the tutorial's view steps.
+ *
+ * @param {Object} camera THREE.Camera.
+ * @param {Object|null} desktop The desktop input (its OrbitControls).
+ * @param {Object} sculptureRoot THREE.Group.
+ * @param {Object} work {offset: Vector3, target: Vector3}
+ * @returns {Object|null} {azimuth, polar, distance, target: [x, y, z] (sculpture-local)}
+ */
+const cameraState = (camera, desktop, sculptureRoot, work) => {
+    if (!desktop || !desktop.controls) {
+        return null;
+    }
+    const target = desktop.controls.target;
+    work.offset.copy(camera.position).sub(target);
+    const distance = work.offset.length();
+    const local = sculptureRoot.worldToLocal(work.target.copy(target));
+    return {
+        azimuth: Math.atan2(work.offset.x, work.offset.z),
+        polar: distance > 0 ? Math.acos(Math.max(-1, Math.min(1, work.offset.y / distance))) : 0,
+        distance: distance,
+        target: [local.x, local.y, local.z],
+    };
+};
+
+/**
+ * The sculpting tools' part of the studio state.
+ *
+ * @param {Object|null} tools The tools.
+ * @returns {Object}
+ */
+const sculptState = (tools) => {
+    if (!tools) {
+        return {tool: '', shape: '', mirror: false, size: 0, strength: 0, canUndo: false, canRedo: false};
+    }
+    return {tool: tools.tool, shape: tools.shape, mirror: !!tools.mirror, size: tools.size, strength: tools.strength,
+        canUndo: tools.canUndo(), canRedo: tools.canRedo()};
+};
+
+/**
+ * The modelling tools' part of the studio state.
+ *
+ * @param {Object|null} modeltools The modelling tools.
+ * @returns {Object}
+ */
+const modelState = (modeltools) => {
+    if (!modeltools) {
+        return {selectMode: '', modelAction: '', axis: 'free', selectionCount: 0};
+    }
+    const selection = modeltools.selection();
+    return {selectMode: modeltools.selectMode, modelAction: modeltools.action, axis: modeltools.axis || 'free',
+        selectionCount: selection && Array.isArray(selection.items) ? selection.items.length : 0};
+};
+
+/**
+ * Whether the studio runs the tutorial, and whether the tutor can listen and speak.
+ *
+ * @param {Object} config Page config from studio.php.
+ * @param {boolean} readonly Whether the piece can only be looked at.
+ * @param {Object} extra Optional strings; extra.tutorial is set when the tour's strings loaded.
+ * @returns {{tutorialon: boolean, canlisten: boolean, canspeak: boolean}}
+ */
+const tutorialFlags = (config, readonly, extra) => {
+    const tutorialon = !readonly && !!(config.tutorial && config.tutorial.enabled) && !!extra.tutorial;
+    const voice = tutorialon ? config.tutorial.voice : null;
+    const ways = (list) => Array.isArray(list) && list.length > 0;
+    return {tutorialon, canlisten: !!voice && ways(voice.listen), canspeak: !!voice && ways(voice.speak)};
+};
+
+/**
  * Run the studio once the strings are loaded.
  *
  * @param {HTMLElement} root Studio root.
  * @param {Object} config Page config from studio.php.
  * @param {Object} strings Strings by key.
- * @param {Object} extra Strings that are not required (by key; missing ones are absent).
+ * @param {Object} extra Strings that are not required (by key; missing ones are absent); extra.tutorial holds the
+ *     tutorial's and the tutor's strings in tutorial mode.
  * @returns {Promise<Object|null>} {stop()} or null without WebGL.
  */
 const run = (root, config, strings, extra) => {
@@ -403,6 +558,75 @@ const run = (root, config, strings, extra) => {
     let stopped = false;
     let started = false;
     let fullwindow = false;
+    // Tutorial mode: the guided tour and the tutor, for someone who works on the piece, and talking with the tutor
+    // (TUTORIAL-VOICE-CONTRACT.md §2, §7): which ways the site and activity have set up.
+    const {tutorialon, canlisten, canspeak} = tutorialFlags(config, readonly, extra);
+    /** @type {Object|null} the tutor (mod_vrmakerspace/tutor) */
+    let tutor = null;
+    /** @type {Object|null} the guided tour (mod_vrmakerspace/tutorial) */
+    let tutorial = null;
+    /** @type {AudioContext|null} the tutor's voice's audio, made on the first gesture (browsers want one) */
+    let audiocontext = null;
+
+    /**
+     * The audio context of the tutor's voice: made the first time (best on a gesture) and woken when asleep. Never
+     * awaited: resume() can hang until a gesture comes.
+     *
+     * @returns {AudioContext|null} Null without voice or Web Audio.
+     */
+    const getAudioContext = () => {
+        if (stopped || !(canlisten || canspeak)) {
+            return null;
+        }
+        if (!audiocontext) {
+            const Context = window.AudioContext || window.webkitAudioContext;
+            if (!Context) {
+                return null;
+            }
+            try {
+                audiocontext = new Context();
+            } catch (e) {
+                Log.debug(e);
+                return null;
+            }
+        }
+        if (audiocontext.state === 'suspended') {
+            audiocontext.resume().catch((error) => Log.debug(error));
+        }
+        return audiocontext;
+    };
+
+    /** The first gesture in the studio makes the voice's audio context (and the next ones wake it). */
+    const onFirstGesture = () => {
+        if (getAudioContext()) {
+            root.removeEventListener('pointerdown', onFirstGesture, true);
+            root.removeEventListener('keydown', onFirstGesture, true);
+        }
+    };
+    if (canlisten || canspeak) {
+        root.addEventListener('pointerdown', onFirstGesture, true);
+        root.addEventListener('keydown', onFirstGesture, true);
+    }
+
+    /**
+     * Push to talk from VR (a thumbstick pressed in or let go): to the tour, which listens and sends.
+     *
+     * @param {boolean} pressed Whether it is held.
+     */
+    const talkToTutor = (pressed) => {
+        if (!tutorial || typeof tutorial.talk !== 'function') {
+            return;
+        }
+        try {
+            getAudioContext();
+            tutorial.talk(!!pressed);
+        } catch (e) {
+            Log.debug(e);
+        }
+    };
+    const counter = createOpCounter();
+    let vravailable = false;
+    let manualsaveat = 0;
 
     // Toolbar first (tools come once the session runs), so status changes show from the start.
     const toolbar = createToolbar(root, {
@@ -419,6 +643,7 @@ const run = (root, config, strings, extra) => {
             askBake: () => askBake(),
             confirmBake: () => closeBake(true),
             cancelBake: () => closeBake(false),
+            tutorial: () => toggleTutorial(),
         },
     });
     toolbar.setSaveAllowed(!readonly);
@@ -433,11 +658,31 @@ const run = (root, config, strings, extra) => {
     }));
 
     /**
+     * Whether the tutor is showing something: what it does is not the student's.
+     *
+     * @returns {boolean}
+     */
+    const tutorBusy = () => !!(tutor && tutor.busy);
+
+    if (tutorialon) {
+        // Count the student's own ops by kind, where the tools hand them to the session.
+        const submitOp = session.submit.bind(session);
+        session.submit = (op) => {
+            const taken = submitOp(op);
+            if (taken !== false && !tutorBusy()) {
+                counter.count(op, modeltools ? modeltools.action : '');
+            }
+            return taken;
+        };
+    }
+
+    /**
      * Save now (the toolbar's button).
      *
      * @returns {Promise}
      */
     const saveNow = () => {
+        manualsaveat = performance.now();
         toolbar.setSaving(true);
         toolbar.message(strings.saving);
         return Promise.resolve(session.saveNow()).then((result) => {
@@ -468,6 +713,9 @@ const run = (root, config, strings, extra) => {
         }
         return engine.exportModel(format).then(({bytes, report}) => {
             download(bytes, kind.type, fileName(title, kind.extension));
+            if (!tutorBusy()) {
+                counter.exports++;
+            }
             toolbar.message(reportText(strings, report || {}));
             return report;
         }).catch((error) => {
@@ -616,6 +864,147 @@ const run = (root, config, strings, extra) => {
         }
     };
 
+    const camerawork = {offset: new THREE.Vector3(), target: new THREE.Vector3()};
+
+    /**
+     * The studio state the tutorial's steps are checked against (TUTORIAL-CONTRACT.md §4): a fresh plain object.
+     *
+     * @returns {Object}
+     */
+    const studioState = () => Object.assign({method: method}, sculptState(tools), modelState(modeltools), {
+        undos: counter.undos,
+        redos: counter.redos,
+        inVr: !!(xr && xr.active),
+        vrAvailable: vravailable,
+        saves: counter.saves,
+        exports: counter.exports,
+        camera: cameraState(camera, desktop, sculptureRoot, camerawork),
+        ops: Object.assign({}, counter.ops),
+    });
+
+    /**
+     * Count the student's undos and redos, where every input (toolbar, keys, VR) calls them.
+     */
+    const countUndoRedo = () => {
+        const undo = tools.undo;
+        const redo = tools.redo;
+        tools.undo = (...args) => {
+            const could = tools.canUndo();
+            const result = undo(...args);
+            if (could && !tutorBusy()) {
+                counter.undos++;
+            }
+            return result;
+        };
+        tools.redo = (...args) => {
+            const could = tools.canRedo();
+            const result = redo(...args);
+            if (could && !tutorBusy()) {
+                counter.redos++;
+            }
+            return result;
+        };
+    };
+
+    /**
+     * The Tutorial button: open the tour where it was left, or close it.
+     *
+     * @returns {Promise|null}
+     */
+    const toggleTutorial = () => {
+        if (!tutorial) {
+            return null;
+        }
+        if (tutorial.isOpen) {
+            tutorial.close();
+            return null;
+        }
+        return tutorial.open(true);
+    };
+
+    /** The tour was closed: the focus goes back to the Tutorial button when it was in the bubble. */
+    const onTutorialClosed = () => {
+        const active = document.activeElement;
+        if (active && active !== document.body && root.contains(active) && !active.closest('[data-region="tutorial"]')) {
+            return;
+        }
+        const button = root.querySelector('[data-action="tutorial"]');
+        (button || canvas).focus({preventScroll: true});
+    };
+
+    /**
+     * Start the tutor and the guided tour (tutorial mode, once the tools are there); the tour opens by itself until
+     * it has been gone through.
+     */
+    const startTutorial = () => {
+        const demoContext = {
+            tools: tools,
+            modeltools: modeltools,
+            engine: engine,
+            session: session,
+            toolbar: toolbar,
+            camera: camera,
+            sculptureRoot: sculptureRoot,
+            setMethod: (name) => setMethod(name),
+            /** @returns {string} The method in use now (a function: the tutor copies this object). */
+            method: () => method,
+            message: (text) => toolMessage(text),
+        };
+        try {
+            tutor = createTutor({THREE: THREE, scene: scene, camera: camera, sculptureRoot: sculptureRoot,
+                strings: extra.tutorial});
+        } catch (e) {
+            // The tour works without the tutor: it only cannot point or show.
+            Log.debug(e);
+            tutor = null;
+        }
+        tutorial = createTutorial({
+            root: root,
+            canvas: canvas,
+            camera: camera,
+            config: config.tutorial,
+            cmid: config.cmid,
+            strings: extra.tutorial,
+            state: studioState,
+            tutor: tutor,
+            xr: xr,
+            toolbar: toolbar,
+            context: demoContext,
+            audioContext: getAudioContext,
+            onClose: onTutorialClosed,
+        });
+        if (tutor && typeof tutor.setVisible === 'function') {
+            tutor.setVisible(false);
+        }
+        if (!tutorial.finished()) {
+            tutorial.open(false);
+        }
+    };
+
+    let tutorfailed = false;
+
+    /**
+     * The tutor's and the tour's frame update; a failure is logged once and never stops the frame loop.
+     *
+     * @param {number} dt Seconds since the last frame.
+     * @param {Object} viewerLocal Where the viewer is, sculpture-local (THREE.Vector3, may be changed).
+     */
+    const updateTutorial = (dt, viewerLocal) => {
+        try {
+            if (tutor) {
+                tutor.update(dt, viewerLocal, {inVr: !!(xr && xr.active)});
+            }
+            if (tutorial) {
+                tutorial.update(dt);
+            }
+        } catch (e) {
+            if (!tutorfailed) {
+                tutorfailed = true;
+                Log.debug(e);
+            }
+        }
+    };
+
     /** Tell the mesh view who is here: selections of people who left stop being drawn at once. */
     const refreshPresent = () => {
         if (engine.poly) {
@@ -751,6 +1140,11 @@ const run = (root, config, strings, extra) => {
     listen('saved', (detail) => {
         if (detail && detail.version) {
             toolbar.message(fill(strings.savedversion, detail.version), MESSAGE_TIME * 2);
+            // For the tutorial, the student's own save (Save now), not the autosave.
+            if (manualsaveat && performance.now() - manualsaveat < MANUAL_SAVE_WINDOW) {
+                manualsaveat = 0;
+                counter.saves++;
+            }
         }
     });
     listen('savefailed', (detail) => {
@@ -805,6 +1199,7 @@ const run = (root, config, strings, extra) => {
     const headpose = [0, 0, 0, 0, 0, 0, 1];
     const desktoppose = {m: '3d', h: headpose, l: null, r: null};
     const vrpose = {m: 'vr', h: null, l: null, r: null};
+    const tutorviewer = new THREE.Vector3();
     let lastpose = 0;
 
     /** Send the own pose (at most 15 a second). */
@@ -850,7 +1245,11 @@ const run = (root, config, strings, extra) => {
             }
         }
         (xr && xr.active ? renderer.xr.getCamera() : camera).getWorldPosition(viewer);
-        presence.tick(performance.now(), sculptureRoot.worldToLocal(viewer));
+        const viewerlocal = sculptureRoot.worldToLocal(viewer);
+        if (tutorialon) {
+            updateTutorial(dt, tutorviewer.copy(viewerlocal));
+        }
+        presence.tick(performance.now(), viewerlocal);
         sendPose();
         renderer.render(scene, camera);
     });
@@ -860,18 +1259,51 @@ const run = (root, config, strings, extra) => {
      *
      * @returns {Promise}
      */
+    /**
+     * Close the tutor's audio, if it was ever made.
+     */
+    const closeAudio = () => {
+        if (audiocontext) {
+            audiocontext.close().catch((error) => Log.debug(error));
+            audiocontext = null;
+        }
+    };
+
+    /**
+     * Note whether this device can enter VR, once WebXR has said so (the tour's VR step needs it).
+     */
+    const watchVrAvailable = () => {
+        Promise.resolve(xr.available).then((available) => {
+            vravailable = !!available;
+            return available;
+        }).catch(() => null);
+    };
+
     const stop = () => {
         if (stopped) {
             return Promise.resolve(null);
         }
         stopped = true;
+        root.removeEventListener('pointerdown', onFirstGesture, true);
+        root.removeEventListener('keydown', onFirstGesture, true);
         document.removeEventListener('click', onLinkClick, true);
         window.removeEventListener('beforeunload', onBeforeUnload);
+        // The tour saves where the student got to before the page goes.
+        const tourending = tutorial ? Promise.resolve(tutorial.dispose()).catch((error) => Log.debug(error)) : null;
         const ending = Promise.resolve().then(() => session.stop()).catch((error) => Log.debug(error));
-        return ending.then(() => {
+        return Promise.all([ending, tourending]).then(() => {
+            if (tutor) {
+                try {
+                    tutor.dispose();
+                } catch (e) {
+                    Log.debug(e);
+                }
+                tutor = null;
+            }
             if (xr) {
                 xr.dispose();
             }
+            closeAudio();
             renderer.setAnimationLoop(null);
             timer.dispose();
             observer.disconnect();
@@ -991,6 +1423,9 @@ const run = (root, config, strings, extra) => {
                 onRefused: (name) => toolbar.message(fill(strings.lockedbyother, name || '…'), MESSAGE_TIME),
             });
             toolbar.setTools(tools);
+            if (tutorialon) {
+                countUndoRedo();
+            }
             if (methods.includes('model')) {
                 modeltools = createModelTools({
                     session: session,
@@ -1039,6 +1474,8 @@ const run = (root, config, strings, extra) => {
             onMethod: (name) => setMethod(name),
             readonly: readonly,
             strings: strings,
+            // Push to talk to the tutor, only in tutorial mode with listening set up.
+            onTalk: canlisten ? talkToTutor : null,
             onStart: () => {
                 desktop.setEnabled(false);
                 if (modelinput) {
@@ -1057,6 +1494,15 @@ const run = (root, config, strings, extra) => {
         applyMethod();
         refreshPresent();
         watchVr(xr, toolbar, () => stopped);
+        watchVrAvailable();
+        if (tutorialon && tools) {
+            try {
+                startTutorial();
+            } catch (e) {
+                // The studio works without the tour.
+                Log.debug(e);
+            }
+        }
         root.dataset.vrmakerspaceReady = readonly ? 'view' : String(config.mode || 'solo');
         canvas.focus({preventScroll: true});
         return {stop: stop};
@@ -1071,7 +1517,8 @@ const run = (root, config, strings, extra) => {
  * Start the studio (js_call_amd from studio.php).
  *
  * @param {Object} config {cmid, sessionid, mode, readonly, user: {id, name}, model, methods, modelurl, modelformat, snapshoturl,
- *     version, workerurl, trackcontributions, maxusers, autosavems, contributionms, backurl}
+ *     version, workerurl, trackcontributions, maxusers, autosavems, contributionms, backurl, tutorial (tutorial mode only:
+ *     {enabled, steps, done, skipped, laststep, ai, aipolicy})}
  * @returns {Promise<Object|null>} {stop()} once running, or null.
  */
 export const init = (config) => {
@@ -1091,11 +1538,26 @@ export const init = (config) => {
         }
         return value;
     }).catch(() => null);
+    // The tutorial's strings, in tutorial mode: without them the studio still runs, without the tour.
+    const tutorialon = !!(config && config.tutorial && config.tutorial.enabled && !config.readonly);
+    const tutorialkeys = tutorialon ? tutorialStringKeys() : [];
+    const tutorialstrings = !tutorialon ? Promise.resolve(null)
+        : Promise.resolve(getStrings(tutorialkeys.map((key) => ({key: key, component: 'mod_vrmakerspace'})))).then((values) => {
+            const texts = {};
+            tutorialkeys.forEach((key, index) => {
+                texts[key] = values[index];
+            });
+            extra.tutorial = texts;
+            return texts;
+        }).catch((error) => {
+            Log.debug(error);
+            return null;
+        });
     return getStrings(STRING_KEYS.map((key) => ({key: key, component: 'mod_vrmakerspace'}))).then((values) => {
         STRING_KEYS.forEach((key, index) => {
             strings[key] = values[index];
         });
-        return optional;
+        return Promise.all([optional, tutorialstrings]);
     }).then(() => run(root, config || {}, strings, extra)).then((studio) => {
         pending.resolve();
         return studio;

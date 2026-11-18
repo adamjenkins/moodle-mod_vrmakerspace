@@ -26,7 +26,8 @@
  * Defines the structure of vrmakerspace.xml.
  *
  * The activity always; with user data, the pieces (sessions) with their versions (snapshots, and
- * their files) and their members' shares (contributions), and the grades. A grade is written as
+ * their files) and their members' shares (contributions), the grades, and each student's tutorial
+ * progress (written as tutorialprogress/progress: "tutorial" is a setting of the activity). A grade is written as
  * usergrade so no element contains a child of its own name. Live connections of pair work (peers and
  * their messages) last minutes and are never backed up.
  */
@@ -41,7 +42,8 @@ class backup_vrmakerspace_activity_structure_step extends backup_activity_struct
 
         $vrmakerspace = new backup_nested_element('vrmakerspace', ['id'], [
             'name', 'intro', 'introformat', 'methods', 'startmodel', 'workmode', 'connectmode', 'maxusers',
-            'trackcontributions', 'grade', 'timecreated', 'timemodified',
+            'trackcontributions', 'grade', 'tutorial', 'tutorai', 'completiontutorial', 'tutorlisten', 'tutorspeak',
+            'timecreated', 'timemodified',
         ]);
 
         $sessions = new backup_nested_element('sessions');
@@ -70,8 +72,15 @@ class backup_vrmakerspace_activity_structure_step extends backup_activity_struct
         $snapshots->add_child($snapshot);
         $session->add_child($contributions);
         $contributions->add_child($contribution);
+        $tutorialprogress = new backup_nested_element('tutorialprogress');
+        $progress = new backup_nested_element('progress', ['id'], [
+            'userid', 'laststep', 'stepsdone', 'stepsskipped', 'timecompleted', 'timemodified',
+        ]);
+
         $vrmakerspace->add_child($usergrades);
         $usergrades->add_child($usergrade);
+        $vrmakerspace->add_child($tutorialprogress);
+        $tutorialprogress->add_child($progress);
 
         $vrmakerspace->set_source_table('vrmakerspace', ['id' => backup::VAR_ACTIVITYID]);
         if ($userinfo) {
@@ -79,6 +88,7 @@ class backup_vrmakerspace_activity_structure_step extends backup_activity_struct
             $snapshot->set_source_table('vrmakerspace_snapshots', ['sessionid' => backup::VAR_PARENTID], 'version ASC');
             $contribution->set_source_table('vrmakerspace_contrib', ['sessionid' => backup::VAR_PARENTID], 'id ASC');
             $usergrade->set_source_table('vrmakerspace_grades', ['vrmakerspaceid' => backup::VAR_PARENTID], 'id ASC');
+            $progress->set_source_table('vrmakerspace_tutorial', ['vrmakerspaceid' => backup::VAR_PARENTID], 'id ASC');
         }
 
         $session->annotate_ids('group', 'groupid');
@@ -87,6 +97,7 @@ class backup_vrmakerspace_activity_structure_step extends backup_activity_struct
         $contribution->annotate_ids('user', 'userid');
         $usergrade->annotate_ids('user', 'userid');
         $usergrade->annotate_ids('user', 'grader');
+        $progress->annotate_ids('user', 'userid');
 
         $vrmakerspace->annotate_files('mod_vrmakerspace', 'intro', null);
         $vrmakerspace->annotate_files('mod_vrmakerspace', 'startmodel', null);

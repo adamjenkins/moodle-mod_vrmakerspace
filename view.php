@@ -26,6 +26,7 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/mod/vrmakerspace/lib.php');
 
 use mod_vrmakerspace\local\session_manager;
+use mod_vrmakerspace\local\tutorial;
 use mod_vrmakerspace\local\view_helper;
 
 $id = required_param('id', PARAM_INT);
@@ -45,6 +46,7 @@ $PAGE->set_title(format_string($vrmakerspace->name, true, ['context' => $context
 $PAGE->set_heading(format_string($course->fullname, true, ['context' => context_course::instance($course->id)]));
 
 $isgroupwork = session_manager::is_group_work($vrmakerspace);
+$istutorial = tutorial::is_enabled($vrmakerspace);
 $tracked = $isgroupwork && !empty($vrmakerspace->trackcontributions);
 $templatecontext = [
     'methods' => view_helper::methods_text($vrmakerspace),
@@ -59,6 +61,7 @@ $templatecontext = [
     'cangrade' => has_capability('mod/vrmakerspace:grade', $context) && (int)$vrmakerspace->grade > 0,
     'gradeurl' => (new moodle_url('/mod/vrmakerspace/grade.php', ['id' => $cm->id]))->out(false),
     'tracked' => $tracked,
+    'istutorial' => $istutorial,
 ];
 if ($isgroupwork) {
     $templatecontext['connection'] = session_manager::connection($vrmakerspace) === session_manager::CONNECTION_COMPANION
@@ -114,6 +117,9 @@ if (has_capability('mod/vrmakerspace:make', $context)) {
             'hasversions' => !empty($rows),
             'hascontribution' => $mine !== '',
             'contribution' => $mine,
+            // Tutorial mode: "Start / Continue the tutorial" (the studio opens the tour) and the progress.
+            'hastutorial' => $istutorial && (int)$session->status !== session_manager::STATUS_CLOSED,
+            'tutorial' => $istutorial ? view_helper::own_tutorial($vrmakerspace, (int)$USER->id) : null,
         ];
     } else if ($isgroupwork) {
         $templatecontext['nogroup'] = true;
@@ -123,6 +129,8 @@ if (has_capability('mod/vrmakerspace:make', $context)) {
 // Every piece, for teachers.
 if (has_capability('mod/vrmakerspace:viewallsubmissions', $context)) {
     $rows = [];
+    $tutorialprogress = $istutorial ? tutorial::get_all_progress((int)$vrmakerspace->id) : [];
+    $methods = session_manager::methods($vrmakerspace);
     foreach (view_helper::visible_sessions($vrmakerspace, $cm, $context) as $session) {
         $latest = session_manager::get_latest_snapshot((int)$session->id);
         $contributions = [];
@@ -140,6 +148,7 @@ if (has_capability('mod/vrmakerspace:viewallsubmissions', $context)) {
             'url' => $latest ? session_manager::snapshot_url($latest, $context)->out(false) : '',
             'viewurl' => $latest ? view_helper::studio_url($context, (int)$session->id)->out(false) : '',
             'contributions' => implode(', ', $contributions),
+            'tutorial' => $istutorial ? view_helper::tutorial_text($session, $tutorialprogress, $methods) : '',
             'managelinks' => $canmanage ? view_helper::manage_links($session, $context) : [],
         ];
     }

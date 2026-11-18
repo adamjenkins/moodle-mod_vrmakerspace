@@ -88,4 +88,32 @@ $functions = [
         'ajax' => true,
         'capabilities' => 'mod/vrmakerspace:managesessions',
     ],
+    'mod_vrmakerspace_save_tutorial_progress' => [
+        'classname' => \mod_vrmakerspace\external\save_tutorial_progress::class,
+        'description' => 'Record the tutorial steps the user has done or skipped, and the step they are on.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/vrmakerspace:view',
+    ],
+    'mod_vrmakerspace_ask_tutor' => [
+        'classname' => \mod_vrmakerspace\external\ask_tutor::class,
+        'description' => 'Ask the tutorial\'s tutor a question about using the studio (answered through the AI subsystem).',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/vrmakerspace:view',
+    ],
+    'mod_vrmakerspace_tutor_speak' => [
+        'classname' => \mod_vrmakerspace\external\tutor_speak::class,
+        'description' => 'One sentence of a tutorial step or of the tutor\'s latest answer, as audio (speech services).',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'mod/vrmakerspace:view',
+    ],
+    'mod_vrmakerspace_tutor_transcribe' => [
+        'classname' => \mod_vrmakerspace\external\tutor_transcribe::class,
+        'description' => 'Turn a spoken question to the tutor into text with the site\'s speech services.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/vrmakerspace:view',
+    ],
 ];

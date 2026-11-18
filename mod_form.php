@@ -29,6 +29,8 @@ require_once($CFG->dirroot . '/mod/vrmakerspace/lib.php');
 
 use mod_vrmakerspace\local\companion_manager;
 use mod_vrmakerspace\local\session_manager;
+use mod_vrmakerspace\local\tutorial;
+use mod_vrmakerspace\speech\registry;
 
 /**
  * Settings form of a VR Makerspace activity.
@@ -119,9 +121,110 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
         $mform->setDefault('trackcontributions', 1);
         $mform->hideIf('trackcontributions', 'workmode', 'eq', session_manager::MODE_INDIVIDUAL);
 
+        // Tutorial mode makes the work individual (forced on save), so the group settings go away.
+        foreach (['workmode', 'connectmode', 'maxusers', 'trackcontributions', 'companionnote'] as $element) {
+            if ($mform->elementExists($element)) {
+                $mform->hideIf($element, 'tutorial', 'checked');
+            }
+        }
+
+        $this->tutorial_elements();
+
         $this->standard_grading_coursemodule_elements();
         $this->standard_coursemodule_elements();
         $this->add_action_buttons();
+    }
+
+    /**
+     * The Tutorial section: tutorial mode; when the site has an AI provider for text (or the activity
+     * already lets students ask), the tutor's answers; and, when the site has a way to listen or speak
+     * (or the activity already has it on), the tutor's voice.
+     *
+     * @return void
+     */
+    protected function tutorial_elements(): void {
+        $mform = $this->_form;
+        $mform->addElement('header', 'tutorialhdr', get_string('tutorialsettings', 'vrmakerspace'));
+        $mform->setExpanded('tutorialhdr');
+
+        $mform->addElement('advcheckbox', 'tutorial', get_string('tutorial', 'vrmakerspace'));
+        $mform->addHelpButton('tutorial', 'tutorial', 'vrmakerspace');
+        $mform->setDefault('tutorial', 0);
+
+        $mform->addElement(
+            'static',
+            'tutorialnote',
+            '',
+            html_writer::div(get_string('tutorialforcedindividual', 'vrmakerspace'), 'alert alert-info mb-0')
+        );
+        $mform->hideIf('tutorialnote', 'tutorial', 'notchecked');
+
+        if (tutorial::ai_available() || !empty($this->current->tutorai)) {
+            $mform->addElement('advcheckbox', 'tutorai', get_string('tutorai', 'vrmakerspace'));
+            $mform->addHelpButton('tutorai', 'tutorai', 'vrmakerspace');
+            $mform->setDefault('tutorai', 0);
+            $mform->hideIf('tutorai', 'tutorial', 'notchecked');
+        }
+
+        // The tutor's voice, each offered when the site has a way to do it (admin settings: speech
+        // services), or the activity already has it on.
+        $voice = [
+            'tutorlisten' => registry::LISTEN,
+            'tutorspeak' => registry::SPEAK,
+        ];
+        foreach ($voice as $element => $direction) {
+            if (registry::client_order($direction) !== [] || !empty($this->current->{$element})) {
+                $mform->addElement('advcheckbox', $element, get_string($element, 'vrmakerspace'));
+                $mform->addHelpButton($element, $element, 'vrmakerspace');
+                $mform->setDefault($element, 0);
+                $mform->hideIf($element, 'tutorial', 'notchecked');
+            }
+        }
+    }
+
+    /**
+     * The custom completion rule: finish the tutorial.
+     *
+     * @return string[] element names
+     */
+    public function add_completion_rules() {
+        $mform = $this->_form;
+        $element = 'completiontutorial' . $this->get_suffix();
+        $mform->addElement('advcheckbox', $element, ' ', get_string('completiontutorial', 'vrmakerspace'));
+        $mform->setDefault($element, 0);
+        if ($mform->elementExists('tutorial')) {
+            $mform->hideIf($element, 'tutorial', 'notchecked');
+        }
+        return [$element];
+    }
+
+    /**
+     * Whether the custom completion rule is enabled: ticked, in tutorial mode (outside it the rule is
+     * hidden and not saved).
+     *
+     * @param array $data submitted data
+     * @return bool
+     */
+    public function completion_rule_enabled($data) {
+        $tutorial = !array_key_exists('tutorial', $data) || !empty($data['tutorial']);
+        return $tutorial && !empty($data['completiontutorial' . $this->get_suffix()]);
+    }
+
+    /**
+     * Clear the completion rule when completion is not automatic or the activity is not in tutorial mode.
+     *
+     * @param stdClass $data submitted data
+     * @return void
+     */
+    public function data_postprocessing($data) {
+        parent::data_postprocessing($data);
+        $suffix = $this->get_suffix();
+        if (!empty($data->completionunlocked)) {
+            $auto = !empty($data->{'completion' . $suffix}) && $data->{'completion' . $suffix} == COMPLETION_TRACKING_AUTOMATIC;
+            if (!$auto || (property_exists($data, 'tutorial') && empty($data->tutorial))) {
+                $data->{'completiontutorial' . $suffix} = 0;
+            }
+        }
     }
 
     /**
@@ -234,6 +337,12 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
             if (!$models) {
                 $errors['startmodelfile'] = get_string('startmodelfile_required', 'vrmakerspace');
             }
+        }
+        // The tutor's AI needs core's per-activity "Generate text" AI tool: without it, it silently answers from the tour.
+        $aioff = (isset($data['enableaitools']) && empty($data['enableaitools']))
+            || (isset($data['action-generate_text']) && empty($data['action-generate_text']));
+        if (!empty($data['tutorial']) && !empty($data['tutorai']) && $aioff) {
+            $errors['tutorai'] = get_string('error_tutorainotool', 'vrmakerspace');
         }
         return $errors;
     }

@@ -1,0 +1,114 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_vrmakerspace/tutorial_bubble
+
+    The guided tour of the studio: the step bubble (title, step number, text, what the student asked, the tutor's
+    reply, the demonstrations it offers, Show me, Back, Skip step, Next or Finish, Close), the ring that marks the
+    control a step is about, the box for asking the tutor (typed, or spoken with Talk) and the Read aloud switch.
+    The mod_vrmakerspace/tutorial module renders it once and fills in each step.
+
+    Classes required for JS:
+    * d-none - hides the buttons and parts a step does not use
+    * mod_vrmakerspace-tour-docked, mod_vrmakerspace-tour-arrow-top, mod_vrmakerspace-tour-arrow-bottom,
+      mod_vrmakerspace-tour-thinking, mod_vrmakerspace-tour-talk-listening - set by JS
+
+    Data attributes required for JS:
+    * data-region tutorial, tutorialring, tutorialarrow, tutorialtitle, tutorialstepof, tutorialtext, tutorialheard,
+      tutorialreply, tutorialdemos, tutorialask, tutorialpolicy, tutorialaskform, tutorialquestion, tutorialtalklabel,
+      tutorialreadaloud
+    * data-tutorial showme, back, skip, next, finish, close, ask, talk
+    * data-demo - on the demonstration buttons JS puts in tutorialdemos
+
+    Context variables required for this template:
+    * uniqid - unique id prefix
+    * canask - true when the Ask box is shown (always in tutorial mode; without the AI the browser answers)
+    * ai - true when questions go to the AI
+    * aipolicy - true when the student has accepted the site's AI policy
+    * listen - true when the student can talk to the tutor (the Talk button)
+    * speak - true when the tutor can speak (the Read aloud switch)
+    * readaloud - true when Read aloud starts on
+
+    Example context (json):
+    {
+        "uniqid": "tour1",
+        "canask": true,
+        "ai": true,
+        "aipolicy": false,
+        "listen": true,
+        "speak": true,
+        "readaloud": true
+    }
+}}
+<div class="mod_vrmakerspace-tourring d-none" data-region="tutorialring" aria-hidden="true"></div>
+<section class="mod_vrmakerspace-tour d-none" data-region="tutorial" role="dialog" aria-modal="false"
+        aria-labelledby="{{uniqid}}-tourtitle">
+    <div class="mod_vrmakerspace-tour-arrow" data-region="tutorialarrow" aria-hidden="true"></div>
+    <div class="d-flex align-items-start gap-2 mb-1">
+        <h3 class="mod_vrmakerspace-tour-title h6 mb-0 me-auto" id="{{uniqid}}-tourtitle" tabindex="-1"
+                data-region="tutorialtitle"></h3>
+        <button type="button" class="btn-close" data-tutorial="close"
+                aria-label="{{#str}} tutorial_close, mod_vrmakerspace {{/str}}"
+                title="{{#str}} tutorial_close, mod_vrmakerspace {{/str}}"></button>
+    </div>
+    <div aria-live="polite" aria-atomic="true">
+        <p class="mod_vrmakerspace-tour-text mb-2" data-region="tutorialtext"></p>
+        <p class="mod_vrmakerspace-tour-heard small text-muted mb-1 d-none" data-region="tutorialheard"></p>
+        <p class="mod_vrmakerspace-tour-reply mb-2 d-none" data-region="tutorialreply"></p>
+    </div>
+    <div class="mod_vrmakerspace-tour-demos d-flex flex-wrap gap-1 mb-2 d-none" data-region="tutorialdemos" role="group"
+            aria-label="{{#str}} tutorvoice_demos, mod_vrmakerspace {{/str}}"></div>
+    {{#canask}}
+    <div class="mod_vrmakerspace-tour-ask mb-2" data-region="tutorialask">
+        {{#ai}}
+        <div data-region="tutorialpolicy"{{#aipolicy}} hidden{{/aipolicy}}>
+            {{^aipolicy}}{{> core_ai/policyblock }}{{/aipolicy}}
+        </div>
+        {{/ai}}
+        <form class="d-flex flex-column gap-1" data-region="tutorialaskform"{{#ai}}{{^aipolicy}} hidden{{/aipolicy}}{{/ai}}>
+            <label class="visually-hidden" for="{{uniqid}}-tourquestion">{{#str}} tutorial_asklabel, mod_vrmakerspace {{/str}}</label>
+            <textarea class="form-control form-control-sm" id="{{uniqid}}-tourquestion" data-region="tutorialquestion" rows="2"
+                    maxlength="500" placeholder="{{#str}} tutorial_askplaceholder, mod_vrmakerspace {{/str}}"></textarea>
+            <div class="d-flex justify-content-end gap-2">
+                {{#listen}}
+                <button type="button" class="btn btn-sm btn-outline-primary mod_vrmakerspace-tour-talk" data-tutorial="talk"
+                        aria-pressed="false" aria-describedby="{{uniqid}}-talkhint">
+                    <span data-region="tutorialtalklabel">{{#str}} tutorvoice_talk, mod_vrmakerspace {{/str}}</span>
+                </button>
+                <span class="visually-hidden" id="{{uniqid}}-talkhint">{{#str}} tutorvoice_talkhint, mod_vrmakerspace {{/str}}</span>
+                {{/listen}}
+                <button type="submit" class="btn btn-sm btn-outline-primary" data-tutorial="ask">{{#str}} tutorial_ask, mod_vrmakerspace {{/str}}</button>
+            </div>
+        </form>
+    </div>
+    {{/canask}}
+    {{#speak}}
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" role="switch" id="{{uniqid}}-readaloud" data-region="tutorialreadaloud"
+                {{#readaloud}}checked{{/readaloud}}>
+        <label class="form-check-label small" for="{{uniqid}}-readaloud">{{#str}} tutorvoice_readaloud, mod_vrmakerspace {{/str}}</label>
+    </div>
+    {{/speak}}
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="mod_vrmakerspace-tour-stepof small text-muted me-auto" data-region="tutorialstepof"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-tutorial="showme">{{#str}} tutorial_showme, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-sm btn-link" data-tutorial="back">{{#str}} tutorial_back, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-sm btn-link d-none" data-tutorial="skip">{{#str}} tutorial_skip, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-sm btn-primary d-none" data-tutorial="next">{{#str}} tutorial_next, mod_vrmakerspace {{/str}}</button>
+        <button type="button" class="btn btn-sm btn-primary d-none" data-tutorial="finish">{{#str}} tutorial_finish, mod_vrmakerspace {{/str}}</button>
+    </div>
+</section>

@@ -18,8 +18,9 @@
  * with aria-pressed, the mirror switch, the shape tools' shape and letters, shown while a shape tool is
  * chosen, brush size and strength sliders), the Model panel (select modes and commands, the shapes menu,
  * tools, axis lock, segments, one-shot commands, the confirmation of Turn into clay), undo and redo, save
- * now, the export menu, Enter VR, full screen, the keyboard help of the method in use, and the status
- * region (a polite live region) with the connection state and the latest message.
+ * now, the export menu, Enter VR, full screen, the Tutorial button (tutorial mode only), the keyboard help of
+ * the method in use, and the status region (a polite live region) with the connection state and the latest
+ * message.
  *
  * The toolbar only binds to the markup the template rendered; every label comes from the template
  * or from the strings the studio loaded.
@@ -72,10 +73,10 @@ const press = (root, action, isChosen) => {
  *
  * @param {HTMLElement} root Studio root element.
  * @param {Object} options {strings, tools (null when read-only), handlers: {save(), exportModel(format), vr(),
- *     fullscreen(), method(name), addShape(shape), selectLoop(), askBake(), confirmBake(), cancelBake()}}
+ *     fullscreen(), method(name), addShape(shape), selectLoop(), askBake(), confirmBake(), cancelBake(), tutorial()}}
  * @returns {Object} {refresh(), setTools(tools), setModel(model), setMethods(names), setMethod(name), setOpenEdges(count),
  *     showBakeConfirm(visible), setStatus(text), message(text, timeout), setVr(available, active), setFullscreen(active),
- *     setSaving(saving), setSaveAllowed(allowed), dispose()}
+ *     setSaving(saving), setSaveAllowed(allowed), setTutorial(open), dispose()}
  */
 export const createToolbar = (root, options) => {
     const strings = options.strings || {};
@@ -92,6 +93,7 @@ export const createToolbar = (root, options) => {
     const messagetext = region(root, 'message');
     const vrbutton = root.querySelector('[data-action="vr"]');
     const fullbutton = root.querySelector('[data-action="fullscreen"]');
+    const tutorialbutton = root.querySelector('[data-action="tutorial"]');
     const savebutton = root.querySelector('[data-action="save"]');
     const undobutton = root.querySelector('[data-action="undo"]');
     const redobutton = root.querySelector('[data-action="redo"]');
@@ -226,6 +228,9 @@ export const createToolbar = (root, options) => {
                 break;
             case 'fullscreen':
                 run('fullscreen');
+                break;
+            case 'tutorial':
+                run('tutorial');
                 break;
             default:
                 break;
@@ -504,6 +509,18 @@ export const createToolbar = (root, options) => {
         setSaveAllowed: (allowed) => {
             saveallowed = !!allowed;
             refreshSave();
+        },
+
+        /**
+         * Show whether the tutorial's bubble is open.
+         *
+         * @param {boolean} open Whether it is.
+         */
+        setTutorial: (open) => {
+            if (tutorialbutton) {
+                tutorialbutton.setAttribute('aria-pressed', open ? 'true' : 'false');
+                tutorialbutton.classList.toggle('active', !!open);
+            }
         },
 
         /** Remove the listeners. */

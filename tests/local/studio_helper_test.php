@@ -243,4 +243,39 @@ final class studio_helper_test extends \advanced_testcase {
             $this->assertSame('nogroup', $e->errorcode);
         }
     }
+
+    /**
+     * Tutorial mode: the studio gets the tour's configuration while the piece can be worked on, never
+     * otherwise; group settings give way to individual work.
+     */
+    public function test_tutorial_config(): void {
+        $this->resetAfterTest();
+        [$vrmakerspace, $cm, $context, $student, $teacher] = $this->make_activity(['tutorial' => 1, 'methods' => 'model',
+            'startmodel' => 'meshcube', 'workmode' => 1]);
+        $this->setUser($student);
+        $resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$student->id, 0, 0);
+        $config = studio_helper::config($vrmakerspace, $context, $student, $resolved);
+        $this->assertSame('solo', $config['mode']);
+        $this->assertTrue($config['tutorial']['enabled']);
+        $this->assertSame(tutorial::applicable_steps('model'), $config['tutorial']['steps']);
+        $this->assertSame([], $config['tutorial']['done']);
+        // The Ask box always shows; the voice is off unless the activity turns it on.
+        $this->assertTrue($config['tutorial']['canask']);
+        $this->assertSame([], $config['tutorial']['voice']['listen']);
+        $this->assertSame([], $config['tutorial']['voice']['speak']);
+        $this->assertSame(tutorial::speech_language(), $config['tutorial']['voice']['language']);
+        $this->assertContains($config['tutorial']['voice']['voicename'], ['female', 'male']);
+
+        // The teacher looking at the student's piece: read-only, no tour.
+        $this->setUser($teacher);
+        $resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$teacher->id, (int)$resolved['session']->id, 0);
+        $config = studio_helper::config($vrmakerspace, $context, $teacher, $resolved);
+        $this->assertTrue($config['readonly']);
+        $this->assertArrayNotHasKey('tutorial', $config);
+
+        [$plain, $plaincm, $plaincontext, $other] = $this->make_activity();
+        $this->setUser($other);
+        $resolved = studio_helper::resolve($plain, $plaincm, $plaincontext, (int)$other->id, 0, 0);
+        $this->assertArrayNotHasKey('tutorial', studio_helper::config($plain, $plaincontext, $other, $resolved));
+    }
 }

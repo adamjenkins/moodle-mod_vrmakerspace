@@ -26,6 +26,7 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use mod_vrmakerspace\local\pair_manager;
 use mod_vrmakerspace\local\session_manager;
+use mod_vrmakerspace\local\tutorial;
 
 /**
  * Privacy provider for mod_vrmakerspace.
@@ -34,10 +35,16 @@ use mod_vrmakerspace\local\session_manager;
  * (vrmakerspace_snapshots and the snapshots file area), the versions they saved of a group's piece,
  * their grades (vrmakerspace_grades: as the graded user and as the grader), their share of a piece
  * (vrmakerspace_contrib), and, briefly, their live connections of pair work (vrmakerspace_peers) with the
- * connection messages they sent (vrmakerspace_signals). Working together live also sends data outside Moodle: to
- * the partner's browser (pair work) and to the companion service (companion work).
+ * connection messages they sent (vrmakerspace_signals), and their progress through the tutorial of a
+ * tutorial-mode activity (vrmakerspace_tutorial). Working together live also sends data outside Moodle: to
+ * the partner's browser (pair work) and to the companion service (companion work). Questions asked of the
+ * tutor go to Moodle's AI subsystem (core_ai), which keeps its own record; the plugin stores none. With
+ * the tutor's voice on, the tutor's answers and steps go to the site's speech service to be spoken, and
+ * the student's spoken questions to be transcribed (or the browser's own speech recognition hears them,
+ * after the student agreed: a user preference).
  *
- * Deleting one user deletes their own pieces, grades, shares, connections and messages. A group's
+ * Deleting one user deletes their own pieces, grades, shares, connections, messages and tutorial
+ * progress. A group's
  * piece is the group's shared work, so it is kept, and the versions the user saved are anonymised
  * (userid 0).
  *
@@ -48,7 +55,8 @@ use mod_vrmakerspace\local\session_manager;
 class provider implements
     \core_privacy\local\metadata\provider,
     \core_privacy\local\request\core_userlist_provider,
-    \core_privacy\local\request\plugin\provider {
+    \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\request\user_preference_provider {
     /** @var string This component. */
     private const COMPONENT = 'mod_vrmakerspace';
 
@@ -95,7 +103,16 @@ class provider implements
             'payload' => 'privacy:metadata:signals:payload',
             'timecreated' => 'privacy:metadata:signals:timecreated',
         ], 'privacy:metadata:signals');
+        $collection->add_database_table('vrmakerspace_tutorial', [
+            'userid' => 'privacy:metadata:vrmakerspace_tutorial:userid',
+            'laststep' => 'privacy:metadata:vrmakerspace_tutorial:laststep',
+            'stepsdone' => 'privacy:metadata:vrmakerspace_tutorial:stepsdone',
+            'stepsskipped' => 'privacy:metadata:vrmakerspace_tutorial:stepsskipped',
+            'timecompleted' => 'privacy:metadata:vrmakerspace_tutorial:timecompleted',
+            'timemodified' => 'privacy:metadata:vrmakerspace_tutorial:timemodified',
+        ], 'privacy:metadata:vrmakerspace_tutorial');
         $collection->add_subsystem_link('core_files', [], 'privacy:metadata:core_files');
+        $collection->add_subsystem_link('core_ai', [], 'privacy:metadata:core_ai');
         $collection->add_external_location_link('pairpartner', [
             'fullname' => 'privacy:metadata:pairpartner:fullname',
             'address' => 'privacy:metadata:pairpartner:address',
@@ -106,7 +123,39 @@ class provider implements
             'peerid' => 'privacy:metadata:vrroomsync:peerid',
             'edits' => 'privacy:metadata:vrroomsync:edits',
         ], 'privacy:metadata:vrroomsync');
+
+        // The tutor's voice: each server-side speech engine the site may use (classes/speech/engine), and
+        // the browser's own recognition. The tutor's latest answer is cached for an hour to be spoken.
+        foreach (array_keys(\mod_vrmakerspace\speech\registry::ENGINES) as $engine) {
+            $collection->add_external_location_link('speech_' . $engine, [
+                'audio' => 'privacy:metadata:speechserver:audio',
+                'answer' => 'privacy:metadata:speechserver:answer',
+            ], 'privacy:metadata:speech_' . $engine);
+        }
+        $collection->add_external_location_link('browserspeech', [
+            'audio' => 'privacy:metadata:browserspeech:audio',
+        ], 'privacy:metadata:browserspeech');
+        $collection->add_user_preference(tutorial::CONSENT_PREFERENCE, 'privacy:metadata:preference:speechconsent');
         return $collection;
+    }
+
+    /**
+     * Export the user's answer to the cloud speech recognition question (as mod_talkwithai's, same author).
+     *
+     * @param int $userid the user
+     * @return void
+     */
+    public static function export_user_preferences(int $userid): void {
+        $consent = get_user_preferences(tutorial::CONSENT_PREFERENCE, null, $userid);
+        if ($consent === null) {
+            return;
+        }
+        writer::export_user_preference(
+            self::COMPONENT,
+            tutorial::CONSENT_PREFERENCE,
+            transform::yesno((bool)$consent),
+            get_string('privacy:preference:speechconsent', 'vrmakerspace')
+        );
     }
 
     /**
@@ -142,9 +191,13 @@ class provider implements
                 SELECT s.vrmakerspaceid
                   FROM {vrmakerspace_sessions} s
                   JOIN {vrmakerspace_signals} sg ON sg.sessionid = s.id
-                 WHERE sg.fromuserid = :u7";
+                 WHERE sg.fromuserid = :u7
+                 UNION
+                SELECT t.vrmakerspaceid
+                  FROM {vrmakerspace_tutorial} t
+                 WHERE t.userid = :u8";
         $params = [];
-        foreach (range(1, 7) as $n) {
+        foreach (range(1, 8) as $n) {
             $params['u' . $n] = $userid;
         }
         return [$sql, $params];
@@ -188,6 +241,7 @@ class provider implements
         $userlist->add_from_sql('userid', 'SELECT userid FROM {vrmakerspace_grades} WHERE vrmakerspaceid = :id', $params);
         $sql = 'SELECT grader FROM {vrmakerspace_grades} WHERE vrmakerspaceid = :id AND grader > 0';
         $userlist->add_from_sql('grader', $sql, $params);
+        $userlist->add_from_sql('userid', 'SELECT userid FROM {vrmakerspace_tutorial} WHERE vrmakerspaceid = :id', $params);
         $live = ['vrmakerspace_contrib' => 'userid', 'vrmakerspace_peers' => 'userid', 'vrmakerspace_signals' => 'fromuserid'];
         foreach ($live as $table => $field) {
             $userlist->add_from_sql($field, "SELECT t.{$field} AS {$field} FROM {{$table}} t
@@ -260,6 +314,16 @@ class provider implements
             if ($given) {
                 $data->gradesgiven = $given;
             }
+            $progress = tutorial::get_progress($vrmakerspaceid, $userid);
+            if ($progress) {
+                $data->tutorial = (object)[
+                    'laststep' => (string)$progress->laststep,
+                    'stepsdone' => tutorial::split_keys($progress->stepsdone),
+                    'stepsskipped' => tutorial::split_keys($progress->stepsskipped),
+                    'timecompleted' => (int)$progress->timecompleted ? transform::datetime($progress->timecompleted) : null,
+                    'timemodified' => transform::datetime($progress->timemodified),
+                ];
+            }
             writer::with_context($context)->export_data([], $data);
         }
     }
@@ -278,6 +342,7 @@ class provider implements
         }
         session_manager::delete_all((object)['id' => $vrmakerspaceid], $context);
         $DB->delete_records('vrmakerspace_grades', ['vrmakerspaceid' => $vrmakerspaceid]);
+        tutorial::delete_for_activity($vrmakerspaceid);
     }
 
     /**
@@ -335,6 +400,7 @@ class provider implements
 
         $DB->delete_records_select('vrmakerspace_grades', "vrmakerspaceid = :vrmakerspaceid AND userid $usersql", $params);
         $DB->set_field_select('vrmakerspace_grades', 'grader', 0, "vrmakerspaceid = :vrmakerspaceid AND grader $usersql", $params);
+        tutorial::delete_for_users($vrmakerspaceid, $userids);
 
         // Their shares of the group's pieces, their live connections and the messages they sent.
         $insessions = "sessionid IN (SELECT id FROM {vrmakerspace_sessions} WHERE vrmakerspaceid = :vrmakerspaceid)";

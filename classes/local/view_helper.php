@@ -211,4 +211,44 @@ class view_helper {
         }
         return $links;
     }
+
+    /**
+     * A student's own tutorial, for the activity page: the studio button's label and the progress.
+     *
+     * @param \stdClass $vrmakerspace the vrmakerspace row (in tutorial mode)
+     * @param int $userid the student
+     * @return array{label: string, status: string, finished: bool}
+     */
+    public static function own_tutorial(\stdClass $vrmakerspace, int $userid): array {
+        $summary = tutorial::summary(
+            tutorial::get_progress((int)$vrmakerspace->id, $userid),
+            session_manager::methods($vrmakerspace)
+        );
+        $label = 'tutorialstart';
+        if ($summary['finished']) {
+            $label = 'openstudio';
+        } else if ($summary['started']) {
+            $label = 'tutorialcontinue';
+        }
+        return [
+            'label' => get_string($label, 'vrmakerspace'),
+            'status' => $summary['text'],
+            'finished' => $summary['finished'],
+        ];
+    }
+
+    /**
+     * The tutorial progress of the owner of a piece, for the teachers' table.
+     *
+     * @param \stdClass $session the session row
+     * @param \stdClass[] $progress every student's progress row, keyed by user id (tutorial::get_all_progress())
+     * @param string $methods the activity's ways of making
+     * @return string plain text ('' for a group's piece)
+     */
+    public static function tutorial_text(\stdClass $session, array $progress, string $methods): string {
+        if ((int)$session->groupid || !(int)$session->userid) {
+            return '';
+        }
+        return tutorial::summary($progress[(int)$session->userid] ?? null, $methods)['text'];
+    }
 }

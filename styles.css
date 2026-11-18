@@ -214,3 +214,170 @@
         display: none;
     }
 }
+
+/* The tutorial's guided tour (templates/tutorial_bubble.mustache): a bubble like a user tour's, over the studio. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 6;
+    width: 22rem;
+    max-width: calc(100% - 1rem);
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    background-color: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #1d2125);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-title {
+    font-weight: 600;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-title:focus {
+    outline: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-title:focus-visible {
+    outline: 2px solid var(--bs-primary, #0f6cbf);
+    outline-offset: 2px;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-reply {
+    padding-left: 0.5rem;
+    border-left: 3px solid var(--bs-info, #008196);
+    white-space: pre-line;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-thinking {
+    color: var(--bs-secondary-color, #6a737b);
+    font-style: italic;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .ai-policy-block {
+    font-size: 0.875rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .ai-policy-block .content {
+    max-height: 10rem;
+    overflow-y: auto;
+}
+
+/* The arrow: a turned square on the edge that faces the control. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-arrow {
+    position: absolute;
+    left: 50%;
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-left: -0.4375rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    background-color: var(--bs-body-bg, #fff);
+    transform: rotate(45deg);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-arrow-top .mod_vrmakerspace-tour-arrow {
+    top: -0.4375rem;
+    border-right: 0;
+    border-bottom: 0;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-arrow-bottom .mod_vrmakerspace-tour-arrow {
+    bottom: -0.4375rem;
+    border-top: 0;
+    border-left: 0;
+}
+
+/* The ring round the control a step is about; it lets clicks through. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tourring {
+    position: absolute;
+    z-index: 5;
+    border: 3px solid var(--bs-primary, #0f6cbf);
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 4px rgba(15, 108, 191, 0.25);
+    pointer-events: none;
+    animation: mod_vrmakerspace-tourpulse 1.6s ease-in-out infinite;
+}
+
+@keyframes mod_vrmakerspace-tourpulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 2px rgba(15, 108, 191, 0.35);
+    }
+
+    50% {
+        box-shadow: 0 0 0 7px rgba(15, 108, 191, 0.1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tourring {
+        animation: none;
+    }
+}
+
+/* Talking to the tutor: the Talk button is held down (push to talk); while it listens, a ring grows with the voice. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-talk {
+    touch-action: none;
+    user-select: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-talk.mod_vrmakerspace-tour-talk-listening {
+    color: #fff;
+    background-color: var(--bs-danger, #ca3120);
+    border-color: var(--bs-danger, #ca3120);
+    box-shadow: 0 0 0 calc(2px + 6px * var(--mod_vrmakerspace-level, 0)) rgba(202, 49, 32, 0.3);
+    animation: mod_vrmakerspace-talkpulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mod_vrmakerspace-talkpulse {
+    0%,
+    100% {
+        outline: 0 solid rgba(202, 49, 32, 0.35);
+    }
+
+    50% {
+        outline: 4px solid rgba(202, 49, 32, 0.15);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tour-talk.mod_vrmakerspace-tour-talk-listening {
+        animation: none;
+    }
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-heard {
+    font-style: italic;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-demos .btn {
+    white-space: normal;
+}
+
+/* Phones (and a narrow studio): the bubble docks under the 3D view instead of covering it. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour.mod_vrmakerspace-tour-docked {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin-top: 0.5rem;
+    box-shadow: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour.mod_vrmakerspace-tour-docked .mod_vrmakerspace-tour-arrow {
+    display: none;
+}
+
+@media (max-width: 575.98px) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tour {
+        position: static;
+        width: auto;
+        max-width: none;
+        margin-top: 0.5rem;
+        box-shadow: none;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn {
+        min-height: 2.5rem;
+    }
+}

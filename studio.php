@@ -68,5 +68,7 @@ echo $OUTPUT->render_from_template('mod_vrmakerspace/studio', [
     // The activity name (the canvas label and the export file name), escaped once by the template.
     'title' => format_string($vrmakerspace->name, true, ['context' => $context, 'escape' => false]),
     'backurl' => $config['backurl'],
+    // Tutorial mode: the toolbar's Tutorial button (only when the tour runs).
+    'tutorial' => !empty($config['tutorial']),
 ] + studio_helper::methods_context($config['methods'], $config['model']));
 echo $OUTPUT->footer();

@@ -153,7 +153,7 @@ class session_manager {
      * @return \stdClass|null the session row, or null when a group-mode user has no (such) group
      */
     public static function get_or_create_for_user(\stdClass $vrmakerspace, $cm, int $userid, int $groupid = 0): ?\stdClass {
-        if ((int)$vrmakerspace->workmode === self::MODE_GROUP) {
+        if (self::is_group_work($vrmakerspace)) {
             $groups = self::get_user_groups($cm, $userid);
             if ($groupid) {
                 if (!isset($groups[$groupid])) {
@@ -265,13 +265,14 @@ class session_manager {
     }
 
     /**
-     * Whether an activity is done in groups (one shared piece per group).
+     * Whether an activity is done in groups (one shared piece per group). Never in tutorial mode: the
+     * tour is for each student on their own piece.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @return bool
      */
     public static function is_group_work(\stdClass $vrmakerspace): bool {
-        return (int)$vrmakerspace->workmode === self::MODE_GROUP;
+        return (int)$vrmakerspace->workmode === self::MODE_GROUP && empty($vrmakerspace->tutorial);
     }
 
     /**

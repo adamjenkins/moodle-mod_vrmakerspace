@@ -3,6 +3,14 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Tutorial mode (`tutorial`), with a guided tour of the studio (`amd/src/tutorial.js`, `tutorialsteps.js`), the tutor robot and its demonstrations (`tutor.js`, `tutordemos.js`), saved progress (table `vrmakerspace_tutorial`), the completion rule `completiontutorial` and the event `tutorial_completed`.
+- Asking the tutor: `mod_vrmakerspace_ask_tutor` (core_ai `generate_text`, an answer and an optional demonstration), browser-side matching without AI (`tutormatch.js`), activity switch `tutorai`.
+- Speech for the tutor: `mod_vrmakerspace_tutor_speak` and `mod_vrmakerspace_tutor_transcribe`, speech engines (browser, Ollama, OpenAI-style, ElevenLabs, Google) ranked in the plugin settings, activity switches `tutorspeak` and `tutorlisten`, caches `speechrate` and `tutoranswer`. Adapted from mod_talkwithai's speech code.
+
 ## [0.1.1] - 2026-11-15
 
 The first tagged release.
