@@ -222,7 +222,8 @@ class view_helper {
     public static function own_tutorial(\stdClass $vrmakerspace, int $userid): array {
         $summary = tutorial::summary(
             tutorial::get_progress((int)$vrmakerspace->id, $userid),
-            session_manager::methods($vrmakerspace)
+            session_manager::methods($vrmakerspace),
+            tutorial::model_first($vrmakerspace)
         );
         $label = 'tutorialstart';
         if ($summary['finished']) {
@@ -243,12 +244,13 @@ class view_helper {
      * @param \stdClass $session the session row
      * @param \stdClass[] $progress every student's progress row, keyed by user id (tutorial::get_all_progress())
      * @param string $methods the activity's ways of making
+     * @param bool $modelfirst whether the studio opens with a polygon mesh (tutorial::model_first())
      * @return string plain text ('' for a group's piece)
      */
-    public static function tutorial_text(\stdClass $session, array $progress, string $methods): string {
+    public static function tutorial_text(\stdClass $session, array $progress, string $methods, bool $modelfirst = false): string {
         if ((int)$session->groupid || !(int)$session->userid) {
             return '';
         }
-        return tutorial::summary($progress[(int)$session->userid] ?? null, $methods)['text'];
+        return tutorial::summary($progress[(int)$session->userid] ?? null, $methods, $modelfirst)['text'];
     }
 }

@@ -3,6 +3,18 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- The tour's order follows the starting model: `tutorial::model_first()` and `applicable_steps($methods, $modelfirst)` put the modelling steps, then `bake` and the sculpting steps first for both ways of making with the `meshcube` start (without `switchmodel`); the client keeps the server's order (`tutorialsteps.js` `stepsFor()`).
+- The steps that open the other way of making (`switchmodel`, or `bake` before the sculpting steps) are offers (`offerAt()`, `offersIn()`): Not now (`tutorial_notnow`) passes over that way's steps, and changing the way of making later opens the tour at them (`tutorial_offer_model`, `tutorial_offer_sculpt`).
+
+### Fixed
+
+- README: the default largest saved piece is 32 MB (`DEFAULT_MAX_SNAPSHOT_SIZE`), not 16 MB.
+- Controls under a bar fixed to the window (the navbar, Moodle 5.3's `course-linear-navigation` footer) could not be clicked: `amd/src/bottombar.js` measures both bars, starts the tools just below the top bar, scrolls focused controls, opened menus and the docked tour bubble between them, and sets `--mod-vrmakerspace-bottombar`, which the stage's `max-height` subtracts. Adapted from mod_talkwithai's conversation page.
+
 ## [0.1.2] - 2026-11-18
 
 ### Added

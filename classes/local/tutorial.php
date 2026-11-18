@@ -195,12 +195,34 @@ final class tutorial {
     }
 
     /**
-     * The steps of an activity with these ways of making, in tour order.
+     * Whether an activity's studio opens with a polygon mesh rather than clay (the studio's own rule, studio.js
+     * initialMethod()): modelling only, or both ways with the polygon cube to start from.
+     *
+     * @param \stdClass $vrmakerspace the vrmakerspace row
+     * @return bool
+     */
+    public static function model_first(\stdClass $vrmakerspace): bool {
+        $methods = session_manager::methods($vrmakerspace);
+        if ($methods === session_manager::METHODS_MODEL) {
+            return true;
+        }
+        $model = session_manager::start_model_for_methods(
+            $methods,
+            session_manager::clean_start_model((string)($vrmakerspace->startmodel ?? ''))
+        );
+        return $methods === session_manager::METHODS_BOTH && $model === session_manager::MODEL_MESHCUBE;
+    }
+
+    /**
+     * The steps of an activity with these ways of making, in tour order. The way of making on screen at the start
+     * comes first: with both ways and a mesh to start from (model_first()), the modelling steps come first, then the
+     * offer to turn the mesh into clay (bake) and the sculpting steps, and the switch to modelling is left out.
      *
      * @param string $methods the ways of making (cleaned here)
+     * @param bool $modelfirst whether the studio opens with a polygon mesh (model_first())
      * @return string[] step keys
      */
-    public static function applicable_steps(string $methods): array {
+    public static function applicable_steps(string $methods, bool $modelfirst = false): array {
         $methods = session_manager::clean_methods($methods);
         $steps = [];
         foreach (self::STEPS as $key => $applies) {
@@ -208,7 +230,14 @@ final class tutorial {
                 $steps[] = $key;
             }
         }
-        return $steps;
+        if (!$modelfirst || $methods !== session_manager::METHODS_BOTH) {
+            return $steps;
+        }
+        $of = fn(string $applies) => array_values(array_filter($steps, fn($key) => self::STEPS[$key] === $applies));
+        $first = array_search('add', $steps, true);
+        $start = array_slice($steps, 0, $first);
+        $finish = array_slice($steps, array_search('save', $steps, true));
+        return array_merge($start, $of(self::APPLIES_MODEL), ['bake'], $of(self::APPLIES_SCULPT), $finish);
     }
 
     /**
@@ -268,10 +297,11 @@ final class tutorial {
      *
      * @param \stdClass|null $progress the row, or null when the student has not started
      * @param string $methods the activity's ways of making
+     * @param bool $modelfirst whether the studio opens with a polygon mesh (model_first())
      * @return array{steps: string[], done: string[], skipped: string[], laststep: string}
      */
-    public static function state(?\stdClass $progress, string $methods): array {
-        $steps = self::applicable_steps($methods);
+    public static function state(?\stdClass $progress, string $methods, bool $modelfirst = false): array {
+        $steps = self::applicable_steps($methods, $modelfirst);
         $done = self::clean_keys(self::split_keys($progress->stepsdone ?? ''), $steps);
         $skipped = array_values(array_diff(self::clean_keys(self::split_keys($progress->stepsskipped ?? ''), $steps), $done));
         $laststep = (string)($progress->laststep ?? '');
@@ -318,7 +348,7 @@ final class tutorial {
 
         $methods = session_manager::methods($vrmakerspace);
         $progress = self::get_progress((int)$vrmakerspace->id, $userid);
-        $state = self::state($progress, $methods);
+        $state = self::state($progress, $methods, self::model_first($vrmakerspace));
         $steps = $state['steps'];
         $newdone = self::clean_keys(array_merge($state['done'], $done), $steps);
         $newskipped = array_values(array_diff(self::clean_keys(array_merge($state['skipped'], $skipped), $steps), $newdone));
@@ -373,7 +403,11 @@ final class tutorial {
         if (!self::is_enabled($vrmakerspace) || $readonly) {
             return null;
         }
-        $state = self::state(self::get_progress((int)$vrmakerspace->id, $userid), session_manager::methods($vrmakerspace));
+        $state = self::state(
+            self::get_progress((int)$vrmakerspace->id, $userid),
+            session_manager::methods($vrmakerspace),
+            self::model_first($vrmakerspace)
+        );
         $ai = self::ai_enabled($vrmakerspace, $context);
         return [
             'enabled' => true,
@@ -391,10 +425,11 @@ final class tutorial {
      *
      * @param \stdClass|null $progress the row, or null when the student has not started
      * @param string $methods the activity's ways of making
+     * @param bool $modelfirst whether the studio opens with a polygon mesh (model_first())
      * @return array{started: bool, finished: bool, done: int, skipped: int, total: int, text: string}
      */
-    public static function summary(?\stdClass $progress, string $methods): array {
-        $state = self::state($progress, $methods);
+    public static function summary(?\stdClass $progress, string $methods, bool $modelfirst = false): array {
+        $state = self::state($progress, $methods, $modelfirst);
         $finished = $progress && (int)$progress->timecompleted > 0;
         $started = $progress && ($state['done'] || $state['skipped'] || $state['laststep'] !== '');
         $counts = ['done' => count($state['done']), 'skipped' => count($state['skipped']), 'total' => count($state['steps'])];
@@ -692,7 +727,7 @@ final class tutorial {
      * @return string
      */
     public static function build_prompt(\stdClass $vrmakerspace, string $step, string $question): string {
-        $steps = self::applicable_steps(session_manager::methods($vrmakerspace));
+        $steps = self::applicable_steps(session_manager::methods($vrmakerspace), self::model_first($vrmakerspace));
         $name = self::plain_string('tutor_name');
         $parts = [get_string('tutor_aiprompt', 'vrmakerspace', (object)[
             'name' => $name !== '' ? $name : get_string('modulename', 'vrmakerspace'),

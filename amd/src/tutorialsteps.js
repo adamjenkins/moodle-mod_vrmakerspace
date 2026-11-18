@@ -315,7 +315,8 @@ export const STEPS = Object.freeze([
 export const STEP_KEYS = Object.freeze(STEPS.map((step) => step.key));
 
 /** The tour's own strings (besides the step titles and texts). */
-export const UI_STRING_KEYS = Object.freeze(['tutorial_next', 'tutorial_back', 'tutorial_skip', 'tutorial_finish',
+export const UI_STRING_KEYS = Object.freeze(['tutorial_notnow', 'tutorial_offer_model', 'tutorial_offer_sculpt',
+    'tutorial_next', 'tutorial_back', 'tutorial_skip', 'tutorial_finish',
     'tutorial_close', 'tutorial_showme', 'tutorial_stepof', 'tutorial_done', 'tutorial_button', 'tutorial_ask',
     'tutorial_askplaceholder', 'tutorial_thinking', 'tutorial_askfailed', 'tutorial_saved', 'tutorial_reopen',
     'tutorial_showmefailed']);
@@ -435,12 +436,60 @@ export const demoWords = (steps, strings) => {
 };
 
 /**
- * The steps of an activity's tour, in order: the ones the server listed (unknown keys are dropped).
+ * The steps of an activity's tour, in the server's order (the way of making on screen at the start comes first;
+ * classes/local/tutorial.php applicable_steps()). Unknown and repeated keys are dropped.
  *
  * @param {string[]} keys config.tutorial.steps.
  * @returns {Object[]}
  */
 export const stepsFor = (keys) => {
-    const wanted = new Set(Array.isArray(keys) ? keys.map(String) : []);
-    return STEPS.filter((step) => wanted.has(step.key));
+    const byKey = new Map(STEPS.map((step) => [step.key, step]));
+    const seen = new Set();
+    return (Array.isArray(keys) ? keys.map(String) : []).filter((key) => {
+        if (!byKey.has(key) || seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    }).map((key) => byKey.get(key));
 };
+
+/**
+ * The steps that offer the other way of making, and the chapter each opens: the switch to modelling after the
+ * sculpting steps, Turn into clay after the modelling steps (when the tour starts with a mesh).
+ *
+ * @type {Object<string, string>}
+ */
+export const OFFERS = Object.freeze({switchmodel: 'model', bake: 'sculpt'});
+
+/**
+ * The offer at a step of the tour: the chapter it opens and where that chapter's steps are, or null when the step
+ * offers nothing there (Turn into clay at the end of the modelling steps of a tour that started with clay).
+ *
+ * @param {Object[]} steps The tour's steps.
+ * @param {number} index The step's index.
+ * @returns {Object|null} {chapter, from, to}: the chapter's steps are steps[from] to steps[to - 1]
+ */
+export const offerAt = (steps, index) => {
+    const step = steps[index];
+    const chapter = step ? OFFERS[step.key] : '';
+    if (!chapter || !steps[index + 1] || steps[index + 1].chapter !== chapter) {
+        return null;
+    }
+    let to = index + 1;
+    while (to < steps.length && steps[to].chapter === chapter) {
+        to++;
+    }
+    return {chapter: chapter, from: index + 1, to: to};
+};
+
+/**
+ * Every offer of a tour, in order.
+ *
+ * @param {Object[]} steps The tour's steps.
+ * @returns {Object[]} [{key, index, chapter, from, to}]
+ */
+export const offersIn = (steps) => steps.map((step, index) => {
+    const offer = offerAt(steps, index);
+    return offer ? Object.assign({key: step.key, index: index}, offer) : null;
+}).filter((offer) => offer !== null);

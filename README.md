@@ -33,7 +33,7 @@ Nothing else: individual work and pair work need no server besides Moodle.
 2. Copy this repository to `public/mod/vrmakerspace` in your Moodle code.
 3. Visit *Site administration > Notifications* to install it.
 4. Optionally set the largest saved piece in *Site administration > Plugins > Activity modules >
-   VR Makerspace* (16 MB by default), and, for tutorial mode, the tutor's speech services on the same page.
+   VR Makerspace* (32 MB by default), and, for tutorial mode, the tutor's speech services on the same page.
 
 ## Settings of an activity
 

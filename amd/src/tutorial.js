@@ -45,9 +45,10 @@ import Log from 'core/log';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import Policy from 'core_ai/policy';
-import {demoWords, stepsFor} from 'mod_vrmakerspace/tutorialsteps';
+import {demoWords, offerAt, offersIn, opCount, stepsFor} from 'mod_vrmakerspace/tutorialsteps';
 import {match as matchDemo} from 'mod_vrmakerspace/tutormatch';
 import {createTutorVoice} from 'mod_vrmakerspace/tutorvoice';
+import {reveal as revealAboveBar} from 'mod_vrmakerspace/bottombar';
 
 /** How often the current step's condition and the bubble's position are checked (s). */
 const CHECK_INTERVAL = 0.1;
@@ -295,6 +296,10 @@ export const createTutorial = (options) => {
     const toolbar = options.toolbar || null;
     const cmid = Number(options.cmid) || 0;
     const steps = stepsFor(config.steps);
+    /** The steps that offer the other way of making (mod_vrmakerspace/tutorialsteps offersIn()). */
+    const offers = offersIn(steps);
+    /** The method and the student's Turn into clay count when last looked at, to see a change of way of making. */
+    let seen = null;
     const done = new Set(Array.isArray(config.done) ? config.done.map(String) : []);
     const skipped = new Set(Array.isArray(config.skipped) ? config.skipped.map(String) : []);
     const stage = root.querySelector('[data-region="stage"]');
@@ -309,6 +314,7 @@ export const createTutorial = (options) => {
     /** @type {Object|null} {index, step, start, memo, completed, elapsed, advanceAt, vrclock} */
     let current = null;
     let checkclock = 0;
+    let crossclock = 0;
     let busy = false;
     let asking = false;
     let invr = false;
@@ -628,6 +634,8 @@ export const createTutorial = (options) => {
         show(parts.buttons.showme, canshow);
         show(parts.buttons.back, current.index > 0);
         show(parts.buttons.skip, step.kind === 'action' && !current.completed);
+        // An offer of the other way of making is turned down with Not now, which passes over its steps.
+        parts.buttons.skip.textContent = offerAt(steps, current.index) ? str('tutorial_notnow') : str('tutorial_skip');
         show(parts.buttons.next, !last && (step.kind === 'info' || current.completed));
         show(parts.buttons.finish, last);
         Object.keys(parts.buttons).forEach((name) => {
@@ -796,6 +804,8 @@ export const createTutorial = (options) => {
         const element = step.target && !step.target.canvas ? targetElement(step) : null;
         if (element && typeof element.scrollIntoView === 'function' && !invr) {
             element.scrollIntoView({block: 'nearest', inline: 'nearest'});
+            // Not under the site's top bar or a bar at the window's bottom, where a click would miss it.
+            revealAboveBar(root, element);
         }
     };
 
@@ -843,6 +853,10 @@ export const createTutorial = (options) => {
         point(step);
         reveal(step);
         position();
+        if (parts.bubble.classList.contains('mod_vrmakerspace-tour-docked') && !invr) {
+            // Docked under the 3D view (narrow windows): scrolled up above a bar fixed to the window's bottom.
+            revealAboveBar(root, parts.bubble);
+        }
         readStep(step.key);
     };
 
@@ -893,12 +907,71 @@ export const createTutorial = (options) => {
         go(current.index + 1);
     };
 
-    /** Skip step. */
+    /** Skip step; Not now on an offer of the other way of making passes over that way's steps too. */
     const skip = () => {
-        if (!done.has(current.step.key)) {
-            skipped.add(current.step.key);
+        const offer = offerAt(steps, current.index);
+        const last = offer ? offer.to : current.index + 1;
+        steps.slice(current.index, last).forEach((step) => {
+            if (!done.has(step.key)) {
+                skipped.add(step.key);
+            }
+        });
+        go(last);
+    };
+
+    /**
+     * The student changed the way of making without the tour (Turn into clay, or the switch to Model) while its
+     * steps have not been gone through: the tour opens at them and says why. Turn into clay changes what is on
+     * screen (the mesh is gone), so the modelling steps not reached yet are passed over; the switch only offers
+     * the modelling steps once the student said Not now to them, or the tour is past them or closed.
+     */
+    const watchCrossing = () => {
+        if (!offers.length || busy || (tutor && tutor.busy)) {
+            return;
         }
-        go(current.index + 1);
+        const now = state();
+        const was = seen;
+        seen = {method: String(now.method || ''), bakes: opCount(now, 'mbake')};
+        if (!was) {
+            return;
+        }
+        offers.some((offer) => {
+            const crossed = offer.chapter === 'sculpt' ? seen.bakes > was.bakes
+                : was.method !== 'model' && seen.method === 'model';
+            const chapter = steps.slice(offer.from, offer.to);
+            if (!crossed || chapter.some((step) => done.has(step.key))) {
+                return false;
+            }
+            const at = opened && current ? current.index : -1;
+            if (at === offer.index || (at >= offer.from && at < offer.to)) {
+                // On the offer itself (its own condition ends it) or already in those steps.
+                return false;
+            }
+            if (offer.chapter === 'model' && opened && at < offer.index) {
+                // Trying the switch before the tour gets there: the sculpting steps go on.
+                return false;
+            }
+            if (at >= 0 && at < offer.index) {
+                steps.slice(at, offer.index).forEach((step) => {
+                    if (!done.has(step.key)) {
+                        skipped.add(step.key);
+                    }
+                });
+            }
+            done.add(offer.key);
+            skipped.delete(offer.key);
+            chapter.forEach((step) => skipped.delete(step.key));
+            dirty = true;
+            scheduleSave();
+            const message = str(`tutorial_offer_${offer.chapter}`);
+            const shown = opened ? Promise.resolve(showStep(offer.from, 1)) : open(false, offer.from);
+            shown.then(() => {
+                reply(message);
+                sayInVr(message);
+                return null;
+            }).catch((error) => Log.debug(error));
+            return true;
+        });
     };
 
     /**
@@ -1694,9 +1767,10 @@ export const createTutorial = (options) => {
      * Open the tour where the student left it.
      *
      * @param {boolean} [focus] Whether the focus moves to the bubble (opened with the Tutorial button).
+     * @param {number} [at] The index of the step to open at (an offer taken up), instead of where the student was.
      * @returns {Promise}
      */
-    const open = (focus = false) => {
+    const open = (focus = false, at = -1) => {
         if (disposed || !steps.length) {
             return Promise.resolve(null);
         }
@@ -1711,7 +1785,10 @@ export const createTutorial = (options) => {
             if (toolbar && typeof toolbar.setTutorial === 'function') {
                 toolbar.setTutorial(true);
             }
-            const index = current && current.step.key !== 'done' ? current.index : startIndex(steps, laststep, done, skipped);
+            let index = current && current.step.key !== 'done' ? current.index : startIndex(steps, laststep, done, skipped);
+            if (at >= 0) {
+                index = at;
+            }
             showStep(index, 1);
             if (focus && parts.title && !invr) {
                 parts.title.focus({preventScroll: true});
@@ -1814,7 +1891,15 @@ export const createTutorial = (options) => {
      * @param {number} dt Seconds since the last frame.
      */
     const update = (dt) => {
-        if (!opened || !current || !parts || disposed) {
+        if (disposed) {
+            return;
+        }
+        crossclock += Math.max(0, Number(dt) || 0);
+        if (crossclock >= CHECK_INTERVAL) {
+            crossclock = 0;
+            watchCrossing();
+        }
+        if (!opened || !current || !parts) {
             return;
         }
         updateVoice();

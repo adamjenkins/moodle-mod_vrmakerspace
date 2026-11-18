@@ -33,8 +33,9 @@
     width: 100%;
     height: 70vh;
     min-height: 18rem;
-    /* The site's top bar and the tool rows must fit above it in the window. */
-    max-height: calc(100vh - 16.5rem);
+    /* The site's top bar and the tool rows must fit above it in the window, and a bar fixed to the window's bottom
+       (Moodle 5.3's activity navigation, measured by mod_vrmakerspace/bottombar) below it. */
+    max-height: calc(100vh - 16.5rem - var(--mod-vrmakerspace-bottombar, 0px));
     overflow: hidden;
     border-radius: 0.375rem;
     background-color: #c9ccd1;
@@ -202,7 +203,8 @@
     box-shadow: inset 0 0 0 3px #0f6cbf;
 }
 
-/* Opening the studio scrolls the tools to the top of the window, just below the site's top bar. */
+/* Opening the studio scrolls the tools to just below the site's top bar (mod_vrmakerspace/bottombar); this is the margin
+   when the browser scrolls to them itself. */
 .mod_vrmakerspace-studio [data-region="toolbar"] {
     scroll-margin-top: 4.25rem;
 }

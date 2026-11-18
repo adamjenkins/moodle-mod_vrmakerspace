@@ -48,6 +48,7 @@ import {createSession} from 'mod_vrmakerspace/net/session';
 import {createTutor} from 'mod_vrmakerspace/tutor';
 import {createTutorial} from 'mod_vrmakerspace/tutorial';
 import {stringKeys as tutorialStringKeys} from 'mod_vrmakerspace/tutorialsteps';
+import {startBelowTopBar, watch as watchBottomBar} from 'mod_vrmakerspace/bottombar';
 
 /** Every string of the studio and the modules it hands its strings to (contract §9). */
 const STRING_KEYS = [
@@ -1401,10 +1402,11 @@ const run = (root, config, strings, extra) => {
     window.addEventListener('pagehide', onPageHide);
     window.addEventListener('pageshow', onPageShow);
 
-    // Below the page heading, the tools and the 3D view may not fit the window: start with them in view.
+    // Below the page heading, the tools and the 3D view may not fit the window: start with them in view, just below
+    // the site's top bar (measured: its height differs between themes and versions).
     const toolrow = root.querySelector('[data-region="toolbar"]');
     if (toolrow && window.scrollY === 0) {
-        toolrow.scrollIntoView({block: 'start'});
+        startBelowTopBar(root, toolrow);
     }
 
     return Promise.resolve(session.start()).then(() => {
@@ -1527,6 +1529,8 @@ export const init = (config) => {
         return Promise.resolve(null);
     }
     root.dataset.vrmakerspaceStarted = '1';
+    // Moodle 5.3's activity navigation footer is fixed to the bottom of the window: keep the controls clear of it.
+    watchBottomBar(root);
     const pending = new Pending('mod_vrmakerspace/studio:init');
     const strings = {};
     const extra = {};

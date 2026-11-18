@@ -23,7 +23,6 @@
  */
 
 defined('MOODLE_INTERNAL') || die();
-
 $string['action_bevel'] = 'Bevel';
 $string['action_extrude'] = 'Extrude';
 $string['action_inset'] = 'Inset';
@@ -423,6 +422,9 @@ $string['tutorial_done'] = 'Well done!';
 $string['tutorial_finish'] = 'Finish';
 $string['tutorial_help'] = 'The studio becomes a guided tour: a tutor shows each student, step by step, how to get around the 3D view, use every sculpting and modelling tool that the ways of making allow, switch between clay and the mesh, save versions and export their piece. Steps that ask for an action end when the student does it, and "Show me" lets the tutor demonstrate it first. Students can close the tour at any time and continue later. Make this the first VR Makerspace activity of a course. Tutorial mode is always individual work.';
 $string['tutorial_next'] = 'Next';
+$string['tutorial_notnow'] = 'Not now';
+$string['tutorial_offer_model'] = 'You switched to modelling, so here is how the modelling tools work. Close the tour if you would rather find out for yourself.';
+$string['tutorial_offer_sculpt'] = 'Your mesh is clay now, so here is how to sculpt it. Close the tour if you would rather find out for yourself.';
 $string['tutorial_reopen'] = 'You can open the tutorial again at any time with the Tutorial button.';
 $string['tutorial_saved'] = 'You have finished the tutorial.';
 $string['tutorial_showme'] = 'Show me';
@@ -434,7 +436,7 @@ $string['tutorial_step_addshape_text'] = 'Open the <strong>Add shape</strong> me
 $string['tutorial_step_addshape_title'] = 'Add a mesh shape';
 $string['tutorial_step_axis_text'] = 'Choose <strong>X</strong>, <strong>Y</strong> or <strong>Z</strong> in the Axis buttons (or press X, Y or Z while you move), then move, turn or scale the selection again: it now goes along that axis only.';
 $string['tutorial_step_axis_title'] = 'Lock an axis';
-$string['tutorial_step_bake_text'] = 'Press <strong>Turn into clay</strong> and confirm: the mesh becomes clay that you can sculpt with the brushes. This cannot be turned back into a mesh, so do it when the shape is ready.';
+$string['tutorial_step_bake_text'] = 'Would you like to sculpt this piece as well? Press <strong>Turn into clay</strong> and confirm: the mesh becomes clay that you can shape with the brushes, and I will show you how. It cannot be turned back into a mesh, so do it when the shape is ready, or press <strong>Not now</strong> to carry on.';
 $string['tutorial_step_bake_title'] = 'Turn the mesh into clay';
 $string['tutorial_step_bevel_text'] = 'Select an edge (or a face), choose <strong>Bevel</strong> (Ctrl+B) and drag to round off the sharp corner. The Segments box sets how smooth it is.';
 $string['tutorial_step_bevel_title'] = 'Bevel';
@@ -492,8 +494,8 @@ $string['tutorial_step_smooth_text'] = 'Choose <strong>Smooth</strong> (key 5) a
 $string['tutorial_step_smooth_title'] = 'Smooth the surface';
 $string['tutorial_step_strength_text'] = 'Move the <strong>Strength</strong> slider to change how much each stroke does. The comma and full stop keys do the same.';
 $string['tutorial_step_strength_title'] = 'Brush strength';
-$string['tutorial_step_switchmodel_text'] = 'This activity has two ways of making. Press <strong>Model</strong> in the switch at the top (or press Tab in the 3D view) to build with a polygon mesh instead of clay. Sculpt brings you back to the clay.';
-$string['tutorial_step_switchmodel_title'] = 'Switch to modelling';
+$string['tutorial_step_switchmodel_text'] = 'This activity has two ways of making. Would you like to try modelling with a polygon mesh as well? Press <strong>Model</strong> in the switch at the top (or press Tab in the 3D view), and I will show you the modelling tools; Sculpt brings you back to the clay. Or press <strong>Not now</strong> to carry on.';
+$string['tutorial_step_switchmodel_title'] = 'Try modelling';
 $string['tutorial_step_together_text'] = 'In other makerspace activities your teacher can let you work with a partner or a group on one piece. You see each other\'s hands and pointers, and everyone\'s changes show at once.';
 $string['tutorial_step_together_title'] = 'Working together';
 $string['tutorial_step_twist_text'] = 'Choose <strong>Twist</strong> (key 2), press on the clay and drag sideways to turn the clay under the brush.';

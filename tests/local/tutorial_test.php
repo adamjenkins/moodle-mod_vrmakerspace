@@ -29,13 +29,14 @@ final class tutorial_test extends \advanced_testcase {
      * A tutorial-mode activity and a student.
      *
      * @param string $methods the ways of making
+     * @param string $startmodel the starting model ('' for a lump, or the polygon cube for modelling only)
      * @return array [\stdClass $vrmakerspace, \stdClass $student]
      */
-    private function make_activity(string $methods = 'both'): array {
+    private function make_activity(string $methods = 'both', string $startmodel = ''): array {
         $gen = $this->getDataGenerator();
         $course = $gen->create_course(['summary' => '']);
         $vrmakerspace = $gen->create_module('vrmakerspace', ['course' => $course->id, 'tutorial' => 1, 'methods' => $methods,
-            'startmodel' => $methods === 'model' ? 'meshcube' : 'lump']);
+            'startmodel' => $startmodel ?: ($methods === 'model' ? 'meshcube' : 'lump')]);
         $student = $gen->create_and_enrol($course, 'student');
         return [$vrmakerspace, $student];
     }
@@ -69,6 +70,53 @@ final class tutorial_test extends \advanced_testcase {
 
         // An unknown value is the default (both).
         $this->assertSame($both, tutorial::applicable_steps('teapot'));
+    }
+
+    /**
+     * A tour that starts with a mesh teaches modelling first, then offers Turn into clay and the sculpting steps;
+     * the switch to modelling is left out. Only both ways of making are reordered.
+     */
+    public function test_applicable_steps_model_first(): void {
+        $steps = tutorial::applicable_steps('both', true);
+        $this->assertCount(39, $steps);
+        $this->assertNotContains('switchmodel', $steps);
+        $this->assertSame(['welcome', 'orbit', 'zoom', 'pan', 'addshape'], array_slice($steps, 0, 5));
+        $bake = array_search('bake', $steps);
+        $this->assertSame('delete', $steps[$bake - 1]);
+        $this->assertSame('add', $steps[$bake + 1]);
+        $this->assertSame('redo', $steps[array_search('save', $steps) - 1]);
+        $this->assertSame('done', end($steps));
+        $this->assertEqualsCanonicalizing(array_diff(tutorial::applicable_steps('both'), ['switchmodel']), $steps);
+
+        $this->assertSame(tutorial::applicable_steps('sculpt'), tutorial::applicable_steps('sculpt', true));
+        $this->assertSame(tutorial::applicable_steps('model'), tutorial::applicable_steps('model', true));
+    }
+
+    /**
+     * The studio opens with a mesh for modelling only, or both ways with the polygon cube to start from.
+     */
+    public function test_model_first(): void {
+        $row = fn(string $methods, string $startmodel) => (object)['methods' => $methods, 'startmodel' => $startmodel];
+        $this->assertTrue(tutorial::model_first($row('model', 'lump')));
+        $this->assertTrue(tutorial::model_first($row('both', 'meshcube')));
+        $this->assertFalse(tutorial::model_first($row('both', 'lump')));
+        $this->assertFalse(tutorial::model_first($row('both', 'empty')));
+        $this->assertFalse(tutorial::model_first($row('sculpt', 'lump')));
+    }
+
+    /**
+     * A tour that starts with a mesh is finished without the switch to modelling, and the studio gets the
+     * modelling steps first.
+     */
+    public function test_model_first_progress(): void {
+        $this->resetAfterTest();
+        [$vrmakerspace, $student] = $this->make_activity('both', 'meshcube');
+        $steps = tutorial::applicable_steps('both', true);
+        $result = tutorial::save_progress($vrmakerspace, (int)$student->id, 'done', $steps, []);
+        $this->assertTrue($result['finished']);
+        $context = \context_module::instance((int)$vrmakerspace->cmid);
+        $config = tutorial::studio_config($vrmakerspace, $context, (int)$student->id, false);
+        $this->assertSame($steps, $config['steps']);
     }
 
     /**

@@ -206,8 +206,8 @@ class restore_vrmakerspace_activity_structure_step extends restore_activity_stru
         if ($DB->record_exists(tutorial::TABLE, ['vrmakerspaceid' => $data->vrmakerspaceid, 'userid' => $data->userid])) {
             return;
         }
-        $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $data->vrmakerspaceid], 'id, methods', MUST_EXIST);
-        $steps = tutorial::applicable_steps((string)$vrmakerspace->methods);
+        $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $data->vrmakerspaceid], 'id, methods, startmodel', MUST_EXIST);
+        $steps = tutorial::applicable_steps((string)$vrmakerspace->methods, tutorial::model_first($vrmakerspace));
         $done = tutorial::clean_keys(tutorial::split_keys((string)($data->stepsdone ?? '')), $steps);
         $skipped = array_values(array_diff(
             tutorial::clean_keys(tutorial::split_keys((string)($data->stepsskipped ?? '')), $steps),

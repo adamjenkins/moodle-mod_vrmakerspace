@@ -131,6 +131,7 @@ if (has_capability('mod/vrmakerspace:viewallsubmissions', $context)) {
     $rows = [];
     $tutorialprogress = $istutorial ? tutorial::get_all_progress((int)$vrmakerspace->id) : [];
     $methods = session_manager::methods($vrmakerspace);
+    $modelfirst = tutorial::model_first($vrmakerspace);
     foreach (view_helper::visible_sessions($vrmakerspace, $cm, $context) as $session) {
         $latest = session_manager::get_latest_snapshot((int)$session->id);
         $contributions = [];
@@ -148,7 +149,7 @@ if (has_capability('mod/vrmakerspace:viewallsubmissions', $context)) {
             'url' => $latest ? session_manager::snapshot_url($latest, $context)->out(false) : '',
             'viewurl' => $latest ? view_helper::studio_url($context, (int)$session->id)->out(false) : '',
             'contributions' => implode(', ', $contributions),
-            'tutorial' => $istutorial ? view_helper::tutorial_text($session, $tutorialprogress, $methods) : '',
+            'tutorial' => $istutorial ? view_helper::tutorial_text($session, $tutorialprogress, $methods, $modelfirst) : '',
             'managelinks' => $canmanage ? view_helper::manage_links($session, $context) : [],
         ];
     }
