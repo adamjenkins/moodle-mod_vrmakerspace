@@ -78,6 +78,12 @@ jobs:
       - name: Add mod_vrroom
         run: moodle-plugin-ci add-plugin adamjenkins/moodle-mod_vrroom
 
+      # moodle-plugin-ci 4.5.12 copies files with their permissions (symfony/filesystem 5.4.56), so git's read-only
+      # object files make its grunt step fail restoring the plugin: "target file could not be opened for writing"
+      # (moodlehq/moodle-plugin-ci#409). Writable copies avoid it while keeping ^4.
+      - name: Make the checkout's git objects writable
+        run: chmod -R u+w plugin/.git
+
       - name: Install moodle-plugin-ci
         run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
         env:
