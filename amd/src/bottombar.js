@@ -135,6 +135,10 @@ export const watch = (root) => {
     }
     let height = -1;
     const measure = () => {
+        if (root.dataset.vrmakerspaceXr === '1') {
+            // In VR: the page is not shown, and its layout work would only take time from the headset's frames.
+            return;
+        }
         const now = Math.max(0, Math.round(window.innerHeight - barTop(root)));
         if (now !== height) {
             height = now;

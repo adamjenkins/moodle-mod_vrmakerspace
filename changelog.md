@@ -3,6 +3,13 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- `studio.js`: a frame whose update fails is still drawn (an undrawn frame shows as a black flash in a headset); the first error is logged.
+- `bottombar.js` does not measure the page while in VR; `vrpalette.js` redraws the board at most every 100 ms while only the brush size or strength changes (each redraw re-uploads a 1024 px texture).
+
 ## [0.1.3] - 2026-11-18
 
 ### Changed

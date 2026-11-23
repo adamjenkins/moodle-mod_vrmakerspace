@@ -56,6 +56,9 @@ const SELECT_COMMAND_KEYS = Object.freeze({all: 'selectall', none: 'selectnone',
 /** The axis lock choices ('free' stands for no lock). */
 const AXES = Object.freeze(['free', 'x', 'y', 'z']);
 
+/** Shortest time between redraws while only the brush size or strength changes (ms). */
+const VALUE_REDRAW_MS = 100;
+
 /** The basic shapes, modeltools' shape names. */
 const MESH_SHAPES = Object.freeze(['cube', 'plane', 'cylinder', 'sphere', 'cone', 'torus']);
 
@@ -532,6 +535,8 @@ export const createPalette = (THREE, options = {}) => {
         method: plan.model ? 'model' : 'sculpt', selectmode: '', action: '', axis: 'free', segments: 1,
         looparmed: false, bakearmed: false};
     let drawn = false;
+    /** When the board was last redrawn for a value change (performance.now()). */
+    let lastdraw = 0;
     let disposed = false;
 
     /**
@@ -690,10 +695,18 @@ export const createPalette = (THREE, options = {}) => {
             const qsize = Math.round(Number(size) * 2000) / 2000;
             const qstrength = Math.round(Number(strength) * 200) / 200;
             const name = String(tool || '');
-            if (drawn && name === state.tool && qsize === state.size && qstrength === state.strength &&
-                    !!canundo === state.canundo && !!canredo === state.canredo && !!mirror === state.mirror) {
+            const same = drawn && name === state.tool && !!canundo === state.canundo && !!canredo === state.canredo
+                && !!mirror === state.mirror;
+            if (same && qsize === state.size && qstrength === state.strength) {
                 return;
             }
+            // While the thumbstick or a slider changes only the size or the strength, the board (a large texture) is
+            // redrawn a few times a second, not on every frame: each redraw uploads it again and costs headset frames.
+            const now = performance.now();
+            if (same && now - lastdraw < VALUE_REDRAW_MS) {
+                return;
+            }
+            lastdraw = now;
             state.mirror = !!mirror;
             state.tool = name;
             state.size = qsize;

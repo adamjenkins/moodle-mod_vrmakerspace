@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- In a VR headset the studio keeps its frame rate better: the tool board is redrawn less often while the brush size or strength changes, and a failing frame is still drawn instead of flashing black.
+
 ## 0.1.3 (2026-11-18) — ALPHA
 
 - The tutorial starts with the way of making that is on screen: an activity that starts with the polygon cube teaches modelling first, one that starts with clay teaches sculpting first. At the end of that part it offers the other way (Turn into clay, or the switch to Model) with Not now to pass it by, and when the student makes that change later on their own, it opens at the steps for it.

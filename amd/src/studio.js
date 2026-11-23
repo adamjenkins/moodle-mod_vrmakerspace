@@ -1234,9 +1234,14 @@ const run = (root, config, strings, extra) => {
         }
     };
 
-    renderer.setAnimationLoop((time, frame) => {
-        timer.update(time);
-        const dt = timer.getDelta();
+    let framefailed = false;
+    /**
+     * Everything a frame does before it is drawn.
+     *
+     * @param {number} dt Seconds since the last frame.
+     * @param {XRFrame} [frame] The XR frame, in an immersive session.
+     */
+    const updateFrame = (dt, frame) => {
         if (xr && xr.active) {
             xr.update(dt, frame);
         } else if (desktop) {
@@ -1252,6 +1257,19 @@ const run = (root, config, strings, extra) => {
         }
         presence.tick(performance.now(), viewerlocal);
         sendPose();
+    };
+    renderer.setAnimationLoop((time, frame) => {
+        timer.update(time);
+        const dt = timer.getDelta();
+        try {
+            updateFrame(dt, frame);
+        } catch (e) {
+            // A frame whose update fails is still drawn: an undrawn frame shows as a black flash in a headset.
+            if (!framefailed) {
+                framefailed = true;
+                Log.debug(e);
+            }
+        }
         renderer.render(scene, camera);
     });
 
@@ -1479,6 +1497,8 @@ const run = (root, config, strings, extra) => {
             // Push to talk to the tutor, only in tutorial mode with listening set up.
             onTalk: canlisten ? talkToTutor : null,
             onStart: () => {
+                // The page is not measured while the headset shows the studio (mod_vrmakerspace/bottombar).
+                root.dataset.vrmakerspaceXr = '1';
                 desktop.setEnabled(false);
                 if (modelinput) {
                     modelinput.setEnabled(false);
@@ -1487,6 +1507,7 @@ const run = (root, config, strings, extra) => {
                 toolbar.setVr(true, true);
             },
             onEnd: () => {
+                delete root.dataset.vrmakerspaceXr;
                 desktop.setEnabled(true);
                 applyMethod();
                 toolbar.setVr(true, false);
