@@ -87,6 +87,15 @@ const FRAME_MARGIN = 1.3;
 /** The most the camera moves back at one change (times its distance), so a stray measurement cannot fling it away. */
 const FRAME_MAX_STEP = 1.6;
 
+/** The backdrop in the headset. */
+const XR_BACKGROUND = new THREE.Color(0xdde3ea);
+
+/** Where the camera starts when the studio opens, times its resting distance. */
+const SETTLE_FROM = 1.5;
+
+/** How long the camera takes to settle when the studio opens (ms). */
+const SETTLE_TIME = 900;
+
 /** How long the camera takes to ease back (ms). */
 const FRAME_TIME = 500;
 
@@ -104,6 +113,12 @@ const SCULPTURE_HEIGHT = 1.0;
 
 /** Height of the pedestal top (m): just under the lowest the grid reaches. */
 const PEDESTAL_TOP = 0.74;
+
+/** Radius of the turntable on top of the stand (m). */
+const TABLE_RADIUS = 0.22;
+
+/** Thickness of the turntable (m). */
+const TABLE_THICKNESS = 0.03;
 
 /** Vertical field of view of the desktop camera (degrees). */
 const FOV = 50;
@@ -313,60 +328,187 @@ const showFailure = (root, strings, error) => {
 };
 
 /**
- * Build the 3D view: renderer, camera, lights, floor, pedestal and the piece's group.
+ * A canvas texture drawn by a function, in sRGB.
+ *
+ * @param {number} width Pixels.
+ * @param {number} height Pixels.
+ * @param {Function} draw Takes the 2D context.
+ * @returns {Object} THREE.CanvasTexture
+ */
+const drawnTexture = (width, height, draw) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    draw(canvas.getContext('2d'), width, height);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+};
+
+/**
+ * A soft round shadow: dark in the middle, fading to nothing at the edge.
+ *
+ * @param {number} strength Opacity in the middle (0-1).
+ * @returns {Object} THREE.CanvasTexture
+ */
+const softShadow = (strength) => drawnTexture(128, 128, (ctx, w) => {
+    const gradient = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    gradient.addColorStop(0, `rgba(20, 24, 30, ${strength})`);
+    gradient.addColorStop(0.55, `rgba(20, 24, 30, ${strength * 0.45})`);
+    gradient.addColorStop(1, 'rgba(20, 24, 30, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, w);
+});
+
+/**
+ * The studio's reflections: a small scene of soft boxes in a grey room, blurred into an environment map once. It gives
+ * the piece gentle highlights and edges without any lights to compute per frame.
+ *
+ * @param {Object} renderer THREE.WebGLRenderer.
+ * @returns {Object} {texture, dispose()}
+ */
+const studioEnvironment = (renderer) => {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const room = new THREE.Scene();
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const wall = new THREE.MeshBasicMaterial({color: 0x6f7884, side: THREE.BackSide});
+    const walls = new THREE.Mesh(geometry, wall);
+    walls.scale.set(12, 6, 12);
+    walls.position.y = 2;
+    room.add(walls);
+    const light = new THREE.MeshBasicMaterial({color: 0xffffff});
+    light.color.multiplyScalar(6);
+    const boxes = [[[-3, 3, 2], [3, 0.1, 2]], [[3, 2.5, 1], [0.1, 2, 3]], [[0, 4.9, 0], [4, 0.1, 4]], [[0, 2, -5.9], [6, 2, 0.1]]];
+    boxes.forEach(([position, scale]) => {
+        const box = new THREE.Mesh(geometry, light);
+        box.position.set(position[0], position[1], position[2]);
+        box.scale.set(scale[0], scale[1], scale[2]);
+        room.add(box);
+    });
+    const target = pmrem.fromScene(room, 0.04);
+    geometry.dispose();
+    wall.dispose();
+    light.dispose();
+    pmrem.dispose();
+    return {texture: target.texture, dispose: () => target.dispose()};
+};
+
+/**
+ * Build the 3D view: renderer, camera, studio lights and reflections, the backdrop, the floor, the turntable with the
+ * piece's soft shadow, and the piece's group.
  *
  * @param {HTMLCanvasElement} canvas The canvas.
- * @returns {Object} {renderer, scene, camera, sculptureRoot, material, dispose()}
+ * @returns {Object} {renderer, scene, camera, sculptureRoot, material, backdrop, dispose()}
  */
 const buildView = (canvas) => {
     const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.95;
     renderer.xr.enabled = true;
     const scene = new THREE.Scene();
-    // A calm, light background and a darker stand, so the piece is what the eye finds first.
-    scene.background = new THREE.Color(0xdfe5ec);
+    // A soft gradient backdrop, light above and a little darker towards the floor: a photo studio's sweep.
+    const backdrop = drawnTexture(4, 256, (ctx, w, h) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, h);
+        gradient.addColorStop(0, '#f3f5f8');
+        gradient.addColorStop(0.55, '#dde3ea');
+        gradient.addColorStop(1, '#b7c0cb');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, w, h);
+    });
+    scene.background = backdrop;
+    const environment = studioEnvironment(renderer);
+    scene.environment = environment.texture;
+    scene.environmentIntensity = 0.55;
     const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.01, 50);
     // Above the piece and to one side: three sides show, so a box reads as a box, and the stand stays below it.
     camera.position.set(CAMERA_SIDE, SCULPTURE_HEIGHT + CAMERA_RISE, CAMERA_DISTANCE);
     camera.lookAt(0, SCULPTURE_HEIGHT, 0);
     scene.add(camera);
 
-    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x5a5f66, 1.4);
+    // Studio lights: a soft sky, a key light from the front left, a cool rim from behind that lines the edges.
+    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x6a707a, 0.45);
     scene.add(hemisphere);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.8);
-    sun.position.set(1.2, 2.6, 1.6);
-    scene.add(sun);
-    const filllight = new THREE.DirectionalLight(0xdfe6ff, 0.5);
-    filllight.position.set(-1.5, 1.2, -1);
+    const key = new THREE.DirectionalLight(0xfff6ea, 1.6);
+    key.position.set(-1.2, 2.6, 1.8);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xdbe7ff, 1.3);
+    rim.position.set(1.4, 1.8, -2.2);
+    scene.add(rim);
+    const filllight = new THREE.DirectionalLight(0xdfe6ff, 0.35);
+    filllight.position.set(1.5, 1.0, 1.0);
     scene.add(filllight);
 
-    const floormaterial = new THREE.MeshStandardMaterial({color: 0xb4bcc6, roughness: 1, metalness: 0});
+    // The floor: a faint grid that fades out with distance, for a sense of depth.
+    const floortexture = drawnTexture(512, 512, (ctx, w) => {
+        ctx.fillStyle = '#c3cbd5';
+        ctx.fillRect(0, 0, w, w);
+        ctx.strokeStyle = 'rgba(70, 80, 95, 0.22)';
+        ctx.lineWidth = 1;
+        for (let at = 0; at <= w; at += w / 16) {
+            ctx.beginPath();
+            ctx.moveTo(at, 0);
+            ctx.lineTo(at, w);
+            ctx.moveTo(0, at);
+            ctx.lineTo(w, at);
+            ctx.stroke();
+        }
+        const fade = ctx.createRadialGradient(w / 2, w / 2, w * 0.1, w / 2, w / 2, w / 2);
+        fade.addColorStop(0, 'rgba(195, 203, 213, 0)');
+        fade.addColorStop(1, 'rgba(195, 203, 213, 1)');
+        ctx.fillStyle = fade;
+        ctx.fillRect(0, 0, w, w);
+    });
+    const floormaterial = new THREE.MeshStandardMaterial({map: floortexture, roughness: 1, metalness: 0});
     const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), floormaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.name = 'vrmakerspace-floor';
     scene.add(floor);
-    const pedestalmaterial = new THREE.MeshStandardMaterial({color: 0xc9d0d8, roughness: 0.7, metalness: 0});
-    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, PEDESTAL_TOP, 48), pedestalmaterial);
-    pedestal.position.set(0, PEDESTAL_TOP / 2, 0);
-    pedestal.name = 'vrmakerspace-pedestal';
-    scene.add(pedestal);
+
+    // The turntable: a slim dark column with a light round top, its edge catching the light, and soft shadows.
+    const columnmaterial = new THREE.MeshStandardMaterial({color: 0x4a525c, roughness: 0.4, metalness: 0.6});
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, PEDESTAL_TOP - TABLE_THICKNESS, 32), columnmaterial);
+    column.position.set(0, (PEDESTAL_TOP - TABLE_THICKNESS) / 2, 0);
+    column.name = 'vrmakerspace-pedestal';
+    scene.add(column);
+    const tablematerial = new THREE.MeshStandardMaterial({color: 0xeef1f4, roughness: 0.35, metalness: 0});
+    const table = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_RADIUS, TABLE_RADIUS * 0.96, TABLE_THICKNESS, 64), tablematerial);
+    table.position.set(0, PEDESTAL_TOP - TABLE_THICKNESS / 2, 0);
+    table.name = 'vrmakerspace-turntable';
+    scene.add(table);
+    const shadowtexture = softShadow(0.3);
+    const shadowmaterial = new THREE.MeshBasicMaterial({map: shadowtexture, transparent: true, depthWrite: false,
+        toneMapped: false});
+    const shadowgeometry = new THREE.PlaneGeometry(1, 1);
+    const pieceshadow = new THREE.Mesh(shadowgeometry, shadowmaterial);
+    pieceshadow.rotation.x = -Math.PI / 2;
+    pieceshadow.scale.setScalar(TABLE_RADIUS * 1.6);
+    pieceshadow.position.set(0, PEDESTAL_TOP + 0.001, 0);
+    pieceshadow.renderOrder = 1;
+    scene.add(pieceshadow);
+    const floorshadow = new THREE.Mesh(shadowgeometry, shadowmaterial);
+    floorshadow.rotation.x = -Math.PI / 2;
+    floorshadow.scale.setScalar(TABLE_RADIUS * 3);
+    floorshadow.position.set(0, 0.001, 0);
+    scene.add(floorshadow);
 
     const sculptureRoot = new THREE.Group();
     sculptureRoot.name = 'vrmakerspace-sculpture';
     sculptureRoot.position.set(0, SCULPTURE_HEIGHT, 0);
     scene.add(sculptureRoot);
-    const material = new THREE.MeshStandardMaterial({color: 0xc08a64, roughness: 0.82, metalness: 0});
+    // Clay with a little sheen, so the studio's soft boxes show in it.
+    const material = new THREE.MeshStandardMaterial({color: 0xb07049, roughness: 0.55, metalness: 0, envMapIntensity: 0.6});
 
     return {
-        renderer, scene, camera, sculptureRoot, material,
+        renderer, scene, camera, sculptureRoot, material, backdrop,
 
         /** Free the GPU resources of the view. */
         dispose: () => {
-            floor.geometry.dispose();
-            floormaterial.dispose();
-            pedestal.geometry.dispose();
-            pedestalmaterial.dispose();
-            material.dispose();
+            [floor, column, table].forEach((mesh) => mesh.geometry.dispose());
+            [floormaterial, columnmaterial, tablematerial, shadowmaterial, material].forEach((each) => each.dispose());
+            [floortexture, shadowtexture, backdrop].forEach((texture) => texture.dispose());
+            shadowgeometry.dispose();
+            environment.dispose();
             renderer.dispose();
         },
     };
@@ -592,6 +734,24 @@ export const createFramer = (THREE, camera, sculptureRoot) => {
         },
 
         /**
+         * On arrival: start a little further out and settle in, so the studio opens with a gentle move. Not when the
+         * person asked the system for less motion.
+         *
+         * @param {Object|null} controls The view's OrbitControls.
+         */
+        settle: (controls) => {
+            const reduce = typeof window.matchMedia === 'function'
+                && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (!controls || reduce) {
+                return;
+            }
+            const distance = camera.position.distanceTo(controls.target);
+            offset.copy(camera.position).sub(controls.target).setLength(distance * SETTLE_FROM);
+            camera.position.copy(controls.target).add(offset);
+            ease = {from: distance * SETTLE_FROM, to: distance, start: performance.now(), time: SETTLE_TIME};
+        },
+
+        /**
          * Per frame: move the camera along its line to the target while easing.
          *
          * @param {Object|null} controls The view's OrbitControls.
@@ -600,7 +760,7 @@ export const createFramer = (THREE, camera, sculptureRoot) => {
             if (!ease || !controls) {
                 return;
             }
-            const t = Math.min(1, (performance.now() - ease.start) / FRAME_TIME);
+            const t = Math.min(1, (performance.now() - ease.start) / (ease.time || FRAME_TIME));
             const distance = ease.from + (ease.to - ease.from) * t * (2 - t);
             offset.copy(camera.position).sub(controls.target).setLength(distance);
             camera.position.copy(controls.target).add(offset);
@@ -1663,6 +1823,7 @@ const run = (root, config, strings, extra) => {
             keyroot: root,
             target: [0, SCULPTURE_HEIGHT, 0],
         });
+        framer.settle(desktop.controls);
         if (modeltools) {
             modelinput = attachModelInput({
                 THREE: THREE,
@@ -1693,6 +1854,8 @@ const run = (root, config, strings, extra) => {
             onStart: () => {
                 // The page is not measured while the headset shows the studio (mod_vrmakerspace/bottombar).
                 root.dataset.vrmakerspaceXr = '1';
+                // In the headset the backdrop would be pasted on each eye: a plain colour instead.
+                scene.background = XR_BACKGROUND;
                 desktop.setEnabled(false);
                 if (modelinput) {
                     modelinput.setEnabled(false);
@@ -1702,6 +1865,7 @@ const run = (root, config, strings, extra) => {
             },
             onEnd: () => {
                 delete root.dataset.vrmakerspaceXr;
+                scene.background = view.backdrop;
                 desktop.setEnabled(true);
                 applyMethod();
                 toolbar.setVr(true, false);

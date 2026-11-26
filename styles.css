@@ -65,7 +65,7 @@
     min-height: 18rem;
     /* The site's top bar and the tool rows must fit above it in the window, and a bar fixed to the window's bottom
        (Moodle 5.3's activity navigation, measured by mod_vrmakerspace/bottombar) below it. */
-    max-height: calc(100vh - 24rem - var(--mod-vrmakerspace-bottombar, 0px));
+    max-height: calc(100vh - 11rem - var(--mod-vrmakerspace-bottombar, 0px));
     overflow: hidden;
     border-radius: 0.375rem;
     background-color: #c9ccd1;
@@ -617,7 +617,7 @@
     }
 
     /* In the sheet: each group's name on its own line, then its tools as equal tiles. */
-    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-grouplabel {
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-grouplabel {
         flex: 1 1 100%;
         margin: 0.25rem 0 0;
     }
@@ -1038,5 +1038,291 @@
 
     .mod_vrmakerspace-studio.mod_vrmakerspace-phone .mod_vrmakerspace-hint {
         bottom: 6rem;
+    }
+}
+
+/* The tools docked inside the 3D view (mod_vrmakerspace/guide adds mod_vrmakerspace-docked): one glass bar along the
+   top edge, the same on a desktop and a phone, with amber for the tool in use. With More it grows over the view (it
+   scrolls when there is more than fits), so the view itself never moves. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    z-index: 3;
+    max-height: calc(100% - 1.5rem);
+    margin: 0;
+    padding: 0.375rem 0.5rem;
+    overflow-y: auto;
+    gap: 0.375rem;
+    color: #f4f6f8;
+    background-color: rgba(18, 22, 28, 0.72);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --bs-secondary-color: rgba(244, 246, 248, 0.72);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar {
+        background-color: rgba(18, 22, 28, 0.9);
+    }
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .btn,
+.mod_vrmakerspace-studio.mod_vrmakerspace-phone .mod_vrmakerspace-tray .btn {
+    --bs-btn-color: #f4f6f8;
+    --bs-btn-bg: rgba(255, 255, 255, 0.1);
+    --bs-btn-border-color: rgba(255, 255, 255, 0.16);
+    --bs-btn-hover-color: #f4f6f8;
+    --bs-btn-hover-bg: rgba(255, 255, 255, 0.18);
+    --bs-btn-hover-border-color: rgba(255, 255, 255, 0.24);
+    --bs-btn-active-color: #1a1a1a;
+    --bs-btn-active-bg: #ffc107;
+    --bs-btn-active-border-color: #ffc107;
+    --bs-btn-disabled-color: rgba(244, 246, 248, 0.4);
+    --bs-btn-disabled-bg: rgba(255, 255, 255, 0.05);
+    --bs-btn-disabled-border-color: rgba(255, 255, 255, 0.1);
+    --bs-btn-focus-box-shadow: none;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .btn:focus-visible,
+.mod_vrmakerspace-studio.mod_vrmakerspace-phone .mod_vrmakerspace-tray .btn:focus-visible {
+    outline: 3px solid #ffc107;
+    outline-offset: 2px;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .btn.mod_vrmakerspace-tile {
+    min-width: 3.75rem;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.78rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .btn.mod_vrmakerspace-tile svg {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .mod_vrmakerspace-savedstate {
+    color: rgba(244, 246, 248, 0.72);
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .mod_vrmakerspace-savedstate.mod_vrmakerspace-saved {
+    color: #7fe0a8;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar label,
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar .mod_vrmakerspace-sliderend {
+    color: rgba(244, 246, 248, 0.85);
+}
+
+/* Order in the bar. Basic: method, its tools, More, then undo and the saved state on the right. With More: method, undo,
+   saved state and Less on the first line, the tool groups below, the File group last, each with its name in front. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar > .mod_vrmakerspace-filegroup {
+    flex: 1 1 100%;
+    order: 9;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-toolbar > * {
+    order: 0;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-toolbar > .mod_vrmakerspace-panel,
+.mod_vrmakerspace-docked:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-toolbar > .mod_vrmakerspace-scrollwrap {
+    order: 5;
+}
+
+.mod_vrmakerspace-docked:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-toolbar > .mod_vrmakerspace-filegroup {
+    order: 9;
+}
+
+.mod_vrmakerspace-docked:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-toolbar > .mod_vrmakerspace-moretools {
+    margin-left: auto;
+}
+
+/* The pictures of the controls and the "?" go to the bottom left, the help opens above them, the tip sits above both. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-legend {
+    top: auto;
+    bottom: 0.75rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-helppanel {
+    top: auto;
+    bottom: 4rem;
+    width: min(48rem, calc(100% - 1.5rem)); /* stylelint-disable-line csstree/validator */
+    max-width: none;
+    max-height: calc(100% - 9rem);
+}
+
+/* While the help is open, the tip steps aside. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel:not(.d-none) ~ .mod_vrmakerspace-hint {
+    display: none;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-hint {
+    bottom: 4rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-stageconfirm {
+    top: auto;
+    bottom: 4rem;
+}
+
+/* The help: small tables of key caps and gesture pictures, side by side where there is room. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-helpgrid {
+    display: grid;
+    align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.75rem 1.25rem;
+}
+
+/* The keys need two columns' room: their key caps are wide and their names should not wrap. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-helpgrid > [data-region="sculpthelp"],
+.mod_vrmakerspace-studio .mod_vrmakerspace-helpgrid > [data-region="modelhelp"] {
+    grid-column: span 2;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helptable {
+    width: 100%;
+    font-size: 0.85rem;
+    color: #f4f6f8;
+    caption-side: top;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helptable caption {
+    padding: 0 0 0.25rem;
+    color: rgba(244, 246, 248, 0.72);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable,
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable tr,
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable td {
+    border: 0 none;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable td:last-child {
+    width: 100%;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helptable td {
+    padding: 0.15rem 0;
+    vertical-align: middle;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helptable td:first-child {
+    width: 1%;
+    padding-right: 0.6rem;
+    white-space: nowrap;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helptable kbd {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 0.1em 0.4em;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #f4f6f8;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helptable .mod_vrmakerspace-gesture {
+    vertical-align: middle;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-method-model .mod_vrmakerspace-helptable .mod_vrmakerspace-legend-sculpt,
+.mod_vrmakerspace-studio.mod_vrmakerspace-method-sculpt .mod_vrmakerspace-helptable .mod_vrmakerspace-legend-model {
+    display: none;
+}
+
+@media (max-width: 575.98px) {
+    /* Ends a little above the bottom of the screen, clear of the site's floating buttons there. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-stage {
+        height: calc(100vh - 13.5rem);
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-hint {
+        border-radius: 14px;
+    }
+
+    /* Phone: the bar at the top holds the method, undo and More; the pictures sit just under it. */
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar {
+        top: 0.5rem;
+        right: 0.5rem;
+        left: 0.5rem;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-legend {
+        top: 4.75rem;
+        bottom: auto;
+        left: 0.5rem;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-helppanel {
+        top: 8rem;
+        bottom: auto;
+        left: 0.5rem;
+        max-height: calc(100% - 9rem);
+    }
+
+    /* The More sheet: an even grid of tiles, four to a row, each group's name above it, Add shape in its group; it
+       keeps clear of the site's floating accessibility button on the right and scrolls on its own. */
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray {
+        max-height: 55%;
+        padding-right: 4rem;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-toolgroup,
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray [data-region="sculptpanel"] {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.375rem;
+        width: 100%;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .btn-group {
+        display: contents;
+    }
+
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-grouplabel,
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-slider,
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray [data-region="shapeoptions"] {
+        grid-column: 1 / -1;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-segments {
+        grid-column: span 2;
+    }
+
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-toolgroup .btn,
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray [data-region="sculptpanel"] .btn {
+        width: 100%;
+        min-width: 0;
+        margin-left: 0;
+        border-radius: 10px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Long tool names wrap inside their tile instead of running into the next one. */
+    .mod_vrmakerspace-phone .mod_vrmakerspace-tray .mod_vrmakerspace-tilelabel {
+        font-size: 0.7rem;
+        line-height: 1.1;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-helppanel {
+        width: calc(100% - 1rem);
     }
 }

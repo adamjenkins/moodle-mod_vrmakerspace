@@ -26,7 +26,9 @@
  * - the people of a group piece: who is here now and who has not opened it yet;
  * - on a phone, the tools in a tray at the bottom of the 3D view, with a cue when the row goes on to the right; with
  *   More, the tray becomes a sheet holding every tool and the File group;
- * - Show me how: three small pictures of a first build for the method in use.
+ * - Show me how: three small pictures of a first build for the method in use;
+ * - the tools dock inside the 3D view, in a glass bar along its top edge (More grows it over the view, never pushing
+ *   the view down).
  *
  * Every word comes from the template. The choice of fewer or more tools is kept in a cookie: Moodle clears the whole
  * localStorage at every login (core/storage_validation).
@@ -465,6 +467,13 @@ export const createGuide = (root, options) => {
     decorate(root);
     if (moretools && readCookie(TOOLS_COOKIE) === 'all') {
         setAll(true);
+    }
+    // The tools dock inside the 3D view, in a glass bar along its top edge: the view keeps its height, and desktop
+    // and phone look the same.
+    const stage = region('stage');
+    if (stage && toolbar && toolbar.parentNode !== stage) {
+        stage.insertBefore(toolbar, stage.firstChild);
+        root.classList.add('mod_vrmakerspace-docked');
     }
     if (typeof window.matchMedia === 'function') {
         const phonequery = window.matchMedia(PHONE);

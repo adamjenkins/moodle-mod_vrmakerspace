@@ -30,7 +30,7 @@
  */
 
 /** Colour of the mesh layer: a cool blue-grey, so it is told apart from the clay. */
-const MESH_COLOUR = 0x9fc4ec;
+const MESH_COLOUR = 0x6f9fd6;
 
 /** Colour of the edges and vertices while editing. */
 const WIRE_COLOUR = 0x3d5266;
@@ -177,8 +177,10 @@ export const createPolyView = (THREE, parent) => {
     solidGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0);
     const solidMaterial = new THREE.MeshStandardMaterial({
         color: MESH_COLOUR,
-        roughness: 0.85,
+        // A little gloss, so the studio's soft boxes give the sides gentle highlights and the edges catch the rim light.
+        roughness: 0.42,
         metalness: 0,
+        envMapIntensity: 0.6,
         // Flat shading: each side lit as one plane, so no crease shows along the diagonal where its two triangles meet.
         flatShading: true,
         side: THREE.DoubleSide,

@@ -170,7 +170,7 @@
             {{/readonly}}
             <div class="dropdown">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" id="{{uniqid}}-export" data-bs-toggle="dropdown"
-                        data-region="exportmenu" aria-haspopup="true" aria-expanded="false"
+                        data-bs-popper-config='{"strategy":"fixed"}' data-region="exportmenu" aria-haspopup="true" aria-expanded="false"
                         title="{{#str}} tip_export, mod_vrmakerspace {{/str}}">{{#str}} export, mod_vrmakerspace {{/str}}</button>
                 <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-export">
                     <li><button type="button" class="dropdown-item" data-action="export" data-format="stl">{{#str}} export_stl, mod_vrmakerspace {{/str}}</button></li>
@@ -407,16 +407,67 @@
                 <h3 class="h6 mb-0 flex-grow-1">{{#str}} help_title, mod_vrmakerspace {{/str}}</h3>
                 <button type="button" class="btn-close" data-action="help" aria-label="{{#str}} help_close, mod_vrmakerspace {{/str}}"></button>
             </div>
-            <div class="mod_vrmakerspace-help small" id="{{uniqid}}-help">
-                <p class="mb-2">{{#str}} help_trackpad, mod_vrmakerspace {{/str}}</p>
-                {{^readonly}}
+            <div class="mod_vrmakerspace-help" id="{{uniqid}}-help">
+                <div class="mod_vrmakerspace-helpgrid">
+                    <table class="table-reboot mod_vrmakerspace-helptable">
+                        <caption>{{#str}} help_mouse, mod_vrmakerspace {{/str}}</caption>
+                        <tr class="mod_vrmakerspace-legend-sculpt"><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 32" width="16" height="22" aria-hidden="true" focusable="false"><rect x="3" y="2" width="18" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v11M3 13h18" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0-8 9h8z" fill="#ffc107"/></svg></td><td>{{#str}} help_use_clay, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr class="mod_vrmakerspace-legend-model"><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 32" width="16" height="22" aria-hidden="true" focusable="false"><rect x="3" y="2" width="18" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v11M3 13h18" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0-8 9h8z" fill="#ffc107"/></svg></td><td>{{#str}} help_use_shapes, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr class="mod_vrmakerspace-legend-model"><td><kbd>Shift</kbd> + <svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 32" width="16" height="22" aria-hidden="true" focusable="false"><rect x="3" y="2" width="18" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v11M3 13h18" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0-8 9h8z" fill="#ffc107"/></svg></td><td>{{#str}} help_pickmore, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 32" width="16" height="22" aria-hidden="true" focusable="false"><rect x="3" y="2" width="18" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v11M3 13h18" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 8 9h-8z" fill="#ffc107"/></svg></td><td>{{#str}} help_turn, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 32" width="16" height="22" aria-hidden="true" focusable="false"><rect x="3" y="2" width="18" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 13h18" stroke="currentColor" stroke-width="2"/><rect x="10" y="5" width="4" height="7" rx="2" fill="#ffc107"/></svg></td><td>{{#str}} help_zoom, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Shift</kbd> + <svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 32" width="16" height="22" aria-hidden="true" focusable="false"><rect x="3" y="2" width="18" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v11M3 13h18" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0-8 9h8z" fill="#ffc107"/></svg></td><td>{{#str}} help_slide, mod_vrmakerspace {{/str}}</td></tr>
+                    </table>
+                    <table class="table-reboot mod_vrmakerspace-helptable">
+                        <caption>{{#str}} help_trackpadhead, mod_vrmakerspace {{/str}}</caption>
+                        <tr><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="12" r="1.8" fill="#ffc107"/><path d="M12 12h5M15 10l2 2-2 2" stroke="#ffc107" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></td><td>{{#str}} help_turn, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9.5" cy="10" r="1.8" fill="#ffc107"/><circle cx="14.5" cy="10" r="1.8" fill="#ffc107"/><path d="M12 13v4M10.5 15.5L12 17l1.5-1.5" stroke="#ffc107" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></td><td>{{#str}} help_zoom, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="14" r="1.8" fill="#ffc107"/><circle cx="16" cy="9" r="1.8" fill="#ffc107"/><path d="M10 12.5l4-2" stroke="#ffc107" stroke-width="1.6" stroke-linecap="round"/></svg></td><td>{{#str}} help_zoom, mod_vrmakerspace {{/str}}</td></tr>
+                    </table>
+                    <table class="table-reboot mod_vrmakerspace-helptable">
+                        <caption>{{#str}} help_touch, mod_vrmakerspace {{/str}}</caption>
+                        <tr class="mod_vrmakerspace-legend-sculpt"><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="#ffc107"/><path d="M12 12v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></td><td>{{#str}} help_use_clay, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr class="mod_vrmakerspace-legend-model"><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="#ffc107"/><path d="M12 12v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></td><td>{{#str}} help_use_shapes, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><svg class="mod_vrmakerspace-gesture" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><circle cx="7" cy="9" r="3.2" fill="#ffc107"/><circle cx="17" cy="15" r="3.2" fill="#ffc107"/><path d="M3 5l2 2M21 19l-2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></td><td>{{#str}} help_zoom, mod_vrmakerspace {{/str}} &middot; {{#str}} help_slide, mod_vrmakerspace {{/str}}</td></tr>
+                    </table>
+                    {{^readonly}}
                     {{#cansculpt}}
-                    <p class="mb-1{{#modelfirst}} d-none{{/modelfirst}}" data-region="sculpthelp">{{#str}} shortcuts, mod_vrmakerspace {{/str}}</p>
-                    <p class="mb-1 d-none" data-region="vrhelp">{{#str}} vrhelp, mod_vrmakerspace {{/str}}</p>
+                    <table class="table-reboot mod_vrmakerspace-helptable{{#modelfirst}} d-none{{/modelfirst}}" data-region="sculpthelp">
+                        <caption>{{#str}} help_keys, mod_vrmakerspace {{/str}}</caption>
+                        <tr><td><kbd>1</kbd>&hellip;<kbd>0</kbd></td><td>{{#str}} help_choosetool, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>{{#str}} help_brushsize, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>{{#str}} help_brushstrength, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>M</kbd></td><td>{{#str}} mirror, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Ctrl</kbd> <kbd>Z</kbd> <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></td><td>{{#str}} help_undoredo, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Tab</kbd></td><td>{{#str}} help_switch, mod_vrmakerspace {{/str}}</td></tr>
+                    </table>
                     {{/cansculpt}}
                     {{#canmodel}}
-                    <p class="mb-1{{^modelfirst}} d-none{{/modelfirst}}" data-region="modelhelp">{{#str}} modelshortcuts, mod_vrmakerspace {{/str}}</p>
-                    <p class="mb-1 d-none" data-region="vrmodelhelp">{{#str}} vrmodelhelp, mod_vrmakerspace {{/str}}</p>
+                    <table class="table-reboot mod_vrmakerspace-helptable{{^modelfirst}} d-none{{/modelfirst}}" data-region="modelhelp">
+                        <caption>{{#str}} help_keys, mod_vrmakerspace {{/str}}</caption>
+                        <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>{{#str}} help_pickwhat, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>G</kbd></td><td>{{#str}} action_move, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>R</kbd></td><td>{{#str}} action_rotate, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>S</kbd></td><td>{{#str}} action_scale, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>E</kbd></td><td>{{#str}} action_extrude, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>I</kbd></td><td>{{#str}} action_inset, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Ctrl</kbd> <kbd>B</kbd></td><td>{{#str}} action_bevel, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Ctrl</kbd> <kbd>R</kbd></td><td>{{#str}} action_loopcut, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd></td><td>{{#str}} help_lock, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>A</kbd> / <kbd>L</kbd></td><td>{{#str}} selectall, mod_vrmakerspace {{/str}} / {{#str}} selectlinked, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>M</kbd> <kbd>F</kbd> <kbd>X</kbd></td><td>{{#str}} oneshot_merge, mod_vrmakerspace {{/str}} / {{#str}} oneshot_fill, mod_vrmakerspace {{/str}} / {{#str}} oneshot_delete, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Ctrl</kbd> <kbd>Z</kbd> <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></td><td>{{#str}} help_undoredo, mod_vrmakerspace {{/str}}</td></tr>
+                        <tr><td><kbd>Tab</kbd></td><td>{{#str}} help_switch, mod_vrmakerspace {{/str}}</td></tr>
+                    </table>
+                    {{/canmodel}}
+                    {{/readonly}}
+                </div>
+                {{^readonly}}
+                    {{#cansculpt}}
+                    <p class="mb-1 mt-2 d-none small" data-region="vrhelp">{{#str}} vrhelp, mod_vrmakerspace {{/str}}</p>
+                    {{/cansculpt}}
+                    {{#canmodel}}
+                    <p class="mb-1 mt-2 d-none small" data-region="vrmodelhelp">{{#str}} vrmodelhelp, mod_vrmakerspace {{/str}}</p>
                     {{/canmodel}}
                 {{/readonly}}
             </div>
