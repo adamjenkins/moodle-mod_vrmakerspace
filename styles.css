@@ -1024,8 +1024,9 @@
         --bs-btn-active-border-color: #ffc107;
     }
 
-    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .mod_vrmakerspace-grouplabel {
-        color: rgba(244, 246, 248, 0.72);
+    /* Group names are text-muted, whose colour comes from this variable: light on the glass. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray {
+        --bs-secondary-color: rgba(244, 246, 248, 0.78);
     }
 
     .mod_vrmakerspace-studio .mod_vrmakerspace-tray .form-control,
