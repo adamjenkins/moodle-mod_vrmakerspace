@@ -159,11 +159,22 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
         );
         $mform->hideIf('tutorialnote', 'tutorial', 'notchecked');
 
-        if (tutorial::ai_available() || !empty($this->current->tutorai)) {
+        if (tutorial::ai_provider_available() || !empty($this->current->tutorai)) {
             $mform->addElement('advcheckbox', 'tutorai', get_string('tutorai', 'vrmakerspace'));
             $mform->addHelpButton('tutorai', 'tutorai', 'vrmakerspace');
             $mform->setDefault('tutorai', 0);
             $mform->hideIf('tutorai', 'tutorial', 'notchecked');
+            // The AI did not answer a little while ago: the teacher learns why students see no Ask box just now.
+            $since = tutorial::ai_down_since();
+            if ($since) {
+                $mform->addElement(
+                    'static',
+                    'tutoraidown',
+                    '',
+                    get_string('tutorai_offline', 'vrmakerspace', userdate($since, get_string('strftimetime', 'langconfig')))
+                );
+                $mform->hideIf('tutoraidown', 'tutorial', 'notchecked');
+            }
         } else {
             // No AI provider on the site: one plain line for the teacher; students see no AI features at all.
             $mform->addElement(

@@ -115,11 +115,18 @@ class ask_tutor extends external_api {
             userid: (int)$USER->id,
             prompttext: $prompt,
         );
-        $response = \core\di::get(\core_ai\manager::class)->process_action($action);
-        if (!$response->get_success()) {
-            $message = trim((string)$response->get_errormessage());
-            throw new \moodle_exception('error_tutorfailed', 'mod_vrmakerspace', '', $message !== '' ? $message : '-');
+        // A provider that cannot be reached, or answers with an error: the student is told calmly, and nobody is offered
+        // the Ask box for a while (tutorial::mark_ai_down()); the first answer after that clears it.
+        try {
+            $response = \core\di::get(\core_ai\manager::class)->process_action($action);
+        } catch (\Throwable $e) {
+            $response = null;
         }
+        if (!$response || !$response->get_success()) {
+            tutorial::mark_ai_down();
+            throw new \moodle_exception('error_tutoroffline', 'mod_vrmakerspace');
+        }
+        tutorial::mark_ai_up();
         $data = $response->get_response_data();
         $parsed = tutorial::parse_answer((string)($data['generatedcontent'] ?? ''), $demos);
         $answer = $parsed['answer'];

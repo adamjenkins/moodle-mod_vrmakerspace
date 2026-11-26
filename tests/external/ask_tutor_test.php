@@ -215,15 +215,24 @@ final class ask_tutor_test extends \core_external\tests\externallib_testcase {
     }
 
     /**
-     * A failed action is reported with the provider's message.
+     * A failed action is reported calmly, and nobody is offered the Ask box for a while; the first answer clears it.
      */
     public function test_failure_reported(): void {
         $this->resetAfterTest();
         $this->stub_ai(true, null);
         [$vrmakerspace] = $this->setup_activity();
-        $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('error_tutorfailed', 'vrmakerspace', 'Model offline'));
-        ask_tutor::execute((int)$vrmakerspace->cmid, 'welcome', 'Hello?');
+        try {
+            ask_tutor::execute((int)$vrmakerspace->cmid, 'welcome', 'Hello?');
+            $this->fail('A failed action must throw.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('error_tutoroffline', $e->errorcode);
+        }
+        $this->assertTrue(\mod_vrmakerspace\local\tutorial::ai_down());
+        $this->assertFalse(\mod_vrmakerspace\local\tutorial::ai_available());
+        $this->assertGreaterThan(0, \mod_vrmakerspace\local\tutorial::ai_down_since());
+        \mod_vrmakerspace\local\tutorial::mark_ai_up();
+        $this->assertFalse(\mod_vrmakerspace\local\tutorial::ai_down());
+        $this->assertTrue(\mod_vrmakerspace\local\tutorial::ai_available());
     }
 
     /**

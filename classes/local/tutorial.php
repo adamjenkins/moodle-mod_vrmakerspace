@@ -128,6 +128,15 @@ final class tutorial {
     /** @var int Longest question a student may ask the tutor, in characters. */
     public const MAX_QUESTION_LENGTH = 500;
 
+    /** @var int How long nobody is offered the Ask box after the AI failed to answer, in seconds. */
+    public const AI_DOWN_SECONDS = 600;
+
+    /** @var string Plugin config: until when the AI counts as not answering (unix time). */
+    public const CONFIG_AIDOWNUNTIL = 'aidownuntil';
+
+    /** @var string Plugin config: when the AI last failed to answer (unix time). */
+    public const CONFIG_AIDOWNAT = 'aidownat';
+
     /** @var int Most questions a student may ask the tutor in RATE_WINDOW seconds. */
     public const RATE_LIMIT = 20;
 
@@ -150,6 +159,16 @@ final class tutorial {
      * @return bool
      */
     public static function ai_available(): bool {
+        return self::ai_provider_available() && !self::ai_down();
+    }
+
+    /**
+     * Whether the site has an AI provider for text: an enabled, configured instance with the action on (core's own
+     * check, public/ai/classes/manager.php get_providers_for_actions()). It cannot tell whether that provider answers.
+     *
+     * @return bool
+     */
+    public static function ai_provider_available(): bool {
         if (!class_exists(\core_ai\manager::class)) {
             return false;
         }
@@ -157,6 +176,47 @@ final class tutorial {
             return \core\di::get(\core_ai\manager::class)->is_action_available(\core_ai\aiactions\generate_text::class);
         } catch (\Throwable $e) {
             return false;
+        }
+    }
+
+    /**
+     * Whether the AI failed to answer a little while ago: then nobody is offered the Ask box until AI_DOWN_SECONDS have
+     * passed, so students are not let down again and again. Learnt only from real questions, never by probing.
+     *
+     * Kept as plugin config (a timestamp, read from the config cache) rather than a cache definition, which would
+     * need a version bump to register: it can become a MUC cache at the next release.
+     *
+     * @return bool
+     */
+    public static function ai_down(): bool {
+        return (int)get_config('mod_vrmakerspace', self::CONFIG_AIDOWNUNTIL) > time();
+    }
+
+    /**
+     * When the AI last failed to answer, while that still counts (0 when it does not).
+     *
+     * @return int unix time
+     */
+    public static function ai_down_since(): int {
+        return self::ai_down() ? (int)get_config('mod_vrmakerspace', self::CONFIG_AIDOWNAT) : 0;
+    }
+
+    /**
+     * The AI failed to answer (it could not be reached, or it returned an error): stop offering it for a while.
+     */
+    public static function mark_ai_down(): void {
+        $now = time();
+        set_config(self::CONFIG_AIDOWNAT, $now, 'mod_vrmakerspace');
+        set_config(self::CONFIG_AIDOWNUNTIL, $now + self::AI_DOWN_SECONDS, 'mod_vrmakerspace');
+    }
+
+    /**
+     * The AI answered: forget an earlier failure (writes only when there is one to forget).
+     */
+    public static function mark_ai_up(): void {
+        if (get_config('mod_vrmakerspace', self::CONFIG_AIDOWNAT)) {
+            unset_config(self::CONFIG_AIDOWNAT, 'mod_vrmakerspace');
+            unset_config(self::CONFIG_AIDOWNUNTIL, 'mod_vrmakerspace');
         }
     }
 

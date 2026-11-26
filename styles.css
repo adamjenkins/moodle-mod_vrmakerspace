@@ -1617,3 +1617,10 @@
         white-space: nowrap;
     }
 }
+
+@media (max-width: 575.98px) {
+    /* The tutorial sheet keeps its right edge clear of the site's floating accessibility button. */
+    .mod_vrmakerspace-studio.mod_vrmakerspace-tourbottom .mod_vrmakerspace-tour.mod_vrmakerspace-tour-docked {
+        padding-right: 3.75rem;
+    }
+}

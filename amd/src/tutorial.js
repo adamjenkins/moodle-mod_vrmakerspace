@@ -68,6 +68,9 @@ const VR_REPEAT = 8;
 /** Below this width of the studio (CSS px) the bubble docks under the 3D view. */
 const DOCK_WIDTH = 576;
 
+/** The errors of mod_vrmakerspace_ask_tutor that mean the AI cannot answer now (not a fault in the question). */
+const OFFLINE_ERRORS = Object.freeze(['error_tutoroffline', 'error_tutornotavailable']);
+
 /** From this studio width (px) the bubble is a panel beside the 3D view, which narrows to make room for it. */
 const SIDE_WIDTH = 860;
 
@@ -313,6 +316,8 @@ export const createTutorial = (options) => {
     let layer = null;
     let rendering = null;
     let opened = false;
+    /** Whether the AI failed to answer in this visit: then no Ask box and no Talk until the page is opened again. */
+    let offline = false;
     /** Whether the tour opened More itself (it closes it again when a step needs only the basic tools). */
     let openedmore = false;
     let disposed = false;
@@ -672,6 +677,11 @@ export const createTutorial = (options) => {
         const step = current.step;
         const last = step.key === 'done';
         const canshow = !!step.demo && !!tutor && typeof tutor.demo === 'function' && !invr;
+        if (offline) {
+            // The AI did not answer in this visit: the Ask box and Talk stay away.
+            show(parts.ask, false);
+            show(parts.talk, false);
+        }
         show(parts.buttons.showme, canshow);
         show(parts.buttons.back, current.index > 0);
         show(parts.buttons.skip, step.kind === 'action' && !current.completed);
@@ -837,6 +847,18 @@ export const createTutorial = (options) => {
     };
 
     /**
+     * Scroll the phone's tool sheet so a control sits in its middle, clear of the fade at its foot.
+     *
+     * @param {HTMLElement} sheet The sheet (it scrolls on its own).
+     * @param {HTMLElement} element The control.
+     */
+    const centreInSheet = (sheet, element) => {
+        const box = element.getBoundingClientRect();
+        const frame = sheet.getBoundingClientRect();
+        sheet.scrollTop += (box.top + box.height / 2) - (frame.top + frame.height / 2);
+    };
+
+    /**
      * Bring the step's control into view (the Model panel scrolls sideways on phones).
      *
      * @param {Object} step The step.
@@ -844,7 +866,14 @@ export const createTutorial = (options) => {
     const reveal = (step) => {
         const element = step.target && !step.target.canvas ? targetElement(step) : null;
         if (element && typeof element.scrollIntoView === 'function' && !invr) {
-            element.scrollIntoView({block: 'nearest', inline: 'nearest'});
+            // In the phone's tool sheet (which scrolls on its own and fades at its foot), into the middle of it, clear of
+            // the fade; elsewhere only as far as needed.
+            const sheet = element.closest('[data-region="tray"]');
+            element.scrollIntoView({block: sheet ? 'center' : 'nearest', inline: 'nearest'});
+            if (sheet) {
+                // The sheet fills in its tools (More) after this: centre the control again once it has.
+                window.requestAnimationFrame(() => window.requestAnimationFrame(() => centreInSheet(sheet, element)));
+            }
             // Not under the site's top bar or a bar at the window's bottom, where a click would miss it.
             revealAboveBar(root, element);
         }
@@ -1269,6 +1298,23 @@ export const createTutorial = (options) => {
     };
 
     /**
+     * The AI cannot answer now (mod_vrmakerspace_ask_tutor said so): say it once, calmly, and take the Ask box and Talk
+     * away for the rest of this visit. The steps and Show me go on as before.
+     */
+    const goOffline = () => {
+        aiready = false;
+        offline = true;
+        stopTalking();
+        tell(str('tutorial_offline'));
+        if (parts) {
+            show(parts.ask, false);
+            show(parts.talk, false);
+        }
+        refreshButtons();
+        position();
+    };
+
+    /**
      * Ask the AI (mod_vrmakerspace_ask_tutor); its answer may name a demonstration.
      *
      * @param {string} question The question.
@@ -1298,6 +1344,11 @@ export const createTutorial = (options) => {
             return answer;
         }).catch((error) => {
             Log.debug(error);
+            if (error && OFFLINE_ERRORS.includes(error.errorcode)) {
+                // The AI did not answer: one calm line, and no Ask box or Talk for the rest of this visit.
+                goOffline();
+                return;
+            }
             tell(str('tutorial_askfailed', errorText(error)));
             const hit = localMatch(question);
             if (hit) {

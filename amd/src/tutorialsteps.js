@@ -319,7 +319,7 @@ export const UI_STRING_KEYS = Object.freeze(['tutorial_notnow', 'tutorial_offer_
     'tutorial_next', 'tutorial_back', 'tutorial_skip', 'tutorial_finish',
     'tutorial_close', 'tutorial_showme', 'tutorial_stepof', 'tutorial_done', 'tutorial_button', 'tutorial_ask',
     'tutorial_askplaceholder', 'tutorial_thinking', 'tutorial_askfailed', 'tutorial_saved', 'tutorial_reopen',
-    'tutorial_showmefailed']);
+    'tutorial_showmefailed', 'tutorial_offline']);
 
 /** The tutor's strings (mod_vrmakerspace/tutor). */
 export const TUTOR_STRING_KEYS = Object.freeze(['tutor_name', 'tutor_demofailed', 'tutor_demonomesh', 'tutor_watch']);
