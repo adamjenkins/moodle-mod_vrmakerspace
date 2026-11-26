@@ -30,10 +30,10 @@
  */
 
 /** Colour of the mesh layer: a cool blue-grey, so it is told apart from the clay. */
-const MESH_COLOUR = 0x7f9cb5;
+const MESH_COLOUR = 0x9fc4ec;
 
 /** Colour of the edges and vertices while editing. */
-const WIRE_COLOUR = 0x1f2933;
+const WIRE_COLOUR = 0x3d5266;
 
 /** Colour of open edges (used by one face, or by more than two). */
 const OPEN_COLOUR = 0xe03131;

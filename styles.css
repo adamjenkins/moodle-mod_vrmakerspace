@@ -7,6 +7,7 @@
 }
 
 .mod_vrmakerspace-studio .mod_vrmakerspace-toolbar {
+    flex-wrap: wrap;
     row-gap: 0.5rem;
 }
 
@@ -14,6 +15,35 @@
     flex: 1 1 100%;
     min-width: 0;
     row-gap: 0.5rem;
+}
+
+/* With the basic tools, one row: the method, its tools, then undo, the saved state and the menus on the right. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > * {
+    order: 3;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > .mod_vrmakerspace-methods {
+    order: 0;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > .mod_vrmakerspace-panel,
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > .mod_vrmakerspace-scrollwrap {
+    flex: 0 1 auto;
+    order: 1;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > .mod_vrmakerspace-moretools {
+    order: 2;
+}
+
+/* With the basic tools, Save now is in the ⋯ menu (the row stays one row); with all of them, beside the state. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-savedstate + [data-action="save"],
+.mod_vrmakerspace-studio:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-menusave {
+    display: none;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > .mod_vrmakerspace-undoredo {
+    margin-left: auto;
 }
 
 .mod_vrmakerspace-studio .mod_vrmakerspace-slider {
@@ -35,7 +65,7 @@
     min-height: 18rem;
     /* The site's top bar and the tool rows must fit above it in the window, and a bar fixed to the window's bottom
        (Moodle 5.3's activity navigation, measured by mod_vrmakerspace/bottombar) below it. */
-    max-height: calc(100vh - 16.5rem - var(--mod-vrmakerspace-bottombar, 0px));
+    max-height: calc(100vh - 24rem - var(--mod-vrmakerspace-bottombar, 0px));
     overflow: hidden;
     border-radius: 0.375rem;
     background-color: #c9ccd1;
@@ -138,16 +168,245 @@
     display: none;
 }
 
-/* Phones: the toolbar wraps, groups take the full width, the canvas keeps most of the screen. */
-@media (max-width: 575.98px) {
-    .mod_vrmakerspace-studio .mod_vrmakerspace-panel > .btn-group:first-child,
-    .mod_vrmakerspace-studio .mod_vrmakerspace-methods {
-        width: 100%;
+/* First-use help (mod_vrmakerspace/guide). */
+
+/* Basic tools: the advanced ones hide until More tools, except one in use. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic [data-advanced]:not(.active) {
+    display: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-goal {
+    min-width: 0;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-goalintro {
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-goalfacts .list-inline-item:not(:last-child)::after {
+    content: "\00b7";
+    margin-left: 0.5rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-member {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 1rem;
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-member .mod_vrmakerspace-dot {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.25rem;
+    border: 1px solid #6a737b;
+    border-radius: 50%;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-member.mod_vrmakerspace-here {
+    border-color: #357a32;
+    color: var(--bs-body-color, #1d2125);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-member.mod_vrmakerspace-here .mod_vrmakerspace-dot {
+    border-color: #357a32;
+    background-color: #357a32;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-savedstate {
+    white-space: nowrap;
+}
+
+/* The pictures of the controls: a small strip in a corner of the 3D view, mouse or touch by the pointer, the method's
+   words by the class; they fade after the first change and the "?" stays. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-legend {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helpbutton {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 50%;
+    font-weight: 700;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-pictures {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    background-color: rgba(29, 33, 37, 0.6);
+    color: #fff;
+    font-size: 0.8rem;
+    transition: opacity 600ms ease;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-pictures li {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-legendfaded .mod_vrmakerspace-pictures {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-pictures .mod_vrmakerspace-legend-touch {
+    display: none;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-method-model .mod_vrmakerspace-pictures .mod_vrmakerspace-legend-sculpt,
+.mod_vrmakerspace-studio.mod_vrmakerspace-method-sculpt .mod_vrmakerspace-pictures .mod_vrmakerspace-legend-model {
+    display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-pictures .mod_vrmakerspace-legend-mouse {
+        display: none;
     }
 
-    .mod_vrmakerspace-studio .mod_vrmakerspace-panel > .btn-group:first-child .btn,
-    .mod_vrmakerspace-studio .mod_vrmakerspace-methods .btn {
-        flex: 1 1 auto;
+    .mod_vrmakerspace-studio .mod_vrmakerspace-pictures .mod_vrmakerspace-legend-touch {
+        display: flex;
+    }
+}
+
+/* The help: the keys of the method in use, over the 3D view. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel {
+    position: absolute;
+    top: 3rem;
+    left: 0.5rem;
+    max-width: 28rem;
+    max-height: calc(100% - 3.5rem);
+    padding: 0.75rem;
+    overflow: auto;
+    border-radius: 0.375rem;
+    background-color: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #1d2125);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
+}
+
+/* Pictured tools: an icon above the word, bigger than a text button. */
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-tile {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-width: 4.25rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.9rem;
+    line-height: 1.1;
+}
+
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-tile svg {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-undoredo .btn.mod_vrmakerspace-tile {
+    min-width: 2.75rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-undoredo .btn.mod_vrmakerspace-tile svg {
+    width: 1.4rem;
+    height: 1.4rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-toolgroup {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolgroup[data-advanced] {
+    display: none;
+}
+
+.mod_vrmakerspace-studio:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-modelpanel .mod_vrmakerspace-toolgroup {
+    flex: 1 1 100%;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-grouplabel {
+    min-width: 5.5rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-savedstate {
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-savedstate.mod_vrmakerspace-saved {
+    color: #357a32;
+}
+
+/* The button the tip names glows. */
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-glow {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 0 0.25rem #ffc107;
+    animation: mod_vrmakerspace-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes mod_vrmakerspace-glow {
+    50% {
+        box-shadow: 0 0 0 0.45rem rgba(255, 193, 7, 0.45);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mod_vrmakerspace-studio .btn.mod_vrmakerspace-glow {
+        animation: none;
+    }
+}
+
+/* The next-step tip: low in the middle of the 3D view, out of the way of the piece. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    max-width: calc(100% - 1rem);
+    padding: 0.5rem 0.75rem;
+    transform: translateX(-50%);
+    border-radius: 0.5rem;
+    background-color: #0f6cbf;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint.d-none {
+    display: none;
+}
+
+/* The shape tools' row and, on a phone, the cue that more of it follows to the right. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-scrollwrap {
+    position: relative;
+    flex: 1 1 100%;
+    min-width: 0;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-morecue {
+    display: none;
+}
+
+/* Phones: the toolbar wraps, groups take the full width, the canvas keeps most of the screen. */
+@media (max-width: 575.98px) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-methods .btn.mod_vrmakerspace-tile {
+        min-width: 3.5rem;
+        padding: 0.2rem 0.4rem;
     }
 
     /* The Model panel stays one row that scrolls sideways, so the 3D view stays where it is. */
@@ -170,6 +429,66 @@
         white-space: nowrap;
     }
 
+    /* More tools follow to the right: a fade and an arrow say so, and the arrow scrolls on. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-hasmore .mod_vrmakerspace-morecue {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: 3rem;
+        padding-right: 0.25rem;
+        background: linear-gradient(to right, rgba(255, 255, 255, 0), var(--bs-body-bg, #fff) 60%);
+        color: #0f6cbf;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    /* The tools' tray: one row at the bottom of the 3D view, the tip just above it. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding: 0.4rem 0.4rem 0.2rem;
+        background-color: rgba(255, 255, 255, 0.92);
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .mod_vrmakerspace-panel {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .mod_vrmakerspace-panel > .btn-group:first-child {
+        width: auto;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .btn-group {
+        flex-wrap: nowrap;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-tray .mod_vrmakerspace-slider {
+        display: none;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone .mod_vrmakerspace-hint {
+        bottom: 5.5rem;
+        font-size: 0.9rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-goalfacts {
+        font-size: 0.75rem;
+    }
+
+    /* The site's floating drawer button would sit on the piece (its d-flex wins over display, not visibility). */
+    body.mod_vrmakerspace-studiopage .drawer-toggles {
+        visibility: hidden;
+    }
+
     .mod_vrmakerspace-studio .mod_vrmakerspace-slider {
         flex: 1 1 100%;
     }
@@ -179,8 +498,82 @@
         width: auto;
     }
 
+    /* The task line, one row of controls, then the 3D view filling the rest of the screen, tools in its tray. */
     .mod_vrmakerspace-studio .mod_vrmakerspace-stage {
-        height: 60vh;
+        height: calc(100vh - 15rem);
+        min-height: 22rem;
+        max-height: none;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-goalfacts,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-goalintro,
+    .mod_vrmakerspace-studio [data-action="save"] {
+        display: none;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-header {
+        font-size: 0.9rem;
+    }
+
+    /* One row of controls: smaller method buttons, no More tools (the phone keeps the basic tools). */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-toolbar {
+        flex-wrap: nowrap;
+        gap: 0.35rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-methods .btn.mod_vrmakerspace-tile {
+        font-size: 0.75rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-methods .btn.mod_vrmakerspace-tile svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-undoredo .btn.mod_vrmakerspace-tile {
+        min-width: 2.4rem;
+        padding: 0.25rem;
+    }
+
+    /* The saved state as a sign only: a tick once saved, a dot while changes wait, nothing before. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-savedstate {
+        font-size: 0;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-savedstate[data-state="saved"]::before {
+        content: "\2713";
+        font-size: 1.25rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-savedstate[data-state="pending"]::before {
+        content: "\25cf";
+        color: #f0ad4e;
+        font-size: 1rem;
+    }
+
+    /* The tray's tools share the width, so the row fits and nothing is cut. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .btn.mod_vrmakerspace-tile {
+        min-width: 3.6rem;
+        padding: 0.25rem 0.3rem;
+        font-size: 0.75rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .btn.mod_vrmakerspace-tile svg {
+        width: 1.4rem;
+        height: 1.4rem;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-undoredo {
+        margin-left: auto;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-moretools {
+        display: none;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-pictures {
+        gap: 0.5rem;
+        font-size: 0.7rem;
     }
 }
 

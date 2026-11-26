@@ -106,12 +106,37 @@ if (has_capability('mod/vrmakerspace:make', $context)) {
                 }
             }
         }
+        // In plain words: what the student does here, that the work saves itself, and whether it is graded.
+        $plain = [];
+        if ((int)$session->groupid) {
+            $groupname = format_string(
+                groups_get_group_name((int)$session->groupid),
+                true,
+                ['context' => $context, 'escape' => false]
+            );
+            $plain[] = ['text' => get_string('intro_group', 'vrmakerspace', $groupname)];
+        } else {
+            $plain[] = ['text' => get_string('intro_alone', 'vrmakerspace')];
+        }
+        if ((int)$session->status !== session_manager::STATUS_CLOSED) {
+            $plain[] = ['text' => get_string('intro_saves', 'vrmakerspace')];
+        }
+        $grade = (int)$vrmakerspace->grade;
+        if ($grade > 0) {
+            $plain[] = ['text' => get_string('intro_graded', 'vrmakerspace', $grade)];
+        } else if ($grade < 0) {
+            $plain[] = ['text' => get_string('intro_gradedscale', 'vrmakerspace')];
+        } else if (!$istutorial) {
+            $plain[] = ['text' => get_string('intro_notgraded', 'vrmakerspace')];
+        }
         $templatecontext['hassculpture'] = true;
         $templatecontext['sculpture'] = [
             'sessionid' => (int)$session->id,
             'owner' => $owner,
             'status' => view_helper::status_text($session),
             'isclosed' => (int)$session->status === session_manager::STATUS_CLOSED,
+            'hasplain' => true,
+            'plain' => $plain,
             'studiourl' => view_helper::studio_url($context, 0, 0, (int)$session->groupid)->out(false),
             'versions' => $rows,
             'hasversions' => !empty($rows),

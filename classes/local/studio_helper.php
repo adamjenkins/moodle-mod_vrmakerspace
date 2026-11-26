@@ -247,4 +247,115 @@ final class studio_helper {
         }
         return get_string('studiotitleversion', 'vrmakerspace', ['owner' => $owner, 'version' => (int)$snapshot->version]);
     }
+
+    /**
+     * Most group members listed in the studio's strip of people.
+     */
+    public const MEMBERS_MAX = 12;
+
+    /**
+     * What the studio template needs for its first-use help: the task strip, the next-step tips, whether the piece
+     * starts empty, when it was last saved and the people of a group piece.
+     *
+     * Plain text throughout: the template escapes it once.
+     *
+     * @param \stdClass $vrmakerspace the vrmakerspace row
+     * @param \context_module $context the activity context
+     * @param \stdClass $user the user
+     * @param array $resolved what resolve() returned
+     * @param array $config what config() returned
+     * @return array{goal: array|null, hints: array, emptystart: bool, meshstart: bool, lastsaved: int,
+     *     hasmembers: bool, members: array, waitingtext: string}
+     */
+    public static function guide_context(
+        \stdClass $vrmakerspace,
+        \context_module $context,
+        \stdClass $user,
+        array $resolved,
+        array $config
+    ): array {
+        global $DB;
+        $session = $resolved['session'];
+        $readonly = !empty($config['readonly']);
+
+        $goal = null;
+        if (!$readonly) {
+            $intro = format_text((string)$vrmakerspace->intro, (int)$vrmakerspace->introformat, ['context' => $context]);
+            $intro = trim(preg_replace('/\s+/u', ' ', html_to_text($intro, 0, false)));
+            $facts = [['text' => get_string('goal_saves', 'vrmakerspace')]];
+            $grade = (int)$vrmakerspace->grade;
+            if ($grade > 0) {
+                $facts[] = ['text' => get_string('goal_graded', 'vrmakerspace', $grade)];
+            } else if ($grade < 0) {
+                $facts[] = ['text' => get_string('goal_gradedscale', 'vrmakerspace')];
+            } else {
+                $facts[] = ['text' => get_string('goal_notgraded', 'vrmakerspace')];
+            }
+            if ((int)$session->groupid) {
+                $groupname = format_string(
+                    groups_get_group_name((int)$session->groupid),
+                    true,
+                    ['context' => $context, 'escape' => false]
+                );
+                $facts[] = ['text' => get_string('goal_group', 'vrmakerspace', $groupname)];
+            } else {
+                $facts[] = ['text' => get_string('goal_alone', 'vrmakerspace')];
+            }
+            $goal = [
+                'name' => format_string($vrmakerspace->name, true, ['context' => $context, 'escape' => false]),
+                'intro' => $intro === '' ? '' : shorten_text($intro, 220),
+                'facts' => $facts,
+            ];
+        }
+
+        // The tips name the buttons by their own strings, so renaming a button renames it in the tips too.
+        $name = fn(string $key): string => get_string($key, 'vrmakerspace');
+        $hints = [
+            'clay' => get_string('hint_clay', 'vrmakerspace'),
+            'claydone' => get_string('hint_clay_done', 'vrmakerspace', (object)['carve' => $name('tool_carve'),
+                'smooth' => $name('tool_smooth')]),
+            'shapesdone' => get_string('hint_shapes_done', 'vrmakerspace'),
+            'clayempty' => get_string('hint_clay_empty', 'vrmakerspace', (object)['shape' => $name('tool_shape')]),
+            'claymesh' => get_string('hint_claymesh', 'vrmakerspace', (object)['shapes' => $name('method_model'),
+                'more' => $name('tools_more'), 'bake' => $name('oneshot_bake')]),
+            'shapespick' => get_string('hint_shapes_pick', 'vrmakerspace'),
+            'shapesact' => get_string('hint_shapes_act', 'vrmakerspace', (object)['move' => $name('action_move'),
+                'extrude' => $name('action_extrude')]),
+            'shapesempty' => get_string('hint_shapes_empty', 'vrmakerspace', (object)['addshape' => $name('addshape'),
+                'cube' => $name('mshape_cube')]),
+        ];
+
+        $lastsaved = (int)$DB->get_field_sql(
+            'SELECT MAX(timecreated) FROM {vrmakerspace_snapshots} WHERE sessionid = ?',
+            [(int)$session->id]
+        );
+
+        $members = [];
+        $others = [];
+        if ((int)$session->groupid && !$readonly) {
+            $namefields = array_map(fn(string $field): string => 'u.' . $field, \core_user\fields::get_name_fields());
+            $users = groups_get_members((int)$session->groupid, 'u.id, ' . implode(', ', $namefields), 'u.lastname, u.firstname');
+            foreach ($users as $member) {
+                if (count($members) >= self::MEMBERS_MAX) {
+                    break;
+                }
+                $you = (int)$member->id === (int)$user->id;
+                $display = pair_manager::display_name(fullname($member));
+                $members[] = ['name' => $display, 'you' => $you];
+                if (!$you) {
+                    $others[] = $display;
+                }
+            }
+        }
+        return [
+            'goal' => $goal,
+            'hints' => $hints,
+            'emptystart' => ($config['model'] ?? '') === session_manager::MODEL_EMPTY,
+            'meshstart' => ($config['model'] ?? '') === session_manager::MODEL_MESHCUBE,
+            'lastsaved' => $lastsaved,
+            'hasmembers' => count($members) > 1,
+            'members' => $members,
+            'waitingtext' => $others ? get_string('status_waitingfor', 'vrmakerspace', implode(', ', $others)) : '',
+        ];
+    }
 }

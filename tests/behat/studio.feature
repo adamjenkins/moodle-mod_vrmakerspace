@@ -22,7 +22,7 @@ Feature: Open the makerspace studio
     When I am on the "Clay animals" "vrmakerspace activity" page logged in as "student1"
     And I should see "Sculpting and modelling"
     And I follow "Open the makerspace"
-    Then I should see "Your piece"
+    Then I should see "Your task:"
     And I should see "Clay animals"
     And I should see "Back to the activity"
     And I should not see "View only"
@@ -32,8 +32,8 @@ Feature: Open the makerspace studio
     And "Add shape" "button" should exist
     And "Cut shape" "button" should exist
     And "Mirror" "button" should exist
-    And "Extrude" "button" should exist
-    And "Loop cut" "button" should exist
+    And "Pull out" "button" should exist
+    And "Add ring" "button" should exist
     And "Turn into clay" "button" should exist
 
   Scenario: A sculpting-only activity hides the Model controls
@@ -44,8 +44,8 @@ Feature: Open the makerspace studio
     And I should see "Sculpting only"
     And I follow "Open the makerspace"
     Then "Inflate" "button" should exist
-    And "Extrude" "button" should not exist
-    And "Loop cut" "button" should not exist
+    And "Pull out" "button" should not exist
+    And "Add ring" "button" should not exist
     And "Turn into clay" "button" should not exist
 
   Scenario: A modelling-only activity hides the Sculpt controls
@@ -56,7 +56,7 @@ Feature: Open the makerspace studio
     And I should see "Modelling only"
     And I should see "A polygon cube"
     And I follow "Open the makerspace"
-    Then "Extrude" "button" should exist
+    Then "Pull out" "button" should exist
     And "Inflate" "button" should not exist
     And "Pinch" "button" should not exist
 
@@ -72,4 +72,4 @@ Feature: Open the makerspace studio
       | vrmakerspace | Group whale | MAKE   | make2    | 1        |
     When I am on the "Group whale" "vrmakerspace activity" page logged in as "student1"
     And I follow "Open the makerspace"
-    Then I should see "Piece of Otters"
+    Then I should see "Together with Otters"

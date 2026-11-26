@@ -57,12 +57,13 @@ $PAGE->add_body_class('mod_vrmakerspace-studiopage');
 $resolved = studio_helper::resolve($vrmakerspace, $cm, $context, (int)$USER->id, $sessionid, $version, $groupid);
 $title = studio_helper::title($resolved['session'], $context, (int)$USER->id, $version ? $resolved['snapshot'] : null);
 $config = studio_helper::config($vrmakerspace, $context, $USER, $resolved);
+// First-use help: the task strip, the next-step tips, the saved state and the people of a group piece.
+$guide = studio_helper::guide_context($vrmakerspace, $context, $USER, $resolved, $config);
+$config['waitingtext'] = $guide['waitingtext'];
 
 $PAGE->requires->js_call_amd('mod_vrmakerspace/studio', 'init', [$config]);
 
 echo $OUTPUT->header();
-// Whose piece this is (and which version): plain text, escaped here because heading() does not.
-echo $OUTPUT->heading(s($title), 3);
 echo $OUTPUT->render_from_template('mod_vrmakerspace/studio', [
     'readonly' => $config['readonly'],
     // The activity name (the canvas label and the export file name), escaped once by the template.
@@ -70,5 +71,7 @@ echo $OUTPUT->render_from_template('mod_vrmakerspace/studio', [
     'backurl' => $config['backurl'],
     // Tutorial mode: the toolbar's Tutorial button (only when the tour runs).
     'tutorial' => !empty($config['tutorial']),
-] + studio_helper::methods_context($config['methods'], $config['model']));
+    // Whose piece this is (and which version): the task strip says it, so the page has no heading band of its own.
+    'piecetitle' => $title,
+] + studio_helper::methods_context($config['methods'], $config['model']) + $guide);
 echo $OUTPUT->footer();

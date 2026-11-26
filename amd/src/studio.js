@@ -49,6 +49,7 @@ import {createTutor} from 'mod_vrmakerspace/tutor';
 import {createTutorial} from 'mod_vrmakerspace/tutorial';
 import {stringKeys as tutorialStringKeys} from 'mod_vrmakerspace/tutorialsteps';
 import {startBelowTopBar, watch as watchBottomBar} from 'mod_vrmakerspace/bottombar';
+import {createGuide} from 'mod_vrmakerspace/guide';
 
 /** Every string of the studio and the modules it hands its strings to (contract §9). */
 const STRING_KEYS = [
@@ -70,6 +71,27 @@ const STRING_KEYS = [
     'meshrefused_nosolid', 'undoreset', 'leavesavefailed',
     'modelopenedges', 'modelshortcuts', 'vrmodelhelp', 'vrmodelselecthelp', 'meshlayer',
 ];
+
+/** Height of the desktop camera above the piece's centre when the studio opens (m). */
+const CAMERA_RISE = 0.3;
+
+/** Distance of the desktop camera in front of the piece when the studio opens (m). */
+const CAMERA_DISTANCE = 0.5;
+
+/** Distance of the desktop camera to the side when the studio opens (m): a three-quarter view shows three sides. */
+const CAMERA_SIDE = 0.3;
+
+/** How much room the camera leaves round the piece when it eases back (1 = touching the edges). */
+const FRAME_MARGIN = 1.3;
+
+/** The most the camera moves back at one change (times its distance), so a stray measurement cannot fling it away. */
+const FRAME_MAX_STEP = 1.6;
+
+/** How long the camera takes to ease back (ms). */
+const FRAME_TIME = 500;
+
+/** How long after a change the camera checks that the piece is still in view (ms): the engine draws it first. */
+const FRAME_DELAY = 700;
 
 /** Size of a shape from the Add shape menu (half-extent or radius, m). */
 const NEW_SHAPE_SIZE = 0.06;
@@ -301,9 +323,11 @@ const buildView = (canvas) => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
     renderer.xr.enabled = true;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xc9ccd1);
+    // A calm, light background and a darker stand, so the piece is what the eye finds first.
+    scene.background = new THREE.Color(0xdfe5ec);
     const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.01, 50);
-    camera.position.set(0, SCULPTURE_HEIGHT + 0.12, 0.62);
+    // Above the piece and to one side: three sides show, so a box reads as a box, and the stand stays below it.
+    camera.position.set(CAMERA_SIDE, SCULPTURE_HEIGHT + CAMERA_RISE, CAMERA_DISTANCE);
     camera.lookAt(0, SCULPTURE_HEIGHT, 0);
     scene.add(camera);
 
@@ -316,12 +340,12 @@ const buildView = (canvas) => {
     filllight.position.set(-1.5, 1.2, -1);
     scene.add(filllight);
 
-    const floormaterial = new THREE.MeshStandardMaterial({color: 0x9aa0a6, roughness: 1, metalness: 0});
+    const floormaterial = new THREE.MeshStandardMaterial({color: 0xb4bcc6, roughness: 1, metalness: 0});
     const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), floormaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.name = 'vrmakerspace-floor';
     scene.add(floor);
-    const pedestalmaterial = new THREE.MeshStandardMaterial({color: 0xe8e6e1, roughness: 0.7, metalness: 0});
+    const pedestalmaterial = new THREE.MeshStandardMaterial({color: 0xc9d0d8, roughness: 0.7, metalness: 0});
     const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, PEDESTAL_TOP, 48), pedestalmaterial);
     pedestal.position.set(0, PEDESTAL_TOP / 2, 0);
     pedestal.name = 'vrmakerspace-pedestal';
@@ -512,6 +536,129 @@ const tutorialFlags = (config, readonly, extra) => {
 };
 
 /**
+ * Keep the whole piece in the desktop view: after a change that takes it out of the frame, the camera eases back
+ * (never in) until it fits again.
+ *
+ * @param {Object} THREE three.js.
+ * @param {Object} camera THREE.PerspectiveCamera.
+ * @param {Object} sculptureRoot THREE.Group holding the piece (and the others' presence, which is left out).
+ * @returns {Object} {check(controls), update(controls)}
+ */
+export const createFramer = (THREE, camera, sculptureRoot) => {
+    const box = new THREE.Box3();
+    const sphere = new THREE.Sphere();
+    const offset = new THREE.Vector3();
+    let ease = null;
+    /**
+     * The box round the piece, in world space: its solid surfaces only (no wireframes, markers or see-through
+     * helpers, and nothing of the others' presence), vertex by vertex.
+     *
+     * @returns {boolean} Whether there is anything to frame.
+     */
+    const measure = () => {
+        box.makeEmpty();
+        sculptureRoot.children.forEach((child) => {
+            if (child.name === 'vrmakerspace-presence') {
+                return;
+            }
+            child.traverseVisible((object) => {
+                const material = object.material;
+                if (object.isMesh && material && !material.wireframe && !material.transparent) {
+                    box.expandByObject(object, true);
+                }
+            });
+        });
+        return !box.isEmpty();
+    };
+    return {
+        /**
+         * Start easing back if the piece no longer fits.
+         *
+         * @param {Object|null} controls The view's OrbitControls.
+         */
+        check: (controls) => {
+            if (!controls || !measure()) {
+                return;
+            }
+            box.getBoundingSphere(sphere);
+            const half = THREE.MathUtils.degToRad(camera.fov / 2);
+            const fit = Math.tan(half) * Math.min(1, camera.aspect || 1);
+            const needed = sphere.radius * FRAME_MARGIN / fit + sphere.center.distanceTo(controls.target);
+            const distance = camera.position.distanceTo(controls.target);
+            if (distance < needed) {
+                ease = {from: distance, to: Math.min(needed, controls.maxDistance, distance * FRAME_MAX_STEP),
+                    start: performance.now()};
+            }
+        },
+
+        /**
+         * Per frame: move the camera along its line to the target while easing.
+         *
+         * @param {Object|null} controls The view's OrbitControls.
+         */
+        update: (controls) => {
+            if (!ease || !controls) {
+                return;
+            }
+            const t = Math.min(1, (performance.now() - ease.start) / FRAME_TIME);
+            const distance = ease.from + (ease.to - ease.from) * t * (2 - t);
+            offset.copy(camera.position).sub(controls.target).setLength(distance);
+            camera.position.copy(controls.target).add(offset);
+            if (t >= 1) {
+                ease = null;
+            }
+        },
+    };
+};
+
+/**
+ * Where the page starts when the studio opens: the page's own heading (whose piece) just above the studio, so nothing
+ * is cut under the site's top bar; else the task strip or the toolbar.
+ *
+ * @param {HTMLElement} root The studio root.
+ * @returns {HTMLElement|null}
+ */
+const startElement = (root) => {
+    const heading = root.previousElementSibling;
+    // On a phone the room goes to the 3D view: start at the task line.
+    const phone = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 575.98px)').matches;
+    if (heading && /^H[1-6]$/.test(heading.tagName) && !phone) {
+        return heading;
+    }
+    return root.querySelector('[data-region="goal"]') || root.querySelector('[data-region="toolbar"]');
+};
+
+/**
+ * Tell the guide about the person's own changes (its tip goes after a few, and the saved state shows them). A stroke
+ * is many ops and one change.
+ *
+ * @param {Object} session The session (its submit() is wrapped).
+ * @param {Function} onChange Called once per change.
+ */
+const countChanges = (session, onChange) => {
+    const strokes = new Set();
+    const submitOwn = session.submit.bind(session);
+    session.submit = (op) => {
+        const taken = submitOwn(op);
+        if (taken === false || !op || typeof op.k !== 'string' || UNCOUNTED_OPS.has(op.k)) {
+            return taken;
+        }
+        if (op.s !== undefined && op.s !== null) {
+            const id = String(op.s);
+            if (strokes.has(id)) {
+                return taken;
+            }
+            strokes.add(id);
+            if (strokes.size > COUNTED_STROKES) {
+                strokes.delete(strokes.values().next().value);
+            }
+        }
+        onChange();
+        return taken;
+    };
+};
+
+/**
  * Run the studio once the strings are loaded.
  *
  * @param {HTMLElement} root Studio root.
@@ -651,6 +798,21 @@ const run = (root, config, strings, extra) => {
     toolbar.setMethods(readonly ? [] : methods);
     toolbar.setMethod(method);
 
+    // First-use help: the next-step tip, the legend, the saved state, fewer or more tools and who is here.
+    const guide = createGuide(root, {
+        readonly: readonly,
+        state: () => ({
+            selected: modeltools && method === 'model' ? modeltools.selection().items.length : 0,
+        }),
+        onToolsChange: () => toolbar.refresh(),
+    });
+    guide.setMethod(method);
+    /** A change of tool, action or selection: the toolbar and the tip follow it. */
+    const refreshTools = () => {
+        toolbar.refresh();
+        guide.refresh();
+    };
+
     const session = createSession(Object.assign({}, config, {
         mode: readonly ? 'view' : config.mode,
         readonly: readonly,
@@ -664,6 +826,20 @@ const run = (root, config, strings, extra) => {
      * @returns {boolean}
      */
     const tutorBusy = () => !!(tutor && tutor.busy);
+
+    const framer = createFramer(THREE, camera, sculptureRoot);
+    let frametimer = null;
+    /** After a change: once the engine has drawn it, keep the whole piece in view. */
+    const frameSoon = () => {
+        window.clearTimeout(frametimer);
+        frametimer = window.setTimeout(() => framer.check(desktop ? desktop.controls : null), FRAME_DELAY);
+    };
+    if (!readonly) {
+        countChanges(session, () => {
+            guide.changed();
+            frameSoon();
+        });
+    }
 
     if (tutorialon) {
         // Count the student's own ops by kind, where the tools hand them to the session.
@@ -690,6 +866,7 @@ const run = (root, config, strings, extra) => {
             toolbar.setSaving(false);
             if (result && result.version) {
                 toolbar.message(fill(strings.savedversion, result.version), MESSAGE_TIME * 2);
+                guide.saved();
             } else {
                 toolbar.message('');
             }
@@ -757,6 +934,7 @@ const run = (root, config, strings, extra) => {
             engine.poly.setShowEditing(modelling);
         }
         toolbar.setMethod(method);
+        guide.setMethod(method);
     };
 
     /**
@@ -1098,7 +1276,12 @@ const run = (root, config, strings, extra) => {
     };
     listen('status', (detail) => {
         const state = detail && detail.state ? detail.state : '';
-        toolbar.setStatus(detail && detail.text ? detail.text : '');
+        // Waiting in a group piece: name who is awaited, and say the person can start.
+        let text = detail && detail.text ? detail.text : '';
+        if (state === 'waiting' && config.waitingtext) {
+            text = config.waitingtext;
+        }
+        toolbar.setStatus(text);
         if (state === 'closed' || state === 'view') {
             toolbar.setSaveAllowed(false);
         }
@@ -1117,6 +1300,7 @@ const run = (root, config, strings, extra) => {
         });
         names.clear();
         now.forEach((name, peerid) => names.set(peerid, name));
+        guide.peers([...names.values()]);
         refreshPresent();
     });
     listen('pose', (detail) => {
@@ -1133,6 +1317,7 @@ const run = (root, config, strings, extra) => {
         presence.remove(peerid);
         const name = names.get(peerid);
         names.delete(peerid);
+        guide.peers([...names.values()]);
         if (name) {
             toolbar.message(fill(strings.peerleft, name), MESSAGE_TIME);
         }
@@ -1141,6 +1326,7 @@ const run = (root, config, strings, extra) => {
     listen('saved', (detail) => {
         if (detail && detail.version) {
             toolbar.message(fill(strings.savedversion, detail.version), MESSAGE_TIME * 2);
+            guide.saved();
             // For the tutorial, the student's own save (Save now), not the autosave.
             if (manualsaveat && performance.now() - manualsaveat < MANUAL_SAVE_WINDOW) {
                 manualsaveat = 0;
@@ -1246,6 +1432,7 @@ const run = (root, config, strings, extra) => {
             xr.update(dt, frame);
         } else if (desktop) {
             desktop.update(dt);
+            framer.update(desktop.controls);
             if (modelinput) {
                 modelinput.update(dt);
             }
@@ -1336,6 +1523,7 @@ const run = (root, config, strings, extra) => {
                 desktop.detach();
             }
             toolbar.dispose();
+            guide.dispose();
             unsubscribers.forEach((off) => off());
             document.removeEventListener('fullscreenchange', onFullscreenChange);
             root.removeEventListener('keydown', onKeyDown);
@@ -1422,7 +1610,8 @@ const run = (root, config, strings, extra) => {
 
     // Below the page heading, the tools and the 3D view may not fit the window: start with them in view, just below
     // the site's top bar (measured: its height differs between themes and versions).
-    const toolrow = root.querySelector('[data-region="toolbar"]');
+    // The task strip comes first, so the task and the way back stay in sight too.
+    const toolrow = startElement(root);
     if (toolrow && window.scrollY === 0) {
         startBelowTopBar(root, toolrow);
     }
@@ -1439,7 +1628,7 @@ const run = (root, config, strings, extra) => {
             tools = createTools({
                 session: session,
                 lockOwner: (p, r) => session.lockOwner(p, r),
-                onChange: () => toolbar.refresh(),
+                onChange: () => refreshTools(),
                 onRefused: (name) => toolbar.message(fill(strings.lockedbyother, name || '…'), MESSAGE_TIME),
             });
             toolbar.setTools(tools);
@@ -1451,12 +1640,17 @@ const run = (root, config, strings, extra) => {
                     session: session,
                     tools: tools,
                     engine: engine,
-                    onChange: () => toolbar.refresh(),
+                    onChange: () => refreshTools(),
                     onRefused: (name) => toolMessage(fill(strings.lockedbyother, name || '…')),
                     onMessage: (key, a) => messageByKey(key, a),
                     log: (error) => Log.debug(error),
                 });
                 toolbar.setModel(modeltools);
+                // With the basic tools there is no Pick button: a click picks anyway, so Move is the tool to start
+                // with, and dragging what was picked moves it.
+                if (root.classList.contains('mod_vrmakerspace-basic') && modeltools.action === 'select') {
+                    modeltools.setAction('move');
+                }
             }
         }
         desktop = attachDesktop({

@@ -31,6 +31,7 @@
  */
 
 import Log from 'core/log';
+import {segmentsLabelKey} from 'mod_vrmakerspace/guide';
 
 /**
  * Find one element of the studio by its data-region.
@@ -86,7 +87,6 @@ export const createToolbar = (root, options) => {
     let method = 'sculpt';
     let vravailable = false;
     const handlers = options.handlers || {};
-    const toolbar = region(root, 'toolbar');
     const size = region(root, 'size');
     const strength = region(root, 'strength');
     const statustext = region(root, 'statustext');
@@ -110,6 +110,8 @@ export const createToolbar = (root, options) => {
     const modelhelp = region(root, 'modelhelp');
     const vrmodelhelp = region(root, 'vrmodelhelp');
     const segments = region(root, 'segments');
+    const segmentsbox = region(root, 'segmentsbox');
+    const segmentslabel = region(root, 'segmentslabel');
     const openedges = region(root, 'openedges');
     const bakeconfirm = region(root, 'bakeconfirm');
     let messagetimer = null;
@@ -265,9 +267,8 @@ export const createToolbar = (root, options) => {
     };
 
     root.addEventListener('click', onClick);
-    if (toolbar) {
-        toolbar.addEventListener('input', onInput);
-    }
+    // On the root, not the toolbar: on a phone the tools move into the tray over the 3D view (mod_vrmakerspace/guide).
+    root.addEventListener('input', onInput);
 
     /** Show the modelling tools' state: select mode, tool, axis lock and segments. */
     const refreshModel = () => {
@@ -277,6 +278,16 @@ export const createToolbar = (root, options) => {
         press(root, 'selectmode', (button) => button.dataset.mode === model.selectMode);
         press(root, 'modelaction', (button) => button.dataset.tool === model.action);
         press(root, 'axis', (button) => button.dataset.axis === (model.axis || 'free'));
+        if (segmentsbox) {
+            // The number box only shows where it does something a person can see: Round off and Add ring always, the
+            // detail of new shapes only with all the tools; its label says what it counts.
+            const key = segmentsLabelKey(model.action);
+            const basic = root.classList.contains('mod_vrmakerspace-basic');
+            show(segmentsbox, key !== 'shape' || !basic);
+            if (segmentslabel && segmentslabel.dataset[key]) {
+                segmentslabel.textContent = segmentslabel.dataset[key];
+            }
+        }
         if (segments) {
             // Bevel, Loop cut and the shapes each have their own range.
             const range = model.segmentRange();
@@ -526,9 +537,7 @@ export const createToolbar = (root, options) => {
         /** Remove the listeners. */
         dispose: () => {
             root.removeEventListener('click', onClick);
-            if (toolbar) {
-                toolbar.removeEventListener('input', onInput);
-            }
+            root.removeEventListener('input', onInput);
             if (messagetimer) {
                 window.clearTimeout(messagetimer);
             }
