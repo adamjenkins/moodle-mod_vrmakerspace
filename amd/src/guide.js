@@ -24,7 +24,9 @@
  * - "Saved ✓ · 2 minutes ago" beside Save now (the full date on hover);
  * - More tools / Fewer tools: the basic tools only, or all of them (a tool in use always shows);
  * - the people of a group piece: who is here now and who has not opened it yet;
- * - on a phone, the tools in a tray at the bottom of the 3D view, with a cue when the row goes on to the right.
+ * - on a phone, the tools in a tray at the bottom of the 3D view, with a cue when the row goes on to the right; with
+ *   More, the tray becomes a sheet holding every tool and the File group;
+ * - Show me how: three small pictures of a first build for the method in use.
  *
  * Every word comes from the template. The choice of fewer or more tools is kept in a cookie: Moodle clears the whole
  * localStorage at every login (core/storage_validation).
@@ -250,6 +252,9 @@ export const createGuide = (root, options) => {
     const tray = region('tray');
     const sculptpanel = region('sculptpanel');
     const toolbar = region('toolbar');
+    const filegroup = region('filegroup');
+    const showme = region('showme');
+    const showmebutton = root.querySelector('[data-action="showme"]');
     const listeners = [];
     let method = 'sculpt';
     let changes = 0;
@@ -371,7 +376,7 @@ export const createGuide = (root, options) => {
         if (!tray || !toolbar) {
             return;
         }
-        [sculptpanel, modelscroll].forEach((panel) => {
+        [sculptpanel, modelscroll, filegroup].forEach((panel) => {
             if (!panel) {
                 return;
             }
@@ -406,6 +411,15 @@ export const createGuide = (root, options) => {
                 break;
             case 'help':
                 setHelp(!!helppanel && helppanel.classList.contains('d-none'));
+                break;
+            case 'showme':
+                if (showme) {
+                    const open = showme.classList.contains('d-none');
+                    showme.classList.toggle('d-none', !open);
+                    if (showmebutton) {
+                        showmebutton.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    }
+                }
                 break;
             case 'hidehint':
                 tipclosed = true;

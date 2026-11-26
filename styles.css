@@ -350,6 +350,46 @@
     color: #357a32;
 }
 
+/* Show me how: three small pictures of a first build, for the method in use. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-showme ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background-color: var(--bs-tertiary-bg, #f8f9fa);
+    counter-reset: mod-vrmakerspace-step;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-showmestep {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    counter-increment: mod-vrmakerspace-step;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-showmestep span::before {
+    content: counter(mod-vrmakerspace-step) ". ";
+    font-weight: 700;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-showmestep:not(:last-child)::after {
+    content: "\2192";
+    margin-left: 0.5rem;
+    color: #d63384;
+    font-size: 1.25rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-method-model .mod_vrmakerspace-showme-sculpt,
+.mod_vrmakerspace-studio.mod_vrmakerspace-method-sculpt .mod_vrmakerspace-showme-model {
+    display: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-sliderend {
+    font-size: 0.7rem;
+}
+
 /* The button the tip names glows. */
 .mod_vrmakerspace-studio .btn.mod_vrmakerspace-glow {
     position: relative;
@@ -567,7 +607,27 @@
         margin-left: auto;
     }
 
-    .mod_vrmakerspace-studio .mod_vrmakerspace-moretools {
+    /* With More, the tray becomes a sheet: every tool group and the File group, wrapping, scrolling up and down. */
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray {
+        max-height: 60%;
+        overflow-y: auto;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-panel {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-toolgroup,
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .btn-group {
+        flex-wrap: wrap;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .mod_vrmakerspace-filegroup {
+        margin-top: 0.4rem;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-hint {
         display: none;
     }
 

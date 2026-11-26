@@ -32,12 +32,13 @@
     * data-region toolbar, methodswitch, sculptpanel, modelpanel, size, strength, shapeoptions, shape, textfield, text,
       segments, stage, canvas, loading, nowebgl, failed, bakeconfirm, statustext, message, openedges, sculpthelp, modelhelp,
       vrhelp, vrmodelhelp; exportmenu, addshapemenu, selectmodes, axislock (what the tutorial's steps point at)
-    * data-region goal, savedstate, legend, helppanel, hint, members, modelscroll, segmentsbox, segmentslabel, tray
+    * data-region goal, savedstate, legend, helppanel, hint, members, modelscroll, segmentsbox, segmentslabel, tray,
+      filegroup, showme
       (the guide)
     * data-action tool (with data-tool), mirror, undo, redo, save, export (with data-format), vr, fullscreen,
       method (with data-method), selectmode (with data-mode), select (with data-select), addshape (with data-shape),
       modelaction (with data-tool), axis (with data-axis), oneshot (with data-oneshot), bakeconfirm, bakecancel, tutorial,
-      moretools, help, hidehint
+      moretools, help, hidehint, showme
     * data-advanced - a tool or heading that only shows with More tools
 
     Context variables required for this template:
@@ -89,6 +90,10 @@
         {{#goal}}
             <div class="mod_vrmakerspace-goal flex-grow-1">
                 <span class="mod_vrmakerspace-goalname"><strong>{{#str}} goal_label, mod_vrmakerspace {{/str}}:</strong> {{name}}</span>
+                {{^tutorial}}
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill ms-2 py-0" data-action="showme"
+                        aria-expanded="false">{{#str}} showme_button, mod_vrmakerspace {{/str}}</button>
+                {{/tutorial}}
                 {{#intro}}<span class="mod_vrmakerspace-goalintro"> &mdash; {{intro}}</span>{{/intro}}
                 <ul class="mod_vrmakerspace-goalfacts list-inline small text-muted mb-0">
                     {{#facts}}<li class="list-inline-item">{{text}}</li>{{/facts}}
@@ -111,6 +116,22 @@
             </ul>
         {{/hasmembers}}
         <a class="ms-auto" href="{{backurl}}">{{#str}} back, mod_vrmakerspace {{/str}}</a>
+        {{#goal}}
+        {{^tutorial}}
+        <div class="mod_vrmakerspace-showme d-none w-100" data-region="showme" aria-label="{{#str}} showme_title, mod_vrmakerspace {{/str}}">
+            <ol class="list-unstyled mb-0 mod_vrmakerspace-showme-model">
+                <li class="mod_vrmakerspace-showmestep"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true" fill="none" stroke="#1d2125" stroke-width="1.5" stroke-linejoin="round"><path d="M16 22l16-8 16 8-16 8z" fill="#f5a25d"/><path d="M16 22v20l16 8V30z" fill="#7d9dbf"/><path d="M48 22v20l-16 8V30z" fill="#6b8aac"/></svg><span>{{#str}} showme_shapes_1, mod_vrmakerspace {{/str}}</span></li>
+                <li class="mod_vrmakerspace-showmestep"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true" fill="none" stroke="#1d2125" stroke-width="1.5" stroke-linejoin="round"><path d="M16 10l16-8 16 8-16 8z" fill="#f5a25d"/><path d="M16 10v32l16 8V18z" fill="#7d9dbf"/><path d="M48 10v32l-16 8V18z" fill="#6b8aac"/><path d="M58 40V12" stroke="#d63384" stroke-width="2"/><path d="M54 17l4-5 4 5" stroke="#d63384" stroke-width="2"/></svg><span>{{#str}} showme_shapes_2, mod_vrmakerspace {{/str}}</span></li>
+                <li class="mod_vrmakerspace-showmestep"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true" fill="none" stroke="#1d2125" stroke-width="1.5" stroke-linejoin="round"><path d="M16 10l16-8 16 8-16 8z" fill="#9fc4ec"/><path d="M16 10v32l16 8V18z" fill="#7d9dbf"/><path d="M48 10v32l-16 8V18z" fill="#6b8aac"/><path d="M48 26l10-5v12l-10 5z" fill="#f5a25d"/><path d="M48 26l10-5" /></svg><span>{{#str}} showme_shapes_3, mod_vrmakerspace {{/str}}</span></li>
+            </ol>
+            <ol class="list-unstyled mb-0 mod_vrmakerspace-showme-sculpt">
+                <li class="mod_vrmakerspace-showmestep"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true" fill="none" stroke="#1d2125" stroke-width="1.5" stroke-linejoin="round"><path d="M14 40c-4-8 0-18 9-20 4-7 15-6 18 1 7 3 7 14 0 18-6 5-21 6-27 1z" fill="#c08a64"/><path d="M24 20c4-6 10-7 14-3" stroke="#d29a6c" stroke-width="6" stroke-linecap="round"/></svg><span>{{#str}} showme_clay_1, mod_vrmakerspace {{/str}}</span></li>
+                <li class="mod_vrmakerspace-showmestep"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true" fill="none" stroke="#1d2125" stroke-width="1.5" stroke-linejoin="round"><path d="M14 40c-4-8 0-18 9-20 4-7 15-6 18 1 7 3 7 14 0 18-6 5-21 6-27 1z" fill="#c08a64"/><path d="M30 34c3 2 7 2 10 0" stroke="#7a5236" stroke-width="3" stroke-linecap="round"/></svg><span>{{#str}} showme_clay_2, mod_vrmakerspace {{/str}}</span></li>
+                <li class="mod_vrmakerspace-showmestep"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true" fill="none" stroke="#1d2125" stroke-width="1.5" stroke-linejoin="round"><ellipse cx="32" cy="32" rx="19" ry="14" fill="#c08a64"/><path d="M22 26c4-3 12-4 18-1" stroke="#e0b48f" stroke-width="2" stroke-linecap="round"/></svg><span>{{#str}} showme_clay_3, mod_vrmakerspace {{/str}}</span></li>
+            </ol>
+        </div>
+        {{/tutorial}}
+        {{/goal}}
     </div>
 
     <div class="mod_vrmakerspace-toolbar btn-toolbar d-flex align-items-center gap-2 mb-2" role="toolbar"
@@ -140,25 +161,24 @@
                     data-saved="{{#str}} savedstate_saved, mod_vrmakerspace {{/str}}"
                     data-justnow="{{#str}} savedstate_justnow, mod_vrmakerspace {{/str}}"
                     data-pending="{{#str}} savedstate_pending, mod_vrmakerspace {{/str}}"></span>
-            <button type="button" class="btn btn-link btn-sm px-1" data-action="save"
-                    title="{{#str}} tip_savenow, mod_vrmakerspace {{/str}}">{{#str}} savenow, mod_vrmakerspace {{/str}}</button>
         {{/readonly}}
-        <div class="dropdown">
-            <button type="button" class="btn btn-outline-secondary dropdown-toggle" id="{{uniqid}}-export" data-bs-toggle="dropdown"
-                    data-region="exportmenu" aria-haspopup="true" aria-expanded="false"
-                    title="{{#str}} more_menu, mod_vrmakerspace {{/str}}: {{#str}} tip_export, mod_vrmakerspace {{/str}}"><span aria-hidden="true">&#8943;</span><span class="visually-hidden">{{#str}} more_menu, mod_vrmakerspace {{/str}}</span></button>
-            <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-export">
-                {{^readonly}}
-                <li class="mod_vrmakerspace-menusave"><button type="button" class="dropdown-item" data-action="save">{{#str}} savenow, mod_vrmakerspace {{/str}}</button></li>
-                <li class="mod_vrmakerspace-menusave"><hr class="dropdown-divider"></li>
-                {{/readonly}}
-                <li><h6 class="dropdown-header">{{#str}} export, mod_vrmakerspace {{/str}}</h6></li>
-                <li><button type="button" class="dropdown-item" data-action="export" data-format="stl">{{#str}} export_stl, mod_vrmakerspace {{/str}}</button></li>
-                <li><button type="button" class="dropdown-item" data-action="export" data-format="glb">{{#str}} export_glb, mod_vrmakerspace {{/str}}</button></li>
-                <li><button type="button" class="dropdown-item" data-action="export" data-format="3mf">{{#str}} export_3mf, mod_vrmakerspace {{/str}}</button></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><button type="button" class="dropdown-item" data-action="fullscreen" aria-pressed="false">{{#str}} fullscreen, mod_vrmakerspace {{/str}}</button></li>
-            </ul>
+        <div class="mod_vrmakerspace-toolgroup mod_vrmakerspace-filegroup" data-region="filegroup" data-advanced="1">
+            <span class="mod_vrmakerspace-grouplabel small text-muted">{{#str}} group_file, mod_vrmakerspace {{/str}}</span>
+            {{^readonly}}
+            <button type="button" class="btn btn-outline-secondary" data-action="save"
+                    title="{{#str}} tip_savenow, mod_vrmakerspace {{/str}}">{{#str}} savenow, mod_vrmakerspace {{/str}}</button>
+            {{/readonly}}
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" id="{{uniqid}}-export" data-bs-toggle="dropdown"
+                        data-region="exportmenu" aria-haspopup="true" aria-expanded="false"
+                        title="{{#str}} tip_export, mod_vrmakerspace {{/str}}">{{#str}} export, mod_vrmakerspace {{/str}}</button>
+                <ul class="dropdown-menu" aria-labelledby="{{uniqid}}-export">
+                    <li><button type="button" class="dropdown-item" data-action="export" data-format="stl">{{#str}} export_stl, mod_vrmakerspace {{/str}}</button></li>
+                    <li><button type="button" class="dropdown-item" data-action="export" data-format="glb">{{#str}} export_glb, mod_vrmakerspace {{/str}}</button></li>
+                    <li><button type="button" class="dropdown-item" data-action="export" data-format="3mf">{{#str}} export_3mf, mod_vrmakerspace {{/str}}</button></li>
+                </ul>
+            </div>
+            <button type="button" class="btn btn-outline-secondary" data-action="fullscreen" aria-pressed="false">{{#str}} fullscreen, mod_vrmakerspace {{/str}}</button>
         </div>
         <button type="button" class="btn btn-primary d-none" data-action="vr" aria-pressed="false">{{#str}} entervr, mod_vrmakerspace {{/str}}</button>
         {{^readonly}}
@@ -218,13 +238,17 @@
                         title="{{#str}} mirror, mod_vrmakerspace {{/str}} (M): {{#str}} tip_tool_mirror, mod_vrmakerspace {{/str}}">{{#str}} mirror, mod_vrmakerspace {{/str}}</button>
                 <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
                     <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrmakerspace {{/str}}</label>
+                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_small, mod_vrmakerspace {{/str}}</span>
                     <input type="range" class="form-range" id="{{uniqid}}-size" data-region="size" min="4" max="80" step="1"
                             value="20">
+                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_big, mod_vrmakerspace {{/str}}</span>
                 </div>
                 <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
                     <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrmakerspace {{/str}}</label>
+                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_gentle, mod_vrmakerspace {{/str}}</span>
                     <input type="range" class="form-range" id="{{uniqid}}-strength" data-region="strength" min="5" max="100"
                             step="5" value="50">
+                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_strong, mod_vrmakerspace {{/str}}</span>
                 </div>
             </div>
             {{/cansculpt}}
@@ -384,6 +408,7 @@
                 <button type="button" class="btn-close" data-action="help" aria-label="{{#str}} help_close, mod_vrmakerspace {{/str}}"></button>
             </div>
             <div class="mod_vrmakerspace-help small" id="{{uniqid}}-help">
+                <p class="mb-2">{{#str}} help_trackpad, mod_vrmakerspace {{/str}}</p>
                 {{^readonly}}
                     {{#cansculpt}}
                     <p class="mb-1{{#modelfirst}} d-none{{/modelfirst}}" data-region="sculpthelp">{{#str}} shortcuts, mod_vrmakerspace {{/str}}</p>

@@ -47,6 +47,12 @@ const SIZE_STEP = 1.2;
 /** Strength step of the comma and full stop keys. */
 const STRENGTH_STEP = 0.1;
 
+/** The brush ring's opacity at the gentlest strength. */
+const CURSOR_OPACITY_MIN = 0.15;
+
+/** How much more solid the brush ring gets at the strongest strength. */
+const CURSOR_OPACITY_RANGE = 0.65;
+
 /** Colour of the tool cursor per tool. */
 const CURSOR_COLOURS = {
     grab: 0x1f6feb,
@@ -271,6 +277,9 @@ export const attach = (options) => {
         cursor.position.copy(at);
         cursor.scale.setScalar(Math.max(0.001, tools.cursorRadius()));
         cursor.material.color.setHex(CURSOR_COLOURS[tools.tool] || CURSOR_COLOURS.add);
+        // The ring shows the brush: its size is Size, and the stronger the brush, the more solid it looks.
+        const strength = Math.max(0, Math.min(1, Number(tools.strength) || 0));
+        cursor.material.opacity = CURSOR_OPACITY_MIN + CURSOR_OPACITY_RANGE * strength;
         cursor.visible = true;
         cursorvisible = true;
     };
@@ -471,6 +480,9 @@ export const attach = (options) => {
             if (cursorvisible) {
                 cursor.scale.setScalar(Math.max(0.001, tools.cursorRadius()));
                 cursor.material.color.setHex(CURSOR_COLOURS[tools.tool] || CURSOR_COLOURS.add);
+                // The ring shows the brush: its size is Size, and the stronger the brush, the more solid it looks.
+                const strength = Math.max(0, Math.min(1, Number(tools.strength) || 0));
+                cursor.material.opacity = CURSOR_OPACITY_MIN + CURSOR_OPACITY_RANGE * strength;
             }
         }
     };
