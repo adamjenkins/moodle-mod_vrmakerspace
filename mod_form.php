@@ -164,6 +164,15 @@ class mod_vrmakerspace_mod_form extends moodleform_mod {
             $mform->addHelpButton('tutorai', 'tutorai', 'vrmakerspace');
             $mform->setDefault('tutorai', 0);
             $mform->hideIf('tutorai', 'tutorial', 'notchecked');
+        } else {
+            // No AI provider on the site: one plain line for the teacher; students see no AI features at all.
+            $mform->addElement(
+                'static',
+                'tutorainote',
+                get_string('tutorai', 'vrmakerspace'),
+                get_string('tutorai_noprovider', 'vrmakerspace')
+            );
+            $mform->hideIf('tutorainote', 'tutorial', 'notchecked');
         }
 
         // The tutor's voice, each offered when the site has a way to do it (admin settings: speech

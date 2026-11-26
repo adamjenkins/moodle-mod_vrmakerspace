@@ -184,10 +184,19 @@ final class studio_helper {
         $tutorial = tutorial::studio_config($vrmakerspace, $context, (int)$user->id, $readonly);
         if ($tutorial !== null) {
             // The tutor's voice (TUTORIAL-VOICE-CONTRACT.md §7): the order the browser tries to listen and to
-            // speak in, as registry::client_order() gives it, empty when the activity's switch is off. The
-            // Ask box always shows in tutorial mode: without the AI the browser answers from the tour.
-            $tutorial['voice'] = tutorial::voice_config($vrmakerspace, (int)$user->id);
-            $tutorial['canask'] = true;
+            // speak in, as registry::client_order() gives it, empty when the activity's switch is off.
+            // AI-only features appear only when an AI can answer (owner, 2026-11-26): without it there is no Ask
+            // box, no AI policy, no speech input (it only asks the tutor), and Read aloud keeps the browser's own
+            // voice but not the server engines.
+            $tutorial['canask'] = !empty($tutorial['ai']);
+            $voice = tutorial::voice_config($vrmakerspace, (int)$user->id);
+            if (!$tutorial['canask']) {
+                $voice['listen'] = [];
+            }
+            if (!tutorial::ai_available()) {
+                $voice['speak'] = array_values(array_diff($voice['speak'], ['server']));
+            }
+            $tutorial['voice'] = $voice;
             $config['tutorial'] = $tutorial;
         }
         return $config;

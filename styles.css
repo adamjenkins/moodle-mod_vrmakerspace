@@ -1447,3 +1447,173 @@
 .mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > [data-action="tutorial"] {
     order: 2;
 }
+
+/* The tutorial's bubble in the suite's glass chrome: dark glass, light text, amber for the next step. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour {
+    color: #f4f6f8;
+    background-color: rgba(18, 22, 28, 0.86);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-size: 0.9375rem;
+    --bs-secondary-color: rgba(244, 246, 248, 0.72);
+    --bs-body-color: #f4f6f8;
+    --bs-heading-color: #f4f6f8;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .mod_vrmakerspace-tour-arrow {
+    border-color: rgba(255, 255, 255, 0.16);
+    background-color: rgba(18, 22, 28, 0.86);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .mod_vrmakerspace-tour-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .mod_vrmakerspace-tour-title::before {
+    content: "";
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    background-color: #ffc107;
+    vertical-align: 0.05em;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn {
+    --bs-btn-color: #f4f6f8;
+    --bs-btn-bg: rgba(255, 255, 255, 0.1);
+    --bs-btn-border-color: rgba(255, 255, 255, 0.2);
+    --bs-btn-hover-color: #f4f6f8;
+    --bs-btn-hover-bg: rgba(255, 255, 255, 0.18);
+    --bs-btn-hover-border-color: rgba(255, 255, 255, 0.28);
+    --bs-btn-active-color: #1a1a1a;
+    --bs-btn-active-bg: #ffc107;
+    --bs-btn-active-border-color: #ffc107;
+    --bs-btn-focus-box-shadow: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn.btn-primary {
+    --bs-btn-color: #1a1a1a;
+    --bs-btn-bg: #ffc107;
+    --bs-btn-border-color: #ffc107;
+    --bs-btn-hover-color: #1a1a1a;
+    --bs-btn-hover-bg: #ffcd39;
+    --bs-btn-hover-border-color: #ffcd39;
+    font-weight: 600;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn.btn-link {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-bg: rgba(255, 255, 255, 0.1);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-color: #f4f6f8;
+    text-decoration: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn:focus-visible,
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .form-control:focus-visible {
+    outline: 3px solid #ffc107;
+    outline-offset: 2px;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .form-control {
+    color: #f4f6f8;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .form-control::placeholder {
+    color: rgba(244, 246, 248, 0.6);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .mod_vrmakerspace-tour-reply {
+    border-left-color: #ffc107;
+}
+
+/* The site's AI policy keeps core's own light card and dark text, with the glass panel's corners. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour .ai-policy-block {
+    overflow: hidden;
+    border-radius: 10px;
+    color: #1d2125;
+    --bs-body-color: #1d2125;
+    --bs-heading-color: #1d2125;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tourring {
+    border-color: #ffc107;
+    border-radius: 12px;
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.3);
+}
+
+@keyframes mod_vrmakerspace-tourpulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.45);
+    }
+
+    50% {
+        box-shadow: 0 0 0 7px rgba(255, 193, 7, 0.12);
+    }
+}
+
+/* Desktop: the bubble is a panel beside the 3D view, which narrows to leave room for it; nothing is covered. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-tourside .mod_vrmakerspace-stage {
+    width: calc(100% - 22.5rem);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour.mod_vrmakerspace-tour-side {
+    right: 0;
+    left: auto;
+    width: 21.75rem;
+    max-width: none;
+    overflow-y: auto;
+}
+
+/* Phones: a sheet under a shorter 3D view, both on the screen together; the sheet scrolls on its own. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-tourbottom .mod_vrmakerspace-stage {
+    height: 40vh;
+    min-height: 14rem;
+}
+
+.mod_vrmakerspace-studio.mod_vrmakerspace-tourbottom .mod_vrmakerspace-tour.mod_vrmakerspace-tour-docked {
+    max-height: calc(60vh - 5.5rem);
+    overflow-y: auto;
+}
+
+/* The AI policy, before the first step, on its own: the whole bubble is the policy until it is accepted or declined. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-policymode .mod_vrmakerspace-tour-title,
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-policymode [data-region="tutorialtext"],
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-policymode [data-region="tutorialheard"],
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-policymode [data-region="tutorialreply"],
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-policymode [data-region="tutorialdemos"],
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour-policymode .form-switch {
+    display: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-tour.mod_vrmakerspace-tour-policymode .ai-policy-block .content {
+    max-height: none;
+    overflow: visible;
+}
+
+@media (max-width: 575.98px) {
+    /* Phone: the bar may take a second row (tutorial mode, longer languages); a button never breaks its word. */
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar > .btn,
+    .mod_vrmakerspace-studio.mod_vrmakerspace-docked .mod_vrmakerspace-toolbar > .btn-group {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+}

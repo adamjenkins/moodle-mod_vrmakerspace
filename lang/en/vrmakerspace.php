@@ -537,6 +537,7 @@ $string['tutor_name'] = 'Tinker, your tutor';
 $string['tutor_watch'] = 'Watch the tutor do it on the practice piece. Undo takes it back.';
 $string['tutorai'] = 'Students can ask the tutor (AI)';
 $string['tutorai_help'] = 'Students can type a question about using the studio during the tutorial, and the tutor answers it. The question is sent, with the tutorial\'s own instructions, to the site\'s AI provider through Moodle\'s AI subsystem; students must accept the site\'s AI policy first, and can ask up to 20 questions an hour. Only offered when the site has an AI provider that generates text.';
+$string['tutorai_noprovider'] = 'The tutor\'s answers are off: this site has no AI provider for text. The written steps still work.';
 $string['tutorial'] = 'Tutorial mode';
 $string['tutorial_ask'] = 'Ask';
 $string['tutorial_askfailed'] = 'The tutor could not answer: {$a}';

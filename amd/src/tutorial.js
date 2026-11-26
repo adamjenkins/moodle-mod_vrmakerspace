@@ -48,7 +48,7 @@ import Policy from 'core_ai/policy';
 import {demoWords, offerAt, offersIn, opCount, stepsFor} from 'mod_vrmakerspace/tutorialsteps';
 import {match as matchDemo} from 'mod_vrmakerspace/tutormatch';
 import {createTutorVoice} from 'mod_vrmakerspace/tutorvoice';
-import {reveal as revealAboveBar} from 'mod_vrmakerspace/bottombar';
+import {reveal as revealAboveBar, startBelowTopBar} from 'mod_vrmakerspace/bottombar';
 
 /** How often the current step's condition and the bubble's position are checked (s). */
 const CHECK_INTERVAL = 0.1;
@@ -67,6 +67,9 @@ const VR_REPEAT = 8;
 
 /** Below this width of the studio (CSS px) the bubble docks under the 3D view. */
 const DOCK_WIDTH = 576;
+
+/** From this studio width (px) the bubble is a panel beside the 3D view, which narrows to make room for it. */
+const SIDE_WIDTH = 860;
 
 /** Space between the bubble and what it points at, and the least space to the studio's edges (CSS px). */
 const GAP = 12;
@@ -310,6 +313,8 @@ export const createTutorial = (options) => {
     let layer = null;
     let rendering = null;
     let opened = false;
+    /** Whether the tour opened More itself (it closes it again when a step needs only the basic tools). */
+    let openedmore = false;
     let disposed = false;
     /** @type {Object|null} {index, step, start, memo, completed, elapsed, advanceAt, vrclock} */
     let current = null;
@@ -469,10 +474,15 @@ export const createTutorial = (options) => {
         if (element && target.closest) {
             element = element.closest(target.closest) || element;
         }
-        // The studio starts with its basic tools (mod_vrmakerspace/guide): a step about a tool behind More shows them all.
-        if (element && !isShown(element) && root.classList.contains('mod_vrmakerspace-basic')
-                && element.closest('[data-advanced], [data-region="brush"]')) {
+        // The studio starts with its basic tools (mod_vrmakerspace/guide): a step about a tool behind More shows them all,
+        // and the next step about a basic tool goes back to the basic ones, so the bar stays small over the piece.
+        const behindmore = !!element && !!element.closest('[data-advanced], [data-region="brush"]');
+        if (element && !isShown(element) && root.classList.contains('mod_vrmakerspace-basic') && behindmore) {
             root.dispatchEvent(new CustomEvent('mod_vrmakerspace:alltools'));
+            openedmore = true;
+        } else if (element && openedmore && !behindmore) {
+            root.dispatchEvent(new CustomEvent('mod_vrmakerspace:basictools'));
+            openedmore = false;
         }
         return isShown(element) ? element : null;
     };
@@ -623,15 +633,25 @@ export const createTutorial = (options) => {
         const rootbox = root.getBoundingClientRect();
         const step = current.step;
         const element = targetElement(step);
-        placeRing(element, rootbox);
         const docked = rootbox.width < DOCK_WIDTH;
+        const side = !docked && rootbox.width >= SIDE_WIDTH && !invr;
+        // The bubble never covers the tools or the way out: a panel beside the 3D view, or a sheet under it on a
+        // phone; the view takes the room that is left (its size observer redraws it).
+        root.classList.toggle('mod_vrmakerspace-tourside', side);
+        root.classList.toggle('mod_vrmakerspace-tourbottom', docked && !invr);
         parts.bubble.classList.toggle('mod_vrmakerspace-tour-docked', docked);
-        if (docked) {
+        parts.bubble.classList.toggle('mod_vrmakerspace-tour-side', side);
+        // While the site's AI policy is on its own, no step is being pointed at yet.
+        placeRing(parts.bubble.classList.contains('mod_vrmakerspace-tour-policymode') ? null : element, rootbox);
+        if (docked || side) {
+            const view = stage || canvas;
             parts.bubble.style.left = '';
-            parts.bubble.style.top = '';
+            parts.bubble.style.top = side && view ? `${view.offsetTop}px` : '';
+            parts.bubble.style.maxHeight = side && view ? `${view.offsetHeight}px` : '';
             show(parts.arrow, false);
             return;
         }
+        parts.bubble.style.maxHeight = '';
         if (element && !(step.target && step.target.canvas)) {
             besideElement(element, rootbox);
             clearTutor(rootbox);
@@ -875,8 +895,9 @@ export const createTutorial = (options) => {
         reveal(step);
         position();
         if (parts.bubble.classList.contains('mod_vrmakerspace-tour-docked') && !invr) {
-            // Docked under the 3D view (narrow windows): scrolled up above a bar fixed to the window's bottom.
-            revealAboveBar(root, parts.bubble);
+            // A sheet under the 3D view (narrow windows): the page starts at the view, so the piece and the sheet
+            // (which scrolls on its own) are on the screen together.
+            startBelowTopBar(root, stage || canvas);
         }
         readStep(step.key);
     };
@@ -1451,11 +1472,26 @@ export const createTutorial = (options) => {
         talk(false);
     };
 
+    /**
+     * The site's AI policy on its own in the bubble (before the first step), or the steps.
+     *
+     * @param {boolean} on Whether only the policy shows.
+     */
+    const setPolicyMode = (on) => {
+        parts.bubble.classList.toggle('mod_vrmakerspace-tour-policymode', on);
+        // The step controls are a flex row (Bootstrap's d-flex wins over a stylesheet): hidden by d-none.
+        const controls = parts.bubble.lastElementChild;
+        if (controls) {
+            controls.classList.toggle('d-none', on);
+        }
+    };
+
     /** The student accepted the AI policy: show the question box. */
     const acceptPolicy = () => {
         Promise.resolve(Policy.acceptPolicy()).then(() => {
             aiready = true;
             parts.policy.hidden = true;
+            setPolicyMode(false);
             parts.askform.hidden = false;
             parts.question.focus();
             refreshButtons();
@@ -1471,6 +1507,7 @@ export const createTutorial = (options) => {
     const declinePolicy = () => {
         aiready = false;
         parts.policy.hidden = true;
+        setPolicyMode(false);
         parts.askform.hidden = false;
         refreshButtons();
         position();
@@ -1759,6 +1796,7 @@ export const createTutorial = (options) => {
             show(parts.bubble, false);
             show(parts.ring, false);
         }
+        root.classList.remove('mod_vrmakerspace-tourside', 'mod_vrmakerspace-tourbottom');
         stopTalking();
         if (voice) {
             // The microphone is let go while the tour is closed.
@@ -1802,6 +1840,8 @@ export const createTutorial = (options) => {
             }
             opened = true;
             invr = !!(options.xr && options.xr.active);
+            // The site's AI policy comes first, on its own, until it is accepted or declined; then only the steps.
+            setPolicyMode(!!parts.policy && !parts.policy.hidden);
             tutorCall('setVisible', true);
             if (toolbar && typeof toolbar.setTutorial === 'function') {
                 toolbar.setTutorial(true);

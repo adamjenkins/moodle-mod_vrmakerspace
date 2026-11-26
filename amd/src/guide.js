@@ -526,6 +526,7 @@ export const createGuide = (root, options) => {
     on(region('canvas'), 'pointerdown', () => openBrush(false));
     // The tutorial asks for all the tools when a step points at one behind More (not remembered as the person's choice).
     on(root, 'mod_vrmakerspace:alltools', () => setAll(true));
+    on(root, 'mod_vrmakerspace:basictools', () => setAll(false));
 
     // Panels that scroll up and down (the phone's More sheet, the help) end on a fade with a chevron while more
     // follows below, so nothing looks cut off.

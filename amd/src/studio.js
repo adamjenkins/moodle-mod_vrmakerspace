@@ -786,7 +786,8 @@ export const createFramer = (THREE, camera, sculptureRoot) => {
     const measure = () => {
         box.makeEmpty();
         sculptureRoot.children.forEach((child) => {
-            if (child.name === 'vrmakerspace-presence') {
+            // Only the piece: not the others' presence, nor the tutor robot that floats beside it.
+            if (child.name === 'vrmakerspace-presence' || child.name === 'vrmakerspace-tutor') {
                 return;
             }
             child.traverseVisible((object) => {
