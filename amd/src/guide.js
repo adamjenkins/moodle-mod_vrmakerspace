@@ -55,8 +55,8 @@ const COOKIE_AGE = 365 * 24 * 3600;
 const PHONE = '(max-width: 575.98px)';
 
 /**
- * The pictures of the basic tools: 24 by 24 line drawings in the colour of the button's text. Fixed strings, never
- * built from data.
+ * The pictures of the tools: 24 by 24 line drawings in the colour of the button's text, in the suite's icon style
+ * (POLISH-ROUND-2026-11-26.md, Chrome: stroke 2, round caps and joins). Fixed strings, never built from data.
  */
 const ICONS = {
     'method:sculpt': '<path d="M6 17c-2-3 0-8 4-9 2-3 7-2 8 2 3 2 2 7-1 8-3 2-8 2-11-1z"/>',
@@ -80,6 +80,28 @@ const ICONS = {
     'modelaction:extrude': '<path d="M4 20h16v-4H4z"/><path d="M12 13V3M8 7l4-4 4 4"/>',
     'addshapemenu': '<path d="M12 3l7 4v8l-7 4-7-4V7z"/><path d="M5 7l7 4 7-4M12 11v8"/>',
     'oneshot:delete': '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+    'modelaction:inset': '<rect x="4" y="4" width="16" height="16"/><rect x="8" y="8" width="8" height="8"/>',
+    'modelaction:bevel': '<path d="M4 20V4h9a7 7 0 0 1 7 7v9z"/>',
+    'modelaction:loopcut': '<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M12 3v18" stroke-dasharray="2 2"/>',
+    'oneshot:merge': '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><path d="M6.5 7.5L12 15l5.5-7.5"/>'
+        + '<circle cx="12" cy="18" r="2.2" fill="currentColor"/>',
+    'oneshot:fill': '<path d="M4 4h16v16H4z"/><path d="M8 8h8v8H8z" fill="currentColor" fill-opacity=".45"/>',
+    'oneshot:flip': '<path d="M12 3v18"/><path d="M9 7l-5 5 5 5z"/>'
+        + '<path d="M15 7l5 5-5 5z" fill="currentColor" fill-opacity=".45"/>',
+    'oneshot:mirror': '<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 6H5v12h4M15 6h4v12h-4"/>',
+    'oneshot:bake': '<path d="M3 9l4-2 4 2v5l-4 2-4-2z"/><path d="M12 12h3M14 10l2 2-2 2"/>'
+        + '<path d="M17 17c-1.5-2 0-5 2.5-5s3 2.5 2 4.5-3 2-4.5.5z"/>',
+    'select:all': '<rect x="4" y="4" width="16" height="16" fill="currentColor" fill-opacity=".35"/>',
+    'select:none': '<rect x="4" y="4" width="16" height="16" stroke-dasharray="3 2"/>',
+    'select:linked': '<rect x="3" y="3" width="10" height="10" fill="currentColor" fill-opacity=".35"/>'
+        + '<rect x="11" y="11" width="10" height="10" fill="currentColor" fill-opacity=".35"/>',
+    'select:loop': '<ellipse cx="12" cy="12" rx="9" ry="4.5"/><path d="M3 12h18" opacity=".35"/>',
+    'tool:twist': '<path d="M12 12a2 2 0 1 1 2 2 4 4 0 1 1-4-4 6 6 0 1 1-6 6"/>',
+    'tool:inflate': '<circle cx="12" cy="12" r="5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+    'tool:pinch': '<path d="M3 12h6M15 12h6M7 8l4 4-4 4M17 8l-4 4 4 4"/>',
+    'tool:flatten': '<path d="M3 18h18"/><path d="M6 18c0-4 3-6 6-6s6 2 6 6"/><path d="M12 3v5M9.5 6l2.5 2.5L14.5 6"/>',
+    'tool:cutshape': '<circle cx="12" cy="12" r="8"/><path d="M9 9h6v6H9z" stroke-dasharray="2 2"/>',
+    'mirror': '<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 6H5v12h4M15 6h4v12h-4"/>',
 };
 
 /**
@@ -90,25 +112,26 @@ const ICONS = {
  */
 const iconKey = (button) => {
     const action = button.dataset.action || '';
-    const detail = {method: 'method', tool: 'tool', modelaction: 'tool', selectmode: 'mode', oneshot: 'oneshot'}[action];
+    const detail = {method: 'method', tool: 'tool', modelaction: 'tool', selectmode: 'mode', oneshot: 'oneshot',
+        select: 'select'}[action];
     if (detail) {
         return `${action}:${button.dataset[detail] || ''}`;
     }
-    if (action === 'undo' || action === 'redo') {
+    if (action === 'undo' || action === 'redo' || action === 'mirror') {
         return action;
     }
     return button.dataset.region === 'addshapemenu' ? 'addshapemenu' : '';
 };
 
 /**
- * Give the basic tools a picture above their name, and make them bigger.
+ * Give the tools a picture above their name, and make them bigger, so every row of tools looks the same.
  *
  * @param {HTMLElement} root The studio root.
  */
 const decorate = (root) => {
     root.querySelectorAll('button[data-action], button[data-region="addshapemenu"]').forEach((button) => {
         const key = iconKey(button);
-        if (!ICONS[key] || button.dataset.advanced || button.querySelector('svg')) {
+        if (!ICONS[key] || button.querySelector('svg')) {
             return;
         }
         const label = document.createElement('span');
@@ -117,7 +140,8 @@ const decorate = (root) => {
             label.appendChild(button.firstChild);
         }
         button.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"'
-            + ` stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>`);
+            + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+            + `${ICONS[key]}</svg>`);
         if (key === 'undo' || key === 'redo') {
             // Undo and redo are known by their arrows: the word stays for screen readers and the tooltip.
             label.classList.add('visually-hidden');

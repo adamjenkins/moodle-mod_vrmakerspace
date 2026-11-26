@@ -177,8 +177,10 @@ export const createPolyView = (THREE, parent) => {
     solidGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0);
     const solidMaterial = new THREE.MeshStandardMaterial({
         color: MESH_COLOUR,
-        roughness: 0.7,
+        roughness: 0.85,
         metalness: 0,
+        // Flat shading: each side lit as one plane, so no crease shows along the diagonal where its two triangles meet.
+        flatShading: true,
         side: THREE.DoubleSide,
         // Pushed back a little, so the edges and the selection drawn on it are not lost in it.
         polygonOffset: true,

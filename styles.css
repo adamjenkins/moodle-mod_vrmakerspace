@@ -609,8 +609,25 @@
 
     /* With More, the tray becomes a sheet: every tool group and the File group, wrapping, scrolling up and down. */
     .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray {
-        max-height: 60%;
+        max-height: 48%;
         overflow-y: auto;
+        border-top: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.75rem 0.75rem 0 0;
+        box-shadow: 0 -0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+    }
+
+    /* In the sheet: each group's name on its own line, then its tools as equal tiles. */
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-grouplabel {
+        flex: 1 1 100%;
+        margin: 0.25rem 0 0;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .btn-group > .btn {
+        flex: 1 0 4.2rem;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .btn-group {
+        flex: 1 1 100%;
     }
 
     .mod_vrmakerspace-studio.mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .mod_vrmakerspace-panel {
@@ -834,5 +851,191 @@
 
     .mod_vrmakerspace-studio .mod_vrmakerspace-tour .btn {
         min-height: 2.5rem;
+    }
+}
+
+/* The suite's shared chrome (dev-docs/mavr/POLISH-ROUND-2026-11-26.md, "Chrome"): everything that floats over the 3D
+   view is a translucent dark glass panel with light text and amber for the next step and focus. The toolbar on the
+   page keeps Moodle's own look. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-pictures,
+.mod_vrmakerspace-studio .mod_vrmakerspace-helpbutton,
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel,
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint,
+.mod_vrmakerspace-studio .mod_vrmakerspace-stageconfirm,
+.mod_vrmakerspace-studio .mod_vrmakerspace-loading {
+    color: #f4f6f8;
+    background-color: rgba(18, 22, 28, 0.72);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    opacity: 1;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-pictures,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-helpbutton,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-helppanel,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-hint,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-stageconfirm,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-loading {
+        background-color: rgba(18, 22, 28, 0.9);
+    }
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-legend {
+    top: 0.75rem;
+    left: 0.75rem;
+    gap: 0.375rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-pictures,
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint {
+    border-radius: 999px;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-pictures {
+    padding: 0.375rem 0.75rem;
+    color: rgba(244, 246, 248, 0.9);
+}
+
+/* The round "?" button: 40 px, 44 px on touch. */
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-helpbutton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 999px;
+    color: #f4f6f8;
+}
+
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-helpbutton:hover {
+    background-color: rgba(60, 66, 74, 0.85);
+    color: #f4f6f8;
+}
+
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-helpbutton[aria-expanded="true"] {
+    background-color: #ffc107;
+    color: #1a1a1a;
+}
+
+@media (pointer: coarse) {
+    .mod_vrmakerspace-studio .btn.mod_vrmakerspace-helpbutton {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel {
+    top: 3.75rem;
+    left: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel h3 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel .mod_vrmakerspace-help {
+    color: rgba(244, 246, 248, 0.72);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* The tip: a glass pill with an amber mark, the colour of "next step". */
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint {
+    bottom: 0.75rem;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    font-weight: 600;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.6rem;
+    border-radius: 50%;
+    background-color: #ffc107;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint .btn-close:focus-visible,
+.mod_vrmakerspace-studio .btn.mod_vrmakerspace-helpbutton:focus-visible {
+    outline: 3px solid #ffc107;
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-stageconfirm {
+    top: 0.75rem;
+    padding: 0.75rem 1rem;
+}
+
+/* Open and close: a short fade and rise, none when motion is reduced. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint:not(.d-none),
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel:not(.d-none) {
+    animation: mod_vrmakerspace-rise 160ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes mod_vrmakerspace-rise {
+    from {
+        opacity: 0;
+        transform: translate(var(--mod-vrmakerspace-x, 0), 6px);
+    }
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-hint {
+    --mod-vrmakerspace-x: -50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-hint:not(.d-none),
+    .mod_vrmakerspace-studio .mod_vrmakerspace-helppanel:not(.d-none) {
+        animation: none;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* The phone's tool tray is a glass bar too, its tools light on dark. */
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray {
+        background-color: rgba(18, 22, 28, 0.78);
+        -webkit-backdrop-filter: blur(12px) saturate(140%);
+        backdrop-filter: blur(12px) saturate(140%);
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+        padding-bottom: calc(0.2rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .btn {
+        --bs-btn-color: #f4f6f8;
+        --bs-btn-bg: rgba(255, 255, 255, 0.1);
+        --bs-btn-border-color: rgba(255, 255, 255, 0.16);
+        --bs-btn-hover-color: #f4f6f8;
+        --bs-btn-hover-bg: rgba(255, 255, 255, 0.18);
+        --bs-btn-hover-border-color: rgba(255, 255, 255, 0.24);
+        --bs-btn-active-color: #1a1a1a;
+        --bs-btn-active-bg: #ffc107;
+        --bs-btn-active-border-color: #ffc107;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .mod_vrmakerspace-grouplabel {
+        color: rgba(244, 246, 248, 0.72);
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .form-control,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .form-select,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray label,
+    .mod_vrmakerspace-studio .mod_vrmakerspace-tray .mod_vrmakerspace-sliderend {
+        color: #f4f6f8;
+    }
+
+    .mod_vrmakerspace-studio.mod_vrmakerspace-phone .mod_vrmakerspace-hint {
+        bottom: 6rem;
     }
 }
