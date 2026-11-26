@@ -1326,3 +1326,124 @@
         width: calc(100% - 1rem);
     }
 }
+
+/* Brush: only with the basic tools; with More the sliders sit in the row. */
+.mod_vrmakerspace-studio:not(.mod_vrmakerspace-basic) [data-basiconly] {
+    display: none;
+}
+
+/* Size and Strength in a small glass popover under the Brush button. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-brushpop {
+    position: absolute;
+    z-index: 4;
+    flex-direction: column;
+    align-items: stretch;
+    width: 22rem;
+    padding: 0.75rem 1rem;
+    color: #f4f6f8;
+    background-color: rgba(18, 22, 28, 0.82);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --bs-secondary-color: rgba(244, 246, 248, 0.72);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-brushpop label {
+    min-width: 4.5rem;
+    color: #f4f6f8;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-brushpop .mod_vrmakerspace-slider .form-range {
+    flex: 1 1 auto;
+    width: auto;
+}
+
+/* "More below": a fade and a chevron that stay at the bottom of a scrolling panel while more follows. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-morebelow {
+    position: sticky;
+    bottom: 0;
+    height: 2.5rem;
+    margin-top: -2.5rem;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(18, 22, 28, 0), rgba(18, 22, 28, 0.95));
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-morebelow::after {
+    content: "";
+    position: absolute;
+    bottom: 0.6rem;
+    left: 50%;
+    width: 0.7rem;
+    height: 0.7rem;
+    margin-left: -0.35rem;
+    border-right: 2px solid #ffc107;
+    border-bottom: 2px solid #ffc107;
+    transform: rotate(45deg);
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-morebelow.d-none {
+    display: none;
+}
+
+/* Keys in the help: the rows flow into two columns, each row a key cap and its name close together. */
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] tbody {
+    display: block;
+    column-count: 2;
+    column-gap: 1.5rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] tr {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.1rem 0;
+    break-inside: avoid;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] td,
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] td:last-child {
+    width: auto;
+    padding: 0;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] td:first-child {
+    flex: 0 0 5.5rem;
+}
+
+.mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] caption {
+    display: block;
+}
+
+@media (max-width: 575.98px) {
+    .mod_vrmakerspace-studio .mod_vrmakerspace-brushpop {
+        top: auto;
+        right: 0.5rem;
+        bottom: 6.5rem;
+        left: 0.5rem;
+        width: auto;
+    }
+
+    /* The sheet rests on whole rows. */
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray {
+        scroll-snap-type: y proximity;
+    }
+
+    .mod_vrmakerspace-phone:not(.mod_vrmakerspace-basic) .mod_vrmakerspace-tray .btn {
+        scroll-snap-align: start;
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-morebelow {
+        background: linear-gradient(to bottom, rgba(18, 22, 28, 0), rgba(18, 22, 28, 0.98));
+    }
+
+    .mod_vrmakerspace-studio .mod_vrmakerspace-helppanel table.mod_vrmakerspace-helptable[data-region] tbody {
+        column-count: 1;
+    }
+}
+
+/* The Tutorial button sits with More, after the tools. */
+.mod_vrmakerspace-studio.mod_vrmakerspace-basic .mod_vrmakerspace-toolbar > [data-action="tutorial"] {
+    order: 2;
+}

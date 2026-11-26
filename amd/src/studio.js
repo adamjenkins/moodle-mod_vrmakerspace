@@ -120,6 +120,24 @@ const TABLE_RADIUS = 0.22;
 /** Thickness of the turntable (m). */
 const TABLE_THICKNESS = 0.03;
 
+/** Thickness of the glass stand's disc (m). */
+const STAND_THICKNESS = 0.006;
+
+/** Radius of the glass stand's post (m). */
+const STAND_POST_RADIUS = 0.008;
+
+/** Smallest radius of the glass stand's disc (m). */
+const STAND_MIN_RADIUS = 0.05;
+
+/** Gap between the piece's lowest point and the stand's top (m). */
+const STAND_CLEAR = 0.0015;
+
+/** Below this height above the turntable (m) the piece rests on the turntable itself: no stand. */
+const STAND_MIN_GAP = 0.02;
+
+/** How often the stand follows the piece (ms). */
+const STAND_TICK = 600;
+
 /** Vertical field of view of the desktop camera (degrees). */
 const FOV = 50;
 
@@ -678,6 +696,74 @@ const tutorialFlags = (config, readonly, extra) => {
 };
 
 /**
+ * A thin glass stand under the piece: a clear disc at the piece's lowest point, with a soft shadow on it and a slim
+ * clear post down to the turntable, so the piece rests on something wherever it is. It follows the piece as it changes,
+ * takes no clicks and lets the piece's geometry pass through. Hidden when there is no piece or the piece reaches down
+ * to the turntable itself.
+ *
+ * @param {Object} THREE three.js.
+ * @param {Object} scene THREE.Scene.
+ * @returns {Object} {update(box), dispose()}
+ */
+export const createStand = (THREE, scene) => {
+    const group = new THREE.Group();
+    group.name = 'vrmakerspace-stand';
+    const glass = new THREE.MeshStandardMaterial({color: 0xffffff, transparent: true, opacity: 0.45, roughness: 0.05,
+        metalness: 0, envMapIntensity: 1.2, depthWrite: false});
+    const discgeometry = new THREE.CylinderGeometry(1, 1, 1, 64);
+    const disc = new THREE.Mesh(discgeometry, glass);
+    disc.renderOrder = 2;
+    group.add(disc);
+    const postgeometry = new THREE.CylinderGeometry(1, 1, 1, 24);
+    const post = new THREE.Mesh(postgeometry, glass);
+    post.renderOrder = 2;
+    group.add(post);
+    const shadowtexture = softShadow(0.45);
+    const shadowmaterial = new THREE.MeshBasicMaterial({map: shadowtexture, transparent: true, depthWrite: false,
+        toneMapped: false});
+    const shadowgeometry = new THREE.PlaneGeometry(1, 1);
+    const shadow = new THREE.Mesh(shadowgeometry, shadowmaterial);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.renderOrder = 1;
+    group.add(shadow);
+    group.visible = false;
+    scene.add(group);
+    const size = new THREE.Vector3();
+    const centre = new THREE.Vector3();
+    return {
+        /**
+         * Follow the piece.
+         *
+         * @param {Object|null} box THREE.Box3 round the piece in world space, null for none.
+         */
+        update: (box) => {
+            if (!box || box.min.y <= PEDESTAL_TOP + STAND_MIN_GAP) {
+                group.visible = false;
+                return;
+            }
+            box.getSize(size);
+            box.getCenter(centre);
+            const radius = Math.min(TABLE_RADIUS, Math.max(STAND_MIN_RADIUS, Math.max(size.x, size.z) * 0.6));
+            const top = box.min.y - STAND_CLEAR;
+            disc.scale.set(radius, STAND_THICKNESS, radius);
+            disc.position.set(centre.x, top - STAND_THICKNESS / 2, centre.z);
+            const postheight = Math.max(0.001, top - STAND_THICKNESS - PEDESTAL_TOP);
+            post.scale.set(STAND_POST_RADIUS, postheight, STAND_POST_RADIUS);
+            post.position.set(centre.x, PEDESTAL_TOP + postheight / 2, centre.z);
+            shadow.scale.setScalar(Math.max(size.x, size.z) * 1.3);
+            shadow.position.set(centre.x, top + 0.0005, centre.z);
+            group.visible = true;
+        },
+
+        /** Free the GPU resources. */
+        dispose: () => {
+            scene.remove(group);
+            [discgeometry, postgeometry, shadowgeometry, glass, shadowmaterial, shadowtexture].forEach((each) => each.dispose());
+        },
+    };
+};
+
+/**
  * Keep the whole piece in the desktop view: after a change that takes it out of the frame, the camera eases back
  * (never in) until it fits again.
  *
@@ -713,6 +799,13 @@ export const createFramer = (THREE, camera, sculptureRoot) => {
         return !box.isEmpty();
     };
     return {
+        /**
+         * The box round the piece now, in world space.
+         *
+         * @returns {Object|null} THREE.Box3 (reused: copy it to keep it), or null when there is nothing.
+         */
+        bounds: () => (measure() ? box : null),
+
         /**
          * Start easing back if the piece no longer fits.
          *
@@ -988,6 +1081,9 @@ const run = (root, config, strings, extra) => {
     const tutorBusy = () => !!(tutor && tutor.busy);
 
     const framer = createFramer(THREE, camera, sculptureRoot);
+    // The glass stand follows the piece, whoever changes it.
+    const stand = createStand(THREE, scene);
+    const standtimer = window.setInterval(() => stand.update(framer.bounds()), STAND_TICK);
     let frametimer = null;
     /** After a change: once the engine has drawn it, keep the whole piece in view. */
     const frameSoon = () => {
@@ -1684,6 +1780,8 @@ const run = (root, config, strings, extra) => {
             }
             toolbar.dispose();
             guide.dispose();
+            window.clearInterval(standtimer);
+            stand.dispose();
             unsubscribers.forEach((off) => off());
             document.removeEventListener('fullscreenchange', onFullscreenChange);
             root.removeEventListener('keydown', onKeyDown);

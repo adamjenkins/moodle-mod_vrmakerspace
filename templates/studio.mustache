@@ -25,7 +25,8 @@
 
     Classes required for JS:
     * d-none - hides the parts the studio shows once it knows what the device can do
-    * mod_vrmakerspace-basic - on the root: only the basic tools show (elements marked data-advanced hide)
+    * mod_vrmakerspace-basic - on the root: only the basic tools show (elements marked data-advanced hide); the tutorial
+      shows all of them (event mod_vrmakerspace:alltools) when a step points at a hidden one
 
     Data attributes required for JS:
     * data-region="mod_vrmakerspace-studioroot" data-title: the studio root and the activity name
@@ -33,13 +34,14 @@
       segments, stage, canvas, loading, nowebgl, failed, bakeconfirm, statustext, message, openedges, sculpthelp, modelhelp,
       vrhelp, vrmodelhelp; exportmenu, addshapemenu, selectmodes, axislock (what the tutorial's steps point at)
     * data-region goal, savedstate, legend, helppanel, hint, members, modelscroll, segmentsbox, segmentslabel, tray,
-      filegroup, showme
+      filegroup, showme, brush
       (the guide)
     * data-action tool (with data-tool), mirror, undo, redo, save, export (with data-format), vr, fullscreen,
       method (with data-method), selectmode (with data-mode), select (with data-select), addshape (with data-shape),
       modelaction (with data-tool), axis (with data-axis), oneshot (with data-oneshot), bakeconfirm, bakecancel, tutorial,
-      moretools, help, hidehint, showme
+      moretools, help, hidehint, showme, brush
     * data-advanced - a tool or heading that only shows with More tools
+    * data-basiconly - a control that only shows with the basic tools (Brush: with More the sliders show in the row)
 
     Context variables required for this template:
     * readonly - true when the piece can only be looked at
@@ -82,7 +84,7 @@
         "members": [{"name": "Sam", "you": true}, {"name": "Alex", "you": false}]
     }
 }}
-<div class="mod_vrmakerspace-studio{{^readonly}}{{^tutorial}} mod_vrmakerspace-basic{{/tutorial}}{{/readonly}}"
+<div class="mod_vrmakerspace-studio{{^readonly}} mod_vrmakerspace-basic{{/readonly}}"
         data-region="mod_vrmakerspace-studioroot" data-title="{{title}}"{{#readonly}} data-readonly="1"{{/readonly}}
         {{#tutorial}} data-tutorial="1"{{/tutorial}}>
     <div class="mod_vrmakerspace-header d-flex flex-wrap align-items-center gap-2 mb-2" data-region="goal">
@@ -185,11 +187,9 @@
             {{#tutorial}}
             <button type="button" class="btn btn-outline-info" data-action="tutorial" aria-pressed="false">{{#str}} tutorial_button, mod_vrmakerspace {{/str}}</button>
             {{/tutorial}}
-            {{^tutorial}}
             <button type="button" class="btn btn-outline-primary mod_vrmakerspace-moretools" data-action="moretools" aria-pressed="false"
                     data-more="{{#str}} tools_more, mod_vrmakerspace {{/str}}"
                     data-fewer="{{#str}} tools_fewer, mod_vrmakerspace {{/str}}">{{#str}} tools_more, mod_vrmakerspace {{/str}}</button>
-            {{/tutorial}}
         {{/readonly}}
         {{^readonly}}
             {{#cansculpt}}
@@ -236,19 +236,23 @@
                 </div>
                 <button type="button" class="btn btn-outline-secondary" data-action="mirror" aria-pressed="false" data-advanced="1"
                         title="{{#str}} mirror, mod_vrmakerspace {{/str}} (M): {{#str}} tip_tool_mirror, mod_vrmakerspace {{/str}}">{{#str}} mirror, mod_vrmakerspace {{/str}}</button>
-                <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
-                    <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrmakerspace {{/str}}</label>
-                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_small, mod_vrmakerspace {{/str}}</span>
-                    <input type="range" class="form-range" id="{{uniqid}}-size" data-region="size" min="4" max="80" step="1"
-                            value="20">
-                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_big, mod_vrmakerspace {{/str}}</span>
-                </div>
-                <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
-                    <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrmakerspace {{/str}}</label>
-                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_gentle, mod_vrmakerspace {{/str}}</span>
-                    <input type="range" class="form-range" id="{{uniqid}}-strength" data-region="strength" min="5" max="100"
-                            step="5" value="50">
-                    <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_strong, mod_vrmakerspace {{/str}}</span>
+                <button type="button" class="btn btn-outline-primary mod_vrmakerspace-brushbutton" data-action="brush" data-basiconly="1"
+                        aria-expanded="false" title="{{#str}} brush_button, mod_vrmakerspace {{/str}}: {{#str}} tip_brush, mod_vrmakerspace {{/str}}">{{#str}} brush_button, mod_vrmakerspace {{/str}}</button>
+                <div class="mod_vrmakerspace-brush d-flex flex-wrap align-items-center gap-2" data-region="brush">
+                    <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
+                        <label class="mb-0" for="{{uniqid}}-size">{{#str}} brushsize, mod_vrmakerspace {{/str}}</label>
+                        <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_small, mod_vrmakerspace {{/str}}</span>
+                        <input type="range" class="form-range" id="{{uniqid}}-size" data-region="size" min="4" max="80" step="1"
+                                value="20">
+                        <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_big, mod_vrmakerspace {{/str}}</span>
+                    </div>
+                    <div class="mod_vrmakerspace-slider d-flex align-items-center gap-2">
+                        <label class="mb-0" for="{{uniqid}}-strength">{{#str}} brushstrength, mod_vrmakerspace {{/str}}</label>
+                        <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_gentle, mod_vrmakerspace {{/str}}</span>
+                        <input type="range" class="form-range" id="{{uniqid}}-strength" data-region="strength" min="5" max="100"
+                                step="5" value="50">
+                        <span class="mod_vrmakerspace-sliderend small text-muted" aria-hidden="true">{{#str}} slider_strong, mod_vrmakerspace {{/str}}</span>
+                    </div>
                 </div>
             </div>
             {{/cansculpt}}

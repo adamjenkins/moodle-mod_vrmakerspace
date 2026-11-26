@@ -469,6 +469,11 @@ export const createTutorial = (options) => {
         if (element && target.closest) {
             element = element.closest(target.closest) || element;
         }
+        // The studio starts with its basic tools (mod_vrmakerspace/guide): a step about a tool behind More shows them all.
+        if (element && !isShown(element) && root.classList.contains('mod_vrmakerspace-basic')
+                && element.closest('[data-advanced], [data-region="brush"]')) {
+            root.dispatchEvent(new CustomEvent('mod_vrmakerspace:alltools'));
+        }
         return isShown(element) ? element : null;
     };
 
@@ -542,10 +547,24 @@ export const createTutorial = (options) => {
         const height = parts.bubble.offsetHeight;
         const width = parts.bubble.offsetWidth;
         const centre = box.left - rootbox.left + box.width / 2;
-        const below = box.bottom - rootbox.top + GAP;
+        // A tool in the bar docked over the 3D view: open below the whole bar, so the bubble never covers other tools.
+        const dock = element.closest('.mod_vrmakerspace-docked [data-region="toolbar"]');
+        const bottom = dock ? Math.max(box.bottom, dock.getBoundingClientRect().bottom) : box.bottom;
+        const below = bottom - rootbox.top + GAP;
         const above = box.top - rootbox.top - GAP - height;
         const room = below + height <= rootbox.height - EDGE || above < EDGE;
         putBubble(centre - width / 2, room ? below : above, rootbox, {x: centre, side: room ? 'top' : 'bottom'});
+    };
+
+    /**
+     * The bottom of the bar of tools docked over the 3D view (mod_vrmakerspace/guide), 0 when it is not docked.
+     *
+     * @returns {number} Viewport y (px).
+     */
+    const dockBottom = () => {
+        const dock = root.querySelector('.mod_vrmakerspace-docked [data-region="toolbar"]')
+            || (root.classList.contains('mod_vrmakerspace-docked') ? root.querySelector('[data-region="toolbar"]') : null);
+        return dock ? dock.getBoundingClientRect().bottom : 0;
     };
 
     /**
@@ -559,12 +578,14 @@ export const createTutorial = (options) => {
         if (head) {
             const width = parts.bubble.offsetWidth;
             const right = head.x + TUTOR_CLEAR + width <= rootbox.width - EDGE;
-            putBubble(right ? head.x + TUTOR_CLEAR : head.x - TUTOR_CLEAR - width, head.y - parts.bubble.offsetHeight / 2,
-                rootbox);
+            // Beside the tutor, but never over the bar of tools docked at the top of the view.
+            const top = Math.max(head.y - parts.bubble.offsetHeight / 2, dockBottom() - rootbox.top + GAP);
+            putBubble(right ? head.x + TUTOR_CLEAR : head.x - TUTOR_CLEAR - width, top, rootbox);
             return;
         }
         const box = (stage || canvas).getBoundingClientRect();
-        putBubble(box.right - rootbox.left - parts.bubble.offsetWidth - GAP, box.top - rootbox.top + GAP, rootbox);
+        putBubble(box.right - rootbox.left - parts.bubble.offsetWidth - GAP, Math.max(box.top, dockBottom()) - rootbox.top + GAP,
+            rootbox);
     };
 
     /**

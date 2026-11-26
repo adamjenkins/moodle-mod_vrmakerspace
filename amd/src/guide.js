@@ -104,6 +104,7 @@ const ICONS = {
     'tool:flatten': '<path d="M3 18h18"/><path d="M6 18c0-4 3-6 6-6s6 2 6 6"/><path d="M12 3v5M9.5 6l2.5 2.5L14.5 6"/>',
     'tool:cutshape': '<circle cx="12" cy="12" r="8"/><path d="M9 9h6v6H9z" stroke-dasharray="2 2"/>',
     'mirror': '<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 6H5v12h4M15 6h4v12h-4"/>',
+    'brush': '<path d="M18 3l3 3-9 9-3-3z"/><path d="M9 12c-3 0-5 2-5 5 0 2-1 3-2 4 4 0 9-1 9-6"/>',
 };
 
 /**
@@ -119,7 +120,7 @@ const iconKey = (button) => {
     if (detail) {
         return `${action}:${button.dataset[detail] || ''}`;
     }
-    if (action === 'undo' || action === 'redo' || action === 'mirror') {
+    if (['undo', 'redo', 'mirror', 'brush'].includes(action)) {
         return action;
     }
     return button.dataset.region === 'addshapemenu' ? 'addshapemenu' : '';
@@ -281,6 +282,8 @@ export const createGuide = (root, options) => {
     const filegroup = region('filegroup');
     const showme = region('showme');
     const showmebutton = root.querySelector('[data-action="showme"]');
+    const brush = region('brush');
+    const brushbutton = root.querySelector('[data-action="brush"]');
     const listeners = [];
     let method = 'sculpt';
     let changes = 0;
@@ -375,7 +378,9 @@ export const createGuide = (root, options) => {
         moretools.setAttribute('aria-pressed', all ? 'true' : 'false');
         moretools.textContent = all ? (moretools.dataset.fewer || '') : (moretools.dataset.more || '');
         onToolsChange();
+        placeBrush();
         refreshCue();
+        window.setTimeout(refreshScrollHints, 50);
     };
 
     /**
@@ -388,6 +393,7 @@ export const createGuide = (root, options) => {
             return;
         }
         helppanel.classList.toggle('d-none', !open);
+        window.setTimeout(refreshScrollHints, 50);
         if (helpbutton) {
             helpbutton.setAttribute('aria-expanded', open ? 'true' : 'false');
         }
@@ -413,8 +419,59 @@ export const createGuide = (root, options) => {
             }
         });
         root.classList.toggle('mod_vrmakerspace-phone', phone);
+        placeBrush();
         refreshCue();
     };
+
+    /**
+     * With the basic tools, Size and Strength sit in a small glass popover under the Brush button, so the bar stays one
+     * row; with all the tools (and in tutorial mode) they sit in the row as before.
+     */
+    function placeBrush() {
+        if (!brush || !sculptpanel) {
+            return;
+        }
+        const stage = region('stage');
+        const popover = !!stage && root.classList.contains('mod_vrmakerspace-basic')
+            && root.classList.contains('mod_vrmakerspace-docked');
+        if (popover && brush.parentNode !== stage) {
+            stage.appendChild(brush);
+            brush.classList.add('mod_vrmakerspace-brushpop', 'd-none');
+        } else if (!popover && brush.parentNode !== sculptpanel) {
+            sculptpanel.appendChild(brush);
+            brush.classList.remove('mod_vrmakerspace-brushpop', 'd-none');
+        }
+        if (brushbutton) {
+            brushbutton.setAttribute('aria-expanded', popover && !brush.classList.contains('d-none') ? 'true' : 'false');
+        }
+    }
+
+    /**
+     * Open or close the Brush popover, under its button.
+     *
+     * @param {boolean} open Whether it shows.
+     */
+    function openBrush(open) {
+        if (!brush || !brush.classList.contains('mod_vrmakerspace-brushpop')) {
+            return;
+        }
+        brush.classList.toggle('d-none', !open);
+        if (brushbutton) {
+            brushbutton.setAttribute('aria-expanded', open ? 'true' : 'false');
+            brushbutton.classList.toggle('active', open);
+        }
+        const stage = region('stage');
+        if (open && stage && brushbutton && !root.classList.contains('mod_vrmakerspace-phone')) {
+            const stagebox = stage.getBoundingClientRect();
+            const buttonbox = brushbutton.getBoundingClientRect();
+            const barbox = toolbar ? toolbar.getBoundingClientRect() : buttonbox;
+            brush.style.left = `${Math.max(8, Math.round(buttonbox.left - stagebox.left))}px`;
+            brush.style.top = `${Math.round(barbox.bottom - stagebox.top + 8)}px`;
+        } else {
+            brush.style.left = '';
+            brush.style.top = '';
+        }
+    }
 
     /** On a phone the shape tools scroll sideways: show that more follow while they do. */
     function refreshCue() {
@@ -437,6 +494,9 @@ export const createGuide = (root, options) => {
                 break;
             case 'help':
                 setHelp(!!helppanel && helppanel.classList.contains('d-none'));
+                break;
+            case 'brush':
+                openBrush(!!brush && brush.classList.contains('d-none'));
                 break;
             case 'showme':
                 if (showme) {
@@ -463,6 +523,32 @@ export const createGuide = (root, options) => {
     });
     on(modelpanel, 'scroll', refreshCue);
     on(window, 'resize', refreshCue);
+    on(region('canvas'), 'pointerdown', () => openBrush(false));
+    // The tutorial asks for all the tools when a step points at one behind More (not remembered as the person's choice).
+    on(root, 'mod_vrmakerspace:alltools', () => setAll(true));
+
+    // Panels that scroll up and down (the phone's More sheet, the help) end on a fade with a chevron while more
+    // follows below, so nothing looks cut off.
+    const scrollers = [tray, helppanel].filter((element) => !!element).map((element) => {
+        const hint = document.createElement('div');
+        hint.className = 'mod_vrmakerspace-morebelow d-none';
+        hint.setAttribute('aria-hidden', 'true');
+        element.appendChild(hint);
+        on(element, 'scroll', () => refreshScrollHints());
+        return {element, hint};
+    });
+    /** Show each panel's "more below" while it has more below. */
+    function refreshScrollHints() {
+        scrollers.forEach(({element, hint}) => {
+            // Tools moved into the tray after the hint was made: keep the hint last, where it sticks to the bottom.
+            if (element.lastElementChild !== hint) {
+                element.appendChild(hint);
+            }
+            const more = element.scrollHeight - element.clientHeight - element.scrollTop > 4;
+            hint.classList.toggle('d-none', !more);
+        });
+    }
+    on(window, 'resize', refreshScrollHints);
 
     decorate(root);
     if (moretools && readCookie(TOOLS_COOKIE) === 'all') {
