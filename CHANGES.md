@@ -24,5 +24,11 @@ The studio is easier to understand the first time you open it.
 - If the AI service does not answer (it cannot be reached, is overloaded or fails), the student sees one calm line ("Tinker can't answer questions right now. The steps still work."), and for 10 minutes nobody on the site is offered the Ask box. The first answer after that clears it. A question the service refuses affects only the student who asked it.
 - In the activity settings, teachers see one line when the site has no AI provider, or when the AI service did not answer recently.
 
+**Security and privacy**
+- In separate groups, a teacher without access to all groups can open only the pieces of their own groups and of those groups' members, by any route: the studio, a version's file, the piece's state and closing or reopening it. Before, the lists were filtered but a piece opened by its address was not.
+- Saved versions are limited on the server. A save within 10 seconds of the same student's newest version updates that version instead of adding one, so the newest work is always kept. Each piece keeps at most 100 versions: beyond that the oldest are removed, never the first or the newest.
+- Deleting a student's data also removes what they had selected in a group piece's saved versions when the group worked through the companion service, and their data export now includes those selections.
+- The grading page reads grades as numbers in the teacher's own format (a decimal comma too) and checks each against the grade range.
+
 **For administrators**
 - Upgrade: a new application cache, `aistatus` ("When the AI last failed to answer the tutor"), is registered. The upgrade also removes two plugin settings that pre-release builds used for the same purpose. There are no database changes.

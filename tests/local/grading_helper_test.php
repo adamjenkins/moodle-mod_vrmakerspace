@@ -95,6 +95,25 @@ final class grading_helper_test extends \advanced_testcase {
         grading_helper::save($vrmakerspace, $gradable, [(int)$one->id => ''], [], (int)$teacher->id);
         $this->assertNull($this->gradebook_grade($vrmakerspace, (int)$one->id));
 
+        // Typed values, as grade.php reads them with PARAM_LOCALISEDFLOAT: a float, false (not a number), null (empty).
+        $this->assertSame(12.5, clean_param('12.5', PARAM_LOCALISEDFLOAT));
+        $this->assertFalse(clean_param('abc', PARAM_LOCALISEDFLOAT));
+        $this->assertNull(clean_param('', PARAM_LOCALISEDFLOAT));
+        $typed = [(int)$one->id => 12.5, (int)$two->id => false];
+        $result = grading_helper::save($vrmakerspace, $gradable, $typed, [], (int)$teacher->id);
+        $this->assertSame(1, $result['saved']);
+        $this->assertSame([(int)$two->id], array_keys($result['errors']));
+        $this->assertEquals(12.5, $this->gradebook_grade($vrmakerspace, (int)$one->id));
+        $result = grading_helper::save($vrmakerspace, $gradable, [(int)$one->id => 25.0], [], (int)$teacher->id);
+        $this->assertSame(get_string('gradeoutofrange', 'vrmakerspace', format_float(20, 2)), $result['errors'][(int)$one->id]);
+        $this->assertEquals(12.5, $this->gradebook_grade($vrmakerspace, (int)$one->id));
+        // The rejected value is shown again by its error, in the teacher's locale.
+        $shown = grading_helper::template_data($vrmakerspace, $context, $gradable, $result['errors'], [(int)$one->id => 25.0]);
+        $values = array_column(array_merge(...array_column($shown['sculptures'], 'members')), 'value', 'userid');
+        $this->assertSame(format_float(25.0, -1), $values[(int)$one->id]);
+        grading_helper::save($vrmakerspace, $gradable, [(int)$one->id => null], [], (int)$teacher->id);
+        $this->assertNull($this->gradebook_grade($vrmakerspace, (int)$one->id));
+
         $data = grading_helper::template_data($vrmakerspace, $context, $gradable);
         $this->assertCount(2, $data['sculptures']);
         $this->assertSame('20.00', $data['maxgrade']);

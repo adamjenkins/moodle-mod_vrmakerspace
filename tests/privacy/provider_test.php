@@ -235,6 +235,81 @@ final class provider_test extends provider_testcase {
     }
 
     /**
+     * A version of the group's piece, saved by bob, holding selections under some author ids.
+     *
+     * @param string[] $authors author ids, one selection row each
+     * @return \stdClass the snapshot row
+     */
+    private function group_version_with_selections(array $authors): \stdClass {
+        $team = \context_module::instance($this->team->cmid);
+        $maker = $this->getDataGenerator()->get_plugin_generator('mod_vrmakerspace');
+        $rows = array_map(fn($author, $i) => '["' . $author . '","f",[' . ($i + 1) . ']]', $authors, array_keys($authors));
+        $data = $maker->snapshot_data('selections' . count($authors), 9);
+        $data = str_replace('"s":[]', '"s":[' . implode(',', $rows) . ']', $data);
+        $data = substr_replace($data, pack('V', strlen($data) - 48), 44, 4);
+        return session_manager::save_snapshot($this->groupsession, $team, (int)$this->bob->id, $data);
+    }
+
+    /**
+     * Group work through the companion keeps a selection under the member's peer id in that piece: it is exported for
+     * them, and deleting them (one user, or several in a context) takes it out, with their user-id selection.
+     */
+    public function test_companion_peer_selection(): void {
+        if (!\mod_vrmakerspace\local\companion_manager::is_installed()) {
+            $this->markTestSkipped('The companion plugin (vrroomruntime_companion) is not installed.');
+        }
+        $team = \context_module::instance($this->team->cmid);
+        $alicepeer = \mod_vrmakerspace\local\companion_manager::peer_id((int)$this->alice->id, (int)$this->groupsession->id);
+        $bobpeer = \mod_vrmakerspace\local\companion_manager::peer_id((int)$this->bob->id, (int)$this->groupsession->id);
+        $this->assertContains($alicepeer, session_manager::author_ids((int)$this->alice->id, (int)$this->groupsession->id));
+        $snapshot = $this->group_version_with_selections([$alicepeer, 'u' . $this->alice->id, $bobpeer]);
+
+        // Export: alice's two selections in that version, not bob's.
+        $this->export_context_data_for_user((int)$this->alice->id, $team, 'mod_vrmakerspace');
+        $data = writer::with_context($team)->get_data();
+        $this->assertSame([['f', [1]], ['f', [2]]], $data->pieces[0]->yourselections[(int)$snapshot->version]);
+
+        // Deleting several users in the context (alice only here) removes both of hers, and leaves bob's.
+        provider::delete_data_for_users(new \core_privacy\local\request\approved_userlist(
+            $team,
+            'mod_vrmakerspace',
+            [(int)$this->alice->id]
+        ));
+        $content = session_manager::get_snapshot_file($snapshot, $team)->get_content();
+        $this->assertStringNotContainsString($alicepeer, $content);
+        $this->assertStringNotContainsString('"u' . $this->alice->id . '"', $content);
+        $this->assertStringContainsString($bobpeer, $content);
+        session_manager::validate_snapshot($content);
+
+        // Deleting one user (bob) takes his peer-id selection out too.
+        $this->setUser($this->bob);
+        provider::delete_data_for_user(new approved_contextlist($this->bob, 'mod_vrmakerspace', [$team->id]));
+        $content = session_manager::get_snapshot_file(
+            session_manager::get_snapshot_by_version((int)$this->groupsession->id, (int)$snapshot->version),
+            $team
+        )->get_content();
+        $this->assertStringNotContainsString($bobpeer, $content);
+    }
+
+    /**
+     * Without the companion, a member's selections are found under their user id only; they are exported for them.
+     */
+    public function test_selection_export_user_id(): void {
+        $team = \context_module::instance($this->team->cmid);
+        $snapshot = $this->group_version_with_selections(['u' . $this->alice->id, 'u' . $this->bob->id]);
+        $this->assertSame(
+            [['f', [1]]],
+            session_manager::author_selections(
+                session_manager::get_snapshot_file($snapshot, $team)->get_content(),
+                ['u' . $this->alice->id]
+            )
+        );
+        $this->export_context_data_for_user((int)$this->alice->id, $team, 'mod_vrmakerspace');
+        $data = writer::with_context($team)->get_data();
+        $this->assertSame([['f', [1]]], $data->pieces[0]->yourselections[(int)$snapshot->version]);
+    }
+
+    /**
      * A compressed mesh section is rewritten compressed.
      */
     public function test_snapshot_without_author_compressed(): void {

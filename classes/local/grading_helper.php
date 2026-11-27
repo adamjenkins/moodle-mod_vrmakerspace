@@ -81,12 +81,12 @@ final class grading_helper {
         // The value for each listed user: the group field first, then the user's own.
         $values = [];
         foreach ($gradable as $sessionid => $item) {
-            $group = trim((string)($groupgrades[$sessionid] ?? ''));
+            $group = self::grade_value($groupgrades[$sessionid] ?? null);
             foreach ($item['userids'] as $userid) {
-                if ((int)$item['session']->groupid && $group !== '') {
+                if ((int)$item['session']->groupid && $group !== null) {
                     $values[$userid] = $group;
                 } else if (array_key_exists($userid, $grades)) {
-                    $values[$userid] = trim((string)$grades[$userid]);
+                    $values[$userid] = self::grade_value($grades[$userid]);
                 }
             }
         }
@@ -94,15 +94,10 @@ final class grading_helper {
         $current = $DB->get_records_menu('vrmakerspace_grades', ['vrmakerspaceid' => $vrmakerspace->id], '', 'userid, grade');
         $saved = 0;
         $errors = [];
-        foreach ($values as $userid => $text) {
-            if ($text === '') {
-                $grade = null;
-            } else {
-                $grade = unformat_float($text, true);
-                if ($grade === false || $grade === null) {
-                    $errors[$userid] = get_string('gradeinvalid', 'vrmakerspace');
-                    continue;
-                }
+        foreach ($values as $userid => $grade) {
+            if ($grade === false) {
+                $errors[$userid] = get_string('gradeinvalid', 'vrmakerspace');
+                continue;
             }
             $old = $current[$userid] ?? null;
             if ($old === null ? $grade === null : $grade !== null && abs((float)$old - $grade) < 0.000005) {
@@ -119,13 +114,35 @@ final class grading_helper {
     }
 
     /**
+     * One posted grade as a float, null (empty: no grade) or false (not a number). grade.php reads the fields with
+     * PARAM_LOCALISEDFLOAT, which gives these already; text (other callers) is read the same way.
+     *
+     * @param mixed $value float, null, false or text
+     * @return float|null|false
+     */
+    private static function grade_value($value) {
+        if ($value === null || $value === false || is_float($value)) {
+            return $value;
+        }
+        if (is_int($value)) {
+            return (float)$value;
+        }
+        $text = trim((string)$value);
+        if ($text === '') {
+            return null;
+        }
+        $grade = unformat_float($text, true);
+        return ($grade === null || $grade === false) ? false : (float)$grade;
+    }
+
+    /**
      * The template data of the grading page.
      *
      * @param \stdClass $vrmakerspace the vrmakerspace row
      * @param \context_module $context the activity context
      * @param array $gradable what gradable() returned
      * @param array $errors user id => message, from save()
-     * @param array $posted user id => text posted, shown again next to an error
+     * @param array $posted user id => value posted (float, null, false or text), shown again next to an error
      * @return array
      */
     public static function template_data(
@@ -153,7 +170,10 @@ final class grading_helper {
                     $value = format_float((float)$current[$userid], 2);
                 }
                 if (isset($errors[$userid])) {
-                    $value = (string)($posted[$userid] ?? $value);
+                    // What the teacher entered, shown again by its error: a number out of range as typed in their
+                    // locale, a field that was not a number empty.
+                    $entered = self::grade_value($posted[$userid] ?? null);
+                    $value = is_float($entered) ? format_float($entered, -1) : '';
                 }
                 $members[] = [
                     'userid' => $userid,

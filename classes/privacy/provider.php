@@ -290,8 +290,12 @@ class provider implements
                     );
                 }
                 $live = self::live_data((int)$session->id, $userid);
-                if (!$own && !$versions && !$live) {
+                $selections = $own ? [] : self::selections($session, $context, $userid);
+                if (!$own && !$versions && !$live && !$selections) {
                     continue;
+                }
+                if ($selections) {
+                    $live['yourselections'] = $selections;
                 }
                 $pieces[] = (object)([
                     'piece' => (int)$session->id,
@@ -413,12 +417,37 @@ class provider implements
             pair_manager::purge_user((int)$userid, $sessionids);
         }
 
-        // What they had selected in the mesh, kept under their id inside the saved versions of the group's piece.
+        // What they had selected in the mesh, kept inside the saved versions of the group's piece under their user id or,
+        // in group work through the companion, their peer id in that piece: each file rewritten once.
         foreach ($DB->get_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspaceid]) as $session) {
+            $authors = [];
             foreach ($userids as $userid) {
-                session_manager::remove_author_from_snapshots($session, $context, 'u' . (int)$userid);
+                $authors = array_merge($authors, session_manager::author_ids((int)$userid, (int)$session->id));
+            }
+            session_manager::remove_author_from_snapshots($session, $context, $authors);
+        }
+    }
+
+    /**
+     * What a user had selected in the mesh, kept in the saved versions of someone else's (a group's) piece under their
+     * user id or companion peer id, for the export.
+     *
+     * @param \stdClass $session the session row
+     * @param \context $context the activity context
+     * @param int $userid the user
+     * @return array version number => selection rows
+     */
+    private static function selections(\stdClass $session, \context $context, int $userid): array {
+        $authors = session_manager::author_ids($userid, (int)$session->id);
+        $found = [];
+        foreach (session_manager::get_snapshots((int)$session->id) as $snapshot) {
+            $file = session_manager::get_snapshot_file($snapshot, $context);
+            $rows = $file ? session_manager::author_selections($file->get_content(), $authors) : [];
+            if ($rows) {
+                $found[(int)$snapshot->version] = $rows;
             }
         }
+        return $found;
     }
 
     /**

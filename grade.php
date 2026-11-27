@@ -52,10 +52,12 @@ $gradable = grading_helper::gradable($vrmakerspace, $cm, $context);
 $errors = [];
 $posted = [];
 
-if ((int)$vrmakerspace->grade > 0 && optional_param('savegrades', '', PARAM_RAW) !== '') {
+if ((int)$vrmakerspace->grade > 0 && optional_param('savegrades', false, PARAM_BOOL)) {
     require_sesskey();
-    $posted = optional_param_array('grade', [], PARAM_RAW_TRIMMED);
-    $groupposted = optional_param_array('groupgrade', [], PARAM_RAW_TRIMMED);
+    // Grades as the teacher typed them, in the user's locale (a comma decimal too): a float, null when the field is
+    // empty (clear the grade), false when it is not a number. save() checks each against the activity's grade range.
+    $posted = optional_param_array('grade', [], PARAM_LOCALISEDFLOAT);
+    $groupposted = optional_param_array('groupgrade', [], PARAM_LOCALISEDFLOAT);
     $result = grading_helper::save($vrmakerspace, $gradable, $posted, $groupposted, (int)$USER->id);
     $errors = $result['errors'];
     if (!$errors) {

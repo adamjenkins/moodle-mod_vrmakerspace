@@ -84,6 +84,15 @@ class session_manager {
     /** @var string The file area holding snapshot data. */
     public const FILEAREA = 'snapshots';
 
+    /**
+     * @var int A save within this many seconds of the same user's newest version of a piece updates that version
+     *     instead of adding one, so versions cannot pile up however often saves come; the newest work is always kept.
+     */
+    public const MIN_VERSION_INTERVAL = 10;
+
+    /** @var int Most versions kept per piece: beyond it the oldest are removed, never the first or the newest. */
+    public const MAX_VERSIONS = 100;
+
     /** @var string Group work with one partner, browser to browser (built in). */
     public const CONNECTION_PAIR = 'pair';
 
@@ -330,7 +339,72 @@ class session_manager {
         if (!has_capability('mod/vrmakerspace:view', $context, $userid)) {
             return false;
         }
-        return self::is_owner($session, $userid) || has_capability('mod/vrmakerspace:viewallsubmissions', $context, $userid);
+        if (self::is_owner($session, $userid)) {
+            return true;
+        }
+        if (!has_capability('mod/vrmakerspace:viewallsubmissions', $context, $userid)) {
+            return false;
+        }
+        // Separate groups: only the pieces of the groups the user may see (the same rule as the lists).
+        $cm = get_fast_modinfo($context->get_course_context()->instanceid)->get_cm($context->instanceid);
+        $groups = self::visible_groups($cm, $context, $userid);
+        return $groups === null || self::in_visible_groups($session, $groups);
+    }
+
+    /**
+     * The groups whose pieces a user may see in an activity: null for all of them (not separate groups, or the user
+     * may access all groups), otherwise the ids of the groups they may see (their own).
+     *
+     * @param \cm_info|\stdClass $cm the course module
+     * @param \context_module $context the activity context
+     * @param int $userid the user
+     * @return int[]|null
+     */
+    public static function visible_groups($cm, \context_module $context, int $userid): ?array {
+        $separate = groups_get_activity_groupmode($cm) == SEPARATEGROUPS;
+        if (!$separate || has_capability('moodle/site:accessallgroups', $context, $userid)) {
+            return null;
+        }
+        return array_map('intval', array_keys(groups_get_activity_allowed_groups($cm, $userid)));
+    }
+
+    /**
+     * The users who belong to any of some groups.
+     *
+     * @param int[] $groups group ids
+     * @return int[] user ids
+     */
+    public static function members_of_groups(array $groups): array {
+        global $DB;
+        if (!$groups) {
+            return [];
+        }
+        [$insql, $params] = $DB->get_in_or_equal($groups);
+        return array_map('intval', $DB->get_fieldset_select('groups_members', 'DISTINCT userid', "groupid $insql", $params));
+    }
+
+    /**
+     * Whether a piece belongs to one of some groups: a group piece of one of them, or the piece of a member of one.
+     *
+     * @param \stdClass $session the session row
+     * @param int[] $groups what visible_groups() gave (not null)
+     * @param int[]|null $members members_of_groups($groups) when already known (lists), null to look the owner up
+     * @return bool
+     */
+    public static function in_visible_groups(\stdClass $session, array $groups, ?array $members = null): bool {
+        global $DB;
+        if ((int)$session->groupid) {
+            return in_array((int)$session->groupid, $groups, true);
+        }
+        if ($members !== null) {
+            return in_array((int)$session->userid, $members, true);
+        }
+        if (!$groups) {
+            return false;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($groups);
+        $params[] = (int)$session->userid;
+        return $DB->record_exists_select('groups_members', "groupid $insql AND userid = ?", $params);
     }
 
     /**
@@ -454,12 +528,19 @@ class session_manager {
             }
         }
 
+        $now = time();
+        $soon = $latest && $now - (int)$latest->timecreated < self::MIN_VERSION_INTERVAL;
+        if ($soon && (int)$latest->userid === $userid && (int)$latest->version > 1) {
+            // Saved again a moment after this user's newest version (a script, or Save now pressed twice): that version
+            // takes the new work instead of a new one being added. The first version (the start) is never rewritten.
+            return self::replace_snapshot($latest, $context, $userid, $data, (int)$header['seq'], $now);
+        }
+
         $transaction = $DB->start_delegated_transaction();
         $version = (int)$DB->get_field_sql(
             'SELECT COALESCE(MAX(version), 0) FROM {vrmakerspace_snapshots} WHERE sessionid = ?',
             [$session->id]
         ) + 1;
-        $now = time();
         $snapshot = (object)[
             'sessionid' => $session->id,
             'version' => $version,
@@ -479,18 +560,109 @@ class session_manager {
             'userid' => $userid,
         ], $data);
         $DB->set_field('vrmakerspace_sessions', 'timemodified', $now, ['id' => $session->id]);
+        self::prune_versions($session, $context);
         $transaction->allow_commit();
         return $snapshot;
     }
 
     /**
-     * A snapshot without one person's mesh selection.
+     * Put new work into an existing version (its file and size), keeping its number.
+     *
+     * @param \stdClass $snapshot the vrmakerspace_snapshots row
+     * @param \context_module $context the activity context
+     * @param int $userid who saves
+     * @param string $data the snapshot bytes (checked by the caller)
+     * @param int $opcount the operations count from the header
+     * @param int $now the time
+     * @return \stdClass the updated row
+     */
+    private static function replace_snapshot(
+        \stdClass $snapshot,
+        \context_module $context,
+        int $userid,
+        string $data,
+        int $opcount,
+        int $now
+    ): \stdClass {
+        global $DB;
+        $transaction = $DB->start_delegated_transaction();
+        $fs = get_file_storage();
+        $fs->delete_area_files($context->id, 'mod_vrmakerspace', self::FILEAREA, $snapshot->id);
+        $fs->create_file_from_string([
+            'contextid' => $context->id,
+            'component' => 'mod_vrmakerspace',
+            'filearea' => self::FILEAREA,
+            'itemid' => $snapshot->id,
+            'filepath' => '/',
+            'filename' => self::snapshot_filename($snapshot),
+            'userid' => $userid,
+        ], $data);
+        $snapshot->opcount = $opcount;
+        $snapshot->filesize = strlen($data);
+        $snapshot->timecreated = $now;
+        $DB->update_record('vrmakerspace_snapshots', $snapshot);
+        $DB->set_field('vrmakerspace_sessions', 'timemodified', $now, ['id' => $snapshot->sessionid]);
+        $transaction->allow_commit();
+        return $snapshot;
+    }
+
+    /**
+     * Keep at most MAX_VERSIONS versions of a piece: remove the oldest beyond that, but never the first version (where
+     * the piece started) or the newest. Version numbers are not reused.
+     *
+     * @param \stdClass $session the session row
+     * @param \context_module $context the activity context
+     * @return int how many versions were removed
+     */
+    public static function prune_versions(\stdClass $session, \context_module $context): int {
+        global $DB;
+        $count = $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $session->id]);
+        if ($count <= self::MAX_VERSIONS) {
+            return 0;
+        }
+        $old = $DB->get_records_select(
+            'vrmakerspace_snapshots',
+            'sessionid = ? AND version > 1',
+            [$session->id],
+            'version ASC',
+            'id',
+            0,
+            $count - self::MAX_VERSIONS
+        );
+        $fs = get_file_storage();
+        foreach ($old as $snapshot) {
+            $fs->delete_area_files($context->id, 'mod_vrmakerspace', self::FILEAREA, $snapshot->id);
+        }
+        if ($old) {
+            $DB->delete_records_list('vrmakerspace_snapshots', 'id', array_keys($old));
+        }
+        return count($old);
+    }
+
+    /**
+     * The ids a user's mesh selections are kept under in a piece's saved versions: 'u' and the user id (pair work and
+     * work alone), and, while the companion plugin is installed, their companion peer id in that piece (group work
+     * through the companion; companion_manager::peer_id(), the id the studio stamps its selection with).
+     *
+     * @param int $userid the user
+     * @param int $sessionid the session (piece)
+     * @return string[]
+     */
+    public static function author_ids(int $userid, int $sessionid): array {
+        $ids = ['u' . $userid];
+        if (companion_manager::is_installed()) {
+            $ids[] = companion_manager::peer_id($userid, $sessionid);
+        }
+        return $ids;
+    }
+
+    /**
+     * The mesh document of a snapshot.
      *
      * @param string $data the snapshot
-     * @param string $author the author id of the selection
-     * @return string|null the new snapshot, or null when it holds no such selection
+     * @return array|null [the document, whether the mesh was compressed, the grid's length], or null when unreadable
      */
-    public static function snapshot_without_author(string $data, string $author): ?string {
+    private static function mesh_document(string $data): ?array {
         if (strlen($data) < 52 || unpack('v', $data, 4)[1] !== self::SNAPSHOT_VERSION) {
             return null;
         }
@@ -505,7 +677,45 @@ class session_manager {
         if (!is_object($doc) || !isset($doc->s) || !is_array($doc->s)) {
             return null;
         }
-        $kept = array_values(array_filter($doc->s, fn($row) => !is_array($row) || ($row[0] ?? null) !== $author));
+        return [$doc, $compressed, $gridlength];
+    }
+
+    /**
+     * The mesh selections a snapshot keeps under some author ids (for a privacy export).
+     *
+     * @param string $data the snapshot
+     * @param string[] $authors author ids (author_ids())
+     * @return array the selection rows, without their author id
+     */
+    public static function author_selections(string $data, array $authors): array {
+        $parsed = self::mesh_document($data);
+        if (!$parsed) {
+            return [];
+        }
+        $rows = [];
+        foreach ($parsed[0]->s as $row) {
+            if (is_array($row) && in_array($row[0] ?? null, $authors, true)) {
+                $rows[] = array_slice($row, 1);
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * A snapshot without some people's mesh selections.
+     *
+     * @param string $data the snapshot
+     * @param string|string[] $authors the author id, or ids, of the selections
+     * @return string|null the new snapshot, or null when it holds no such selection
+     */
+    public static function snapshot_without_author(string $data, $authors): ?string {
+        $authors = array_map('strval', (array)$authors);
+        $parsed = self::mesh_document($data);
+        if (!$parsed) {
+            return null;
+        }
+        [$doc, $compressed, $gridlength] = $parsed;
+        $kept = array_values(array_filter($doc->s, fn($row) => !is_array($row) || !in_array($row[0] ?? null, $authors, true)));
         if (count($kept) === count($doc->s)) {
             return null;
         }
@@ -520,9 +730,9 @@ class session_manager {
      *
      * @param \stdClass $session the session row
      * @param \context_module $context the activity's context
-     * @param string $author the author id of the selection
+     * @param string|string[] $author the author id, or ids, of the selections
      */
-    public static function remove_author_from_snapshots(\stdClass $session, \context_module $context, string $author): void {
+    public static function remove_author_from_snapshots(\stdClass $session, \context_module $context, $author): void {
         global $DB;
         foreach ($DB->get_records('vrmakerspace_snapshots', ['sessionid' => $session->id]) as $snapshot) {
             $file = self::get_snapshot_file($snapshot, $context);

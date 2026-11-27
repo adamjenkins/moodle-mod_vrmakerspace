@@ -4,7 +4,8 @@ VR Makerspace is a Moodle activity in which students make a 3D piece, alone or t
 in one shared piece, in a VR headset (WebXR, for example the Meta Quest browser) or in an ordinary desktop
 browser with mouse and keyboard. They can use two ways of making on the same piece, even at the same
 time as each other: **sculpting** clay with brushes, and **modelling** a polygon mesh with Blender-like
-tools. Every save is kept as a version; teachers look at every piece and every version in 3D, see how
+tools. Saves are kept as versions (up to 100 per piece: the first and the newest are always kept, and saves a
+few seconds apart update the newest version); teachers look at every piece and every version in 3D, see how
 much each member of a group contributed, and grade the pieces in the gradebook. Pieces export to STL,
 glTF and 3MF for 3D printing.
 

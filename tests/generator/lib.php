@@ -106,12 +106,17 @@ class mod_vrmakerspace_generator extends testing_module_generator {
         global $DB;
         $vrmakerspace = $DB->get_record('vrmakerspace', ['id' => $session->vrmakerspaceid], '*', MUST_EXIST);
         $cm = get_coursemodule_from_instance('vrmakerspace', $vrmakerspace->id, $vrmakerspace->course, false, MUST_EXIST);
-        return session_manager::save_snapshot(
+        $snapshot = session_manager::save_snapshot(
             $session,
             context_module::instance($cm->id),
             $userid,
             $this->snapshot_data($tag, $opcount)
         );
+        // Each generated version stands for a separate save: dated back past the interval within which a user's saves
+        // update their newest version (session_manager::MIN_VERSION_INTERVAL), so the next one adds a version.
+        $snapshot->timecreated = (int)$snapshot->timecreated - session_manager::MIN_VERSION_INTERVAL;
+        $DB->set_field('vrmakerspace_snapshots', 'timecreated', $snapshot->timecreated, ['id' => $snapshot->id]);
+        return $snapshot;
     }
 
     /**

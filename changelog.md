@@ -22,6 +22,13 @@ All notable changes to this plugin are documented here. The format follows
 - The help panel is a table of pictures; the toolbar is one glass bar docked into the stage.
 - The engine tests moved to `tests/speech/engine/`, matching their namespace.
 
+### Security
+
+- `session_manager::can_view()` applies separate groups: without `moodle/site:accessallgroups`, a viewer who is not an owner sees only pieces of the groups `groups_get_activity_allowed_groups()` gives them, or of those groups' members. This covers every direct-id path: `pluginfile` snapshots (`lib.php`), `studio.php?session=`, `manage.php`, `get_session_state` and `set_session_status`. `view_helper::visible_sessions()` uses the same `visible_groups()` and `in_visible_groups()` (VRS-1).
+- `session_manager::save_snapshot()`: a save within `MIN_VERSION_INTERVAL` (10 s) of the same user's newest version (not version 1) replaces that version's file (`replace_snapshot()`), and `prune_versions()` keeps at most `MAX_VERSIONS` (100) per piece, removing the oldest except version 1 and the newest (VRS-2).
+- Privacy: `session_manager::author_ids()` gives `'u'.userid` and, with the companion plugin installed, `companion_manager::peer_id()`. Deleting users removes selections under both from every version (each file rewritten once), and the export lists them as `yourselections` (F1).
+- `grade.php` reads `savegrades` as `PARAM_BOOL` and the grade arrays as `PARAM_LOCALISEDFLOAT`; `grading_helper::save()` takes float, null (clear) or false (invalid), and `grader::save_grade()` checks the range.
+
 ### Removed
 
 - Upgrade step 2026112700 unsets the plugin settings `aidownat` and `aidownuntil`, which pre-release builds used before the `aistatus` cache.

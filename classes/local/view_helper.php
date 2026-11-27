@@ -121,26 +121,15 @@ class view_helper {
      * @return \stdClass[] vrmakerspace_sessions rows keyed by id, oldest first
      */
     public static function visible_sessions(\stdClass $vrmakerspace, $cm, \context_module $context): array {
-        global $DB;
+        global $DB, $USER;
         $sessions = $DB->get_records('vrmakerspace_sessions', ['vrmakerspaceid' => $vrmakerspace->id], 'id ASC');
-        if (groups_get_activity_groupmode($cm) != SEPARATEGROUPS || has_capability('moodle/site:accessallgroups', $context)) {
+        // The same rule as session_manager::can_view() for one piece, with the members looked up once.
+        $groups = session_manager::visible_groups($cm, $context, (int)$USER->id);
+        if ($groups === null) {
             return $sessions;
         }
-        $allowedgroups = array_map('intval', array_keys(groups_get_activity_allowed_groups($cm)));
-        $allowedusers = [];
-        if ($allowedgroups) {
-            [$insql, $params] = $DB->get_in_or_equal($allowedgroups);
-            $allowedusers = array_map('intval', $DB->get_fieldset_select(
-                'groups_members',
-                'DISTINCT userid',
-                "groupid $insql",
-                $params
-            ));
-        }
-        return array_filter($sessions, function ($session) use ($allowedgroups, $allowedusers) {
-            return (int)$session->groupid ? in_array((int)$session->groupid, $allowedgroups, true)
-                : in_array((int)$session->userid, $allowedusers, true);
-        });
+        $members = session_manager::members_of_groups($groups);
+        return array_filter($sessions, fn($session) => session_manager::in_visible_groups($session, $groups, $members));
     }
 
     /**

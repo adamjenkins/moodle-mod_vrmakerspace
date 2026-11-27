@@ -162,6 +162,111 @@ final class session_manager_test extends \advanced_testcase {
     }
 
     /**
+     * Separate groups: a teacher without access to all groups sees only the pieces of their own groups and of those
+     * groups' members, on every direct path (can_view) as in the lists (visible_sessions); one with it sees all.
+     */
+    public function test_can_view_separate_groups(): void {
+        $this->resetAfterTest();
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course(['summary' => '', 'groupmode' => SEPARATEGROUPS, 'groupmodeforce' => 1]);
+        $solo = $gen->create_module('vrmakerspace', ['course' => $course->id, 'startmodel' => 'sphere']);
+        $team = $gen->create_module('vrmakerspace', ['course' => $course->id, 'startmodel' => 'sphere',
+            'workmode' => session_manager::MODE_GROUP]);
+        $groupa = $gen->create_group(['courseid' => $course->id]);
+        $groupb = $gen->create_group(['courseid' => $course->id]);
+        $ana = $gen->create_and_enrol($course, 'student');
+        $ben = $gen->create_and_enrol($course, 'student');
+        $teacher = $gen->create_and_enrol($course, 'teacher');
+        $editor = $gen->create_and_enrol($course, 'editingteacher');
+        $gen->create_group_member(['groupid' => $groupa->id, 'userid' => $ana->id]);
+        $gen->create_group_member(['groupid' => $groupb->id, 'userid' => $ben->id]);
+        $gen->create_group_member(['groupid' => $groupa->id, 'userid' => $teacher->id]);
+        $maker = $this->generator();
+        $anapiece = $maker->create_session(['vrmakerspaceid' => $solo->id, 'userid' => $ana->id]);
+        $benpiece = $maker->create_session(['vrmakerspaceid' => $solo->id, 'userid' => $ben->id]);
+        $piecea = $maker->create_session(['vrmakerspaceid' => $team->id, 'groupid' => $groupa->id]);
+        $pieceb = $maker->create_session(['vrmakerspaceid' => $team->id, 'groupid' => $groupb->id]);
+        $solocontext = \context_module::instance($solo->cmid);
+        $teamcontext = \context_module::instance($team->cmid);
+
+        // A non-editing teacher in group A (no moodle/site:accessallgroups).
+        $this->assertTrue(session_manager::can_view($anapiece, $solocontext, (int)$teacher->id));
+        $this->assertFalse(session_manager::can_view($benpiece, $solocontext, (int)$teacher->id));
+        $this->assertTrue(session_manager::can_view($piecea, $teamcontext, (int)$teacher->id));
+        $this->assertFalse(session_manager::can_view($pieceb, $teamcontext, (int)$teacher->id));
+        $this->setUser($teacher);
+        $cm = get_fast_modinfo($course)->get_cm($team->cmid);
+        $this->assertSame([(int)$piecea->id], array_keys(view_helper::visible_sessions($team, $cm, $teamcontext)));
+
+        // The owners still see their own; an editing teacher (access to all groups) sees everything.
+        $this->assertTrue(session_manager::can_view($benpiece, $solocontext, (int)$ben->id));
+        $this->assertTrue(session_manager::can_view($pieceb, $teamcontext, (int)$ben->id));
+        $this->assertFalse(session_manager::can_view($pieceb, $teamcontext, (int)$ana->id));
+        $this->assertTrue(session_manager::can_view($benpiece, $solocontext, (int)$editor->id));
+        $this->assertTrue(session_manager::can_view($pieceb, $teamcontext, (int)$editor->id));
+
+        // Visible groups: the teacher sees every piece.
+        $visible = $gen->create_course(['summary' => '', 'groupmode' => VISIBLEGROUPS, 'groupmodeforce' => 1]);
+        $open = $gen->create_module('vrmakerspace', ['course' => $visible->id, 'startmodel' => 'sphere']);
+        $gen->enrol_user($teacher->id, $visible->id, 'teacher');
+        $gen->enrol_user($ben->id, $visible->id, 'student');
+        $openpiece = $maker->create_session(['vrmakerspaceid' => $open->id, 'userid' => $ben->id]);
+        $this->assertTrue(session_manager::can_view($openpiece, \context_module::instance($open->cmid), (int)$teacher->id));
+    }
+
+    /**
+     * Saves a moment after the same user's newest version update it rather than adding one; a version older than the
+     * interval, or the first version, is never overwritten; beyond MAX_VERSIONS the oldest go, never the first.
+     */
+    public function test_save_interval_and_version_cap(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$course, $vrmakerspace, , $context] = $this->make_activity();
+        $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $session = session_manager::get_or_create($vrmakerspace, 0, (int)$user->id);
+        $maker = $this->generator();
+
+        $first = session_manager::save_snapshot($session, $context, (int)$user->id, $maker->snapshot_data('one', 1));
+        $second = session_manager::save_snapshot($session, $context, (int)$user->id, $maker->snapshot_data('two', 2));
+        $third = session_manager::save_snapshot($session, $context, (int)$user->id, $maker->snapshot_data('three', 3));
+        $this->assertSame([1, 2, 2], [(int)$first->version, (int)$second->version, (int)$third->version]);
+        $this->assertSame(2, $DB->count_records('vrmakerspace_snapshots', ['sessionid' => $session->id]));
+        // The newest work is kept, in version 2; version 1 is untouched.
+        $this->assertSame(
+            $maker->snapshot_data('three', 3),
+            session_manager::get_snapshot_file(session_manager::get_snapshot_by_version((int)$session->id, 2), $context)
+                ->get_content()
+        );
+        $this->assertSame($maker->snapshot_data('one', 1), session_manager::get_snapshot_file($first, $context)->get_content());
+        $this->assertSame(3, (int)session_manager::get_latest_snapshot((int)$session->id)->opcount);
+
+        // After the interval, a new version.
+        $past = time() - session_manager::MIN_VERSION_INTERVAL;
+        $DB->set_field('vrmakerspace_snapshots', 'timecreated', $past, ['id' => $second->id]);
+        $fourth = session_manager::save_snapshot($session, $context, (int)$user->id, $maker->snapshot_data('four', 4));
+        $this->assertSame(3, (int)$fourth->version);
+        $DB->set_field('vrmakerspace_snapshots', 'timecreated', $past, ['id' => $fourth->id]);
+
+        // Up to the cap and one more: the oldest after the first goes, with its file.
+        for ($i = 4; $i <= session_manager::MAX_VERSIONS + 1; $i++) {
+            $maker->create_snapshot($session, (int)$user->id, 'v' . $i, $i);
+        }
+        $versions = array_map(fn($s) => (int)$s->version, array_values(session_manager::get_snapshots((int)$session->id)));
+        $this->assertCount(session_manager::MAX_VERSIONS, $versions);
+        $this->assertSame(1, $versions[0]);
+        $this->assertSame(3, $versions[1]);
+        $this->assertSame(session_manager::MAX_VERSIONS + 1, end($versions));
+        $this->assertSame([], get_file_storage()->get_area_files(
+            $context->id,
+            'mod_vrmakerspace',
+            session_manager::FILEAREA,
+            (int)$second->id,
+            'id',
+            false
+        ));
+    }
+
+    /**
      * Data without the magic number is refused, and nothing is stored.
      */
     public function test_save_snapshot_refuses_foreign_data(): void {
