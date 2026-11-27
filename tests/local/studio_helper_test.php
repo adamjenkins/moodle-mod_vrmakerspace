@@ -259,8 +259,10 @@ final class studio_helper_test extends \advanced_testcase {
         $this->assertTrue($config['tutorial']['enabled']);
         $this->assertSame(tutorial::applicable_steps('model'), $config['tutorial']['steps']);
         $this->assertSame([], $config['tutorial']['done']);
-        // The Ask box always shows; the voice is off unless the activity turns it on.
-        $this->assertTrue($config['tutorial']['canask']);
+        // No AI for the tutor here (the tutor's AI is off and the test site has no provider): no Ask box, and the voice is
+        // off unless the activity turns it on (the owner's rule: no AI-only feature without an AI).
+        $this->assertFalse($config['tutorial']['canask']);
+        $this->assertFalse($config['tutorial']['ai']);
         $this->assertSame([], $config['tutorial']['voice']['listen']);
         $this->assertSame([], $config['tutorial']['voice']['speak']);
         $this->assertSame(tutorial::speech_language(), $config['tutorial']['voice']['language']);

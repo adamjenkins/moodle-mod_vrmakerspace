@@ -41,4 +41,12 @@ $definitions = [
         'simpledata' => true,
         'ttl' => 3600,
     ],
+    // When the AI last failed to answer the tutor (tutorial::mark_ai_down()), shared by the whole site: nobody is
+    // offered the Ask box for a while after it.
+    'aistatus' => [
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+        'simpledata' => true,
+        'staticacceleration' => true,
+    ],
 ];

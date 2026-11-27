@@ -49,6 +49,7 @@ $string['browserstt_desc'] = 'Chrome and Edge recognise speech on Google\'s or M
 $string['brush_button'] = 'Brush';
 $string['brushsize'] = 'Size';
 $string['brushstrength'] = 'Strength';
+$string['cachedef_aistatus'] = 'When the AI last failed to answer the tutor, so that the Ask box is not offered for a while';
 $string['cachedef_speechrate'] = 'Recent speech service calls per user, for rate limiting';
 $string['cachedef_tutoranswer'] = 'The tutor\'s latest answer to each student, so that only it can be spoken';
 $string['cannotsculpt'] = 'You cannot work on this piece: it is closed, or it is not yours or your group\'s.';

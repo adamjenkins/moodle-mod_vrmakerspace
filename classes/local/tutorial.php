@@ -131,11 +131,8 @@ final class tutorial {
     /** @var int How long nobody is offered the Ask box after the AI failed to answer, in seconds. */
     public const AI_DOWN_SECONDS = 600;
 
-    /** @var string Plugin config: until when the AI counts as not answering (unix time). */
-    public const CONFIG_AIDOWNUNTIL = 'aidownuntil';
-
-    /** @var string Plugin config: when the AI last failed to answer (unix time). */
-    public const CONFIG_AIDOWNAT = 'aidownat';
+    /** @var string Key in the aistatus cache: when the AI last failed to answer (unix time). */
+    public const CACHE_AIDOWNAT = 'aidownat';
 
     /** @var int Most questions a student may ask the tutor in RATE_WINDOW seconds. */
     public const RATE_LIMIT = 20;
@@ -183,13 +180,10 @@ final class tutorial {
      * Whether the AI failed to answer a little while ago: then nobody is offered the Ask box until AI_DOWN_SECONDS have
      * passed, so students are not let down again and again. Learnt only from real questions, never by probing.
      *
-     * Kept as plugin config (a timestamp, read from the config cache) rather than a cache definition, which would
-     * need a version bump to register: it can become a MUC cache at the next release.
-     *
      * @return bool
      */
     public static function ai_down(): bool {
-        return (int)get_config('mod_vrmakerspace', self::CONFIG_AIDOWNUNTIL) > time();
+        return self::ai_down_since() > 0;
     }
 
     /**
@@ -198,25 +192,37 @@ final class tutorial {
      * @return int unix time
      */
     public static function ai_down_since(): int {
-        return self::ai_down() ? (int)get_config('mod_vrmakerspace', self::CONFIG_AIDOWNAT) : 0;
+        $since = (int)\cache::make('mod_vrmakerspace', 'aistatus')->get(self::CACHE_AIDOWNAT);
+        return ($since && $since + self::AI_DOWN_SECONDS > time()) ? $since : 0;
+    }
+
+    /**
+     * Whether a failed AI action means the service cannot answer now (not reachable, overloaded or failing), rather
+     * than that it refused this one question (a 4xx such as a content filter): only the first marks the AI down, so
+     * one student's question cannot switch the tutor off for everyone.
+     *
+     * @param int|null $errorcode the response's error code (an HTTP status, 0 or below when there was no answer), null
+     *     when the action threw
+     * @return bool
+     */
+    public static function is_outage(?int $errorcode): bool {
+        return $errorcode === null || $errorcode <= 0 || $errorcode === 429 || $errorcode >= 500;
     }
 
     /**
      * The AI failed to answer (it could not be reached, or it returned an error): stop offering it for a while.
      */
     public static function mark_ai_down(): void {
-        $now = time();
-        set_config(self::CONFIG_AIDOWNAT, $now, 'mod_vrmakerspace');
-        set_config(self::CONFIG_AIDOWNUNTIL, $now + self::AI_DOWN_SECONDS, 'mod_vrmakerspace');
+        \cache::make('mod_vrmakerspace', 'aistatus')->set(self::CACHE_AIDOWNAT, time());
     }
 
     /**
      * The AI answered: forget an earlier failure (writes only when there is one to forget).
      */
     public static function mark_ai_up(): void {
-        if (get_config('mod_vrmakerspace', self::CONFIG_AIDOWNAT)) {
-            unset_config(self::CONFIG_AIDOWNAT, 'mod_vrmakerspace');
-            unset_config(self::CONFIG_AIDOWNUNTIL, 'mod_vrmakerspace');
+        $cache = \cache::make('mod_vrmakerspace', 'aistatus');
+        if ($cache->get(self::CACHE_AIDOWNAT)) {
+            $cache->delete(self::CACHE_AIDOWNAT);
         }
     }
 

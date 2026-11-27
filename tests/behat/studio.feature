@@ -30,7 +30,7 @@ Feature: Open the makerspace studio
     And "Pinch" "button" should exist
     And "Flatten" "button" should exist
     And "Add shape" "button" should exist
-    And "Cut shape" "button" should exist
+    And "Cut out" "button" should exist
     And "Mirror" "button" should exist
     And "Pull out" "button" should exist
     And "Add ring" "button" should exist

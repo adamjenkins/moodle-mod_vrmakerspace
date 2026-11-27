@@ -123,8 +123,13 @@ class ask_tutor extends external_api {
             $response = null;
         }
         if (!$response || !$response->get_success()) {
-            tutorial::mark_ai_down();
-            throw new \moodle_exception('error_tutoroffline', 'mod_vrmakerspace');
+            if (tutorial::is_outage($response ? (int)$response->get_errorcode() : null)) {
+                tutorial::mark_ai_down();
+                throw new \moodle_exception('error_tutoroffline', 'mod_vrmakerspace');
+            }
+            // The service refused this question only: this student is told, nobody else is affected.
+            $message = trim((string)$response->get_errormessage());
+            throw new \moodle_exception('error_tutorfailed', 'mod_vrmakerspace', '', $message !== '' ? $message : '-');
         }
         tutorial::mark_ai_up();
         $data = $response->get_response_data();

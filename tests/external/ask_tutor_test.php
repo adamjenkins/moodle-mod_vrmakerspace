@@ -236,6 +236,23 @@ final class ask_tutor_test extends \core_external\tests\externallib_testcase {
     }
 
     /**
+     * Only an outage marks the AI down for everyone; a refusal of one question (a 4xx) does not.
+     */
+    public function test_outage_or_refusal(): void {
+        $this->resetAfterTest();
+        foreach ([null, -1, 0, 429, 500, 503] as $code) {
+            $this->assertTrue(\mod_vrmakerspace\local\tutorial::is_outage($code), var_export($code, true));
+        }
+        foreach ([400, 401, 403, 404, 422] as $code) {
+            $this->assertFalse(\mod_vrmakerspace\local\tutorial::is_outage($code), (string)$code);
+        }
+        $this->assertFalse(\mod_vrmakerspace\local\tutorial::ai_down());
+        \mod_vrmakerspace\local\tutorial::mark_ai_down();
+        $this->assertTrue(\mod_vrmakerspace\local\tutorial::ai_down());
+        $this->assertGreaterThan(0, \mod_vrmakerspace\local\tutorial::ai_down_since());
+    }
+
+    /**
      * Refused when the activity is not in tutorial mode, the tutor is off, or there is no AI provider.
      *
      * @param array $settings activity settings
