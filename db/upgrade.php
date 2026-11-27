@@ -68,5 +68,14 @@ function xmldb_vrmakerspace_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026111800, 'vrmakerspace');
     }
 
+    if ($oldversion < 2026112700) {
+        // The tutor's "the AI did not answer" mark is now the aistatus cache (registered by this version): drop the two
+        // plugin settings that pre-release builds kept it in.
+        unset_config('aidownat', 'mod_vrmakerspace');
+        unset_config('aidownuntil', 'mod_vrmakerspace');
+
+        upgrade_mod_savepoint(true, 2026112700, 'vrmakerspace');
+    }
+
     return true;
 }

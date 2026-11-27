@@ -3,6 +3,29 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-11-27
+
+### Added
+
+- First-use help (`amd/src/guide.js`): a task strip with the saved state (`guide_context()` in `studio_helper`), **Show me how** (`tipFor()`), the group's members with who is present, pictured tool buttons, scroll hints on the phone's tool sheet, and a **Brush** pop-up for size and strength.
+- The studio starts with the basic tools (`mod_vrmakerspace-basic`); **More** / **Less** switch to all tools (`mod_vrmakerspace:alltools`, `mod_vrmakerspace:basictools`).
+- A studio stage (`studio.js`): PMREM soft-box environment, ACES tone mapping, a turntable, and a glass stand under the piece, sized from the piece's bounds (the tutor robot is left out of the bounds and of the camera framing).
+- The activity page's plain summary (`intro_*` strings) and the **Backup file** link (`versionbackup`).
+- The `aistatus` application cache: when the AI last failed to answer the tutor (`tutorial::mark_ai_down()`, `ai_down()`, `ai_down_since()`, `is_outage()`, `mark_ai_up()`).
+- Strings `tutorai_noprovider`, `tutorai_offline`, `tutorial_offline`, `error_tutoroffline`, `cachedef_aistatus`, and the strings of the guide and help panel.
+
+### Changed
+
+- The tutorial bubble is a glass side panel beside the stage on wide windows and a sheet under a 40vh stage on narrow ones; the site's AI policy is shown on its own before the first step; a step whose target is behind More opens More and the next basic step closes it; on a phone a target in the tool sheet is centred in it.
+- AI-only features follow the AI (owner's rule, 2026-11-26): `canask` is true only when the tutor's AI is available; without it the voice config drops speech input and the server voices.
+- `ask_tutor`: a provider exception or an outage (no answer, error code 0 or below, 429, 5xx) throws `error_tutoroffline` and marks the AI down for 600 s for the whole site; a refusal of one question (other 4xx) keeps `error_tutorfailed` and marks nothing. The first answer clears the mark.
+- The help panel is a table of pictures; the toolbar is one glass bar docked into the stage.
+- The engine tests moved to `tests/speech/engine/`, matching their namespace.
+
+### Removed
+
+- Upgrade step 2026112700 unsets the plugin settings `aidownat` and `aidownuntil`, which pre-release builds used before the `aistatus` cache.
+
 ## [0.1.4] - 2026-11-23
 
 ### Fixed

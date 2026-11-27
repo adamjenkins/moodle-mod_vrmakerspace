@@ -76,11 +76,18 @@ the plugin.
 - **Asking the tutor**: students can type (or, with *Students can speak to the tutor*, say) a question such as
   "how do I make it stick out?". With the AI on, the answer comes from the site's AI provider (Site administration >
   AI), given the tour's own texts, and when a demonstration fits, the tutor does it on the piece while it answers.
-  Students must accept the site's AI policy first; there are at most 20 questions an hour each. With the AI off,
-  the question is matched in the browser to the tools' names and a list of everyday words for each, and the tutor
-  shows that step and its demonstration, or offers the demonstrations it knows. Nothing needs an AI.
+  Students must accept the site's AI policy first, which the tutorial shows on its own before the first step; there
+  are at most 20 questions an hour each. Asking needs an AI: when the site has no AI provider for text, or the
+  activity's *Students can ask the tutor (AI)* is off, there is no Ask box, no AI policy and no *Talk* button, and
+  teachers see one line saying so in the activity settings. The steps, the tutor and *Show me* work without an AI.
+- **When the AI service does not answer**: if the provider cannot be reached, is overloaded (429) or fails (5xx),
+  the student sees "Tinker can't answer questions right now. The steps still work.", and nobody on the site is
+  offered the Ask box for 10 minutes (the `aistatus` cache); the first answer after that clears it, and teachers
+  see the time of the failure in the activity settings. The plugin never sends a test question. A question the
+  provider refuses (another 4xx) is reported only to the student who asked it.
 - **Voice**: with *The tutor speaks*, the tutor reads its answers and the steps aloud, and its face moves with the
-  speech; in VR the voice comes from where it stands. With *Students can speak to the tutor*, students hold the *Talk*
+  speech; in VR the voice comes from where it stands. Without an AI, only the browser's own voice reads aloud. With
+  *Students can speak to the tutor* (and an AI to ask), students hold the *Talk*
   button (in VR: press and hold either thumbstick). The site administrator chooses who speaks and who listens in the
   plugin's settings: up to three choices each, from the browser's own speech, Ollama with an audio model (such as
   lfm3-audio, which uses the site's Ollama AI provider with no extra setup), any OpenAI-style audio server, ElevenLabs
